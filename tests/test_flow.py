@@ -137,6 +137,26 @@ def test_reverse_hiring_and_contact_boundary():
         assert "secret@example.test" not in found.text
         assert "Тестовый Кандидат" not in found.text
         assert "Не публиковать этот текст" not in found.text
+        snapshot_id = found.json()["id"]
+        history = employer.get("/api/v1/employer/searches").json()
+        assert len(history) == 1 and history[0]["id"] == snapshot_id
+        assert history[0]["result_count"] == 1
+        assert second_employer.get("/api/v1/employer/searches").json() == []
+        assert second_employer.get(f"/api/v1/employer/searches/{snapshot_id}").status_code == 404
+        assert second_employer.get(f"/api/v1/employer/searches?need_id={need_id}").status_code == 404
+        refined = employer.post("/api/v1/employer/searches",
+                                json={"need_id":need_id,"parent_snapshot_id":snapshot_id},
+                                headers=csrf(employer))
+        assert refined.status_code == 201, refined.text
+        assert refined.json()["parent_snapshot_id"] == snapshot_id
+        assert {item["id"] for item in employer.get("/api/v1/employer/searches").json()} == {
+            snapshot_id, refined.json()["id"]}
+        another_need = employer.post("/api/v1/employer/needs", json=need | {"title":"Вторая команда"},
+                                     headers=csrf(employer)).json()["id"]
+        wrong_parent = employer.post("/api/v1/employer/searches",
+                                     json={"need_id":another_need,"parent_snapshot_id":snapshot_id},
+                                     headers=csrf(employer))
+        assert wrong_parent.status_code == 404
 
         offer = {"candidate_id":person["id"], "need_id":need_id, "offer_text":"Приглашаем обсудить работу с событиями в нашей команде.",
                  "reason":"Подтверждена обработка повторных событий в тесте.",
@@ -174,3 +194,9 @@ def test_reverse_hiring_and_contact_boundary():
         from backend.mail_worker import expire_invitations
         assert expire_invitations() >= 1
         assert candidate.post(f"/api/v1/invitations/{again.json()['id']}/accept", headers=csrf(candidate)).status_code == 409
+        assert candidate.put("/api/v1/candidate/profile", json=profile | {"published":False},
+                             headers=csrf(candidate)).status_code == 200
+        hidden_snapshot = employer.get(f"/api/v1/employer/searches/{snapshot_id}")
+        assert hidden_snapshot.status_code == 200
+        assert hidden_snapshot.json()["results"] == []
+        assert hidden_snapshot.json()["unavailable_count"] == 1

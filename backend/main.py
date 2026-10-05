@@ -439,7 +439,7 @@ def search_candidates(data: SearchIn, user: User = Depends(get_user), db: Sessio
         problem("NOT_FOUND", 404)
     if data.parent_snapshot_id:
         parent = db.get(SearchSnapshot, data.parent_snapshot_id)
-        if not parent or parent.employer_id != user.id:
+        if not parent or parent.employer_id != user.id or parent.need_id != need.id:
             problem("NOT_FOUND", 404)
     profiles = db.scalars(select(CandidateProfile)).all()
     scored = [(p, score_profile(p, need)) for p in profiles if eligible(p, need, data.fsp_only, data.stack)]
@@ -461,7 +461,25 @@ def render_snapshot(db: Session, snapshot: SearchSnapshot) -> dict:
             results.append(public_candidate(candidate, row["match"]))
     return {"id": snapshot.id, "need_id": snapshot.need_id, "parent_snapshot_id": snapshot.parent_id,
             "algorithm_version": snapshot.algorithm_version, "created_at": snapshot.created_at.isoformat(),
-            "results": results, "unavailable_count": len(snapshot.results)-len(results)}
+            "filters": snapshot.filters, "results": results,
+            "unavailable_count": len(snapshot.results)-len(results)}
+
+
+@app.get("/api/v1/employer/searches")
+def list_searches(need_id: str | None = None, user: User = Depends(get_user), db: Session = Depends(get_db)):
+    require(user, "employer")
+    if need_id:
+        need = db.get(HiringNeed, need_id)
+        if not need or need.employer_id != user.id:
+            problem("NOT_FOUND", 404)
+    query = select(SearchSnapshot).where(SearchSnapshot.employer_id == user.id)
+    if need_id:
+        query = query.where(SearchSnapshot.need_id == need_id)
+    snapshots = db.scalars(query.order_by(SearchSnapshot.created_at.desc(), SearchSnapshot.id.desc()).limit(30)).all()
+    return [{"id": item.id, "need_id": item.need_id, "parent_snapshot_id": item.parent_id,
+             "algorithm_version": item.algorithm_version, "created_at": item.created_at.isoformat(),
+             "filters": item.filters, "result_count": len(item.results or [])}
+            for item in snapshots]
 
 
 @app.get("/api/v1/employer/searches/{snapshot_id}")
