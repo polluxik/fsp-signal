@@ -8,7 +8,7 @@ import time
 from sqlalchemy import select, update
 
 from .config import settings
-from .db import Base, SessionLocal, engine
+from .db import SessionLocal
 from .models import Invitation, MailOutbox, now
 
 
@@ -49,8 +49,6 @@ def expire_invitations() -> int:
 
 
 def main() -> None:
-    if settings.app_mode in ("demo", "test"):
-        Base.metadata.create_all(engine)
     while True:
         expire_invitations()
         if not deliver_one():

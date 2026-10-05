@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from .assessment import COMPETENCIES
 from .config import settings
-from .db import Base, SessionLocal, engine
+from .db import SessionLocal
 from .models import CandidateProfile, EmployerProfile, HiringNeed, User, now
 from .security import hasher
 
@@ -15,7 +15,6 @@ from .security import hasher
 def seed() -> None:
     if settings.app_mode != "demo":
         raise SystemExit("Synthetic seed is allowed only in APP_MODE=demo")
-    Base.metadata.create_all(engine)
     rng = random.Random(20261005)
     with SessionLocal() as db:
         employer = db.scalar(select(User).where(User.email == "employer@demo.test"))

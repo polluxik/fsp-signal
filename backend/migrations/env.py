@@ -1,9 +1,7 @@
 from logging.config import fileConfig
 
-from sqlalchemy import create_engine
-
 from backend.config import settings
-from backend.db import Base
+from backend.db import Base, engine
 import backend.models  # noqa: F401 - registers metadata
 
 from alembic import context
@@ -60,9 +58,7 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    connectable = create_engine(settings.database_url, pool_pre_ping=True)
-
-    with connectable.connect() as connection:
+    with engine.connect() as connection:
         context.configure(
             connection=connection, target_metadata=target_metadata, compare_type=True
         )

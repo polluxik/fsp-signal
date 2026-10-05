@@ -19,7 +19,7 @@ services:
     environment: &app_env
       APP_MODE: demo
       DATABASE_URL: postgresql+psycopg://fsp:demo_change_before_real_deploy@db:5432/fsp_signal
-      PUBLIC_BASE_URL: http://localhost:8080
+      PUBLIC_BASE_URL: http://127.0.0.1:8080
       SMTP_HOST: mailpit
       SMTP_PORT: 1025
       SMTP_FROM: demo@example.test

@@ -1,15 +1,8 @@
 """End-to-end API rules, using the real evaluator and separate users."""
 
-import os
 import re
-import tempfile
 from io import BytesIO
 from urllib.parse import parse_qs, urlparse
-
-db_file = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-db_file.close()
-os.environ["APP_MODE"] = "test"
-os.environ["DATABASE_URL"] = f"sqlite:///{db_file.name.replace(os.sep, '/')}"
 
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import select  # noqa: E402

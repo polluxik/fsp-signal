@@ -8,13 +8,13 @@ import secrets
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, Response, UploadFile
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, select, text, update
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func, inspect, select, text, update
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from .assessment import BLUEPRINT_VERSION, COMPETENCIES, grade_attempt, make_assessment, public_questions
 from .config import settings
-from .db import Base, engine, get_db
+from .db import Base, get_db
 from .matching import can_search, eligible, fsp_bonus, public_candidate, score_profile, suggest_competencies
 from .models import (AssessmentAttempt, CandidateProfile, ContactGrant, EmailToken, EmployerProfile,
                      HiringNeed, Invitation, LoginSession, MailOutbox, SearchSnapshot, User, now)
@@ -26,8 +26,6 @@ from .security import aware, check_password, csrf_guard, digest, get_user, hashe
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    if settings.app_mode in ("demo", "test"):
-        Base.metadata.create_all(engine)
     yield
 
 
@@ -114,6 +112,12 @@ def live():
 
 @app.get("/api/v1/health/ready")
 def ready(db: Session = Depends(get_db)):
+    try:
+        existing = set(inspect(db.get_bind()).get_table_names())
+    except SQLAlchemyError:
+        problem("DATABASE_NOT_READY", 503)
+    if set(Base.metadata.tables) - existing:
+        problem("SCHEMA_NOT_READY", 503)
     db.execute(text("SELECT 1"))
     return {"status": "ok"}
 
