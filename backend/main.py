@@ -15,13 +15,16 @@ from sqlalchemy.orm import Session
 from .assessment import BLUEPRINT_VERSION, COMPETENCIES, grade_attempt, make_assessment, public_questions
 from .config import settings
 from .db import Base, get_db
-from .matching import can_search, eligible, fsp_bonus, public_candidate, score_profile, suggest_competencies
+from .matching import (can_search, eligible, evaluate_compatibility, fsp_bonus,
+                       public_candidate, score_profile, suggest_competencies)
 from .models import (AssessmentAttempt, CandidateProfile, ContactGrant, EmailToken, EmployerProfile,
-                     HiringNeed, Invitation, LoginSession, MailOutbox, SearchSnapshot, User, now)
+                     HiringNeed, Invitation, LoginSession, MailOutbox, RoleVersion,
+                     SearchSnapshot, User, now)
 from .passport import render_passport
+from .preferences import formats_from_legacy, is_blocked, preferences_data
 from .resume_import import MAX_PDF_BYTES, ResumeImportError, preview_pdf
 from .role_cards import create_initial_draft
-from .routes_v2 import router as v2_router
+from .routes_v2 import candidate_router, router as v2_router
 from .schemas import (AnswersIn, CandidateIn, EmployerIn, FspLinkIn, InvitationIn, LoginIn,
                       NeedIn, RegisterIn, SearchIn, StartAssessmentIn, VerifyIn)
 from .security import aware, check_password, csrf_guard, digest, get_user, hasher, new_session, require, set_auth_cookies
@@ -34,6 +37,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="ФСП Сигнал", version="0.1.0", description="Демонстрационный API обратного найма",
               docs_url="/api/docs", openapi_url="/api/openapi.json", lifespan=lifespan)
 app.include_router(v2_router)
+app.include_router(candidate_router)
 
 
 def problem(code: str, status: int = 422) -> None:
@@ -66,6 +70,8 @@ def candidate_private(profile: CandidateProfile) -> dict:
         "verification_source": profile.verification_source,
         "published": bool(profile.published_at), "consent_processing": bool(profile.consent_processing_at),
         "available": profile.available, "min_salary_rub": profile.min_salary_rub,
+        "preferences_version": profile.preferences_version,
+        "adult_hiring_confirmed": bool(profile.adult_attested_at),
         "work_format": profile.work_format, "fsp_id": profile.fsp_id,
         "fsp_status": profile.fsp_status, "fsp_result": profile.fsp_result,
         "next_grade_change_at": (aware(profile.grade_changed_at)+timedelta(days=30)).isoformat()
@@ -83,6 +89,27 @@ def invitation_data(invite: Invitation) -> dict:
             "state": "expired" if invite.state in ("sent", "viewed") and aware(invite.expires_at) <= now() else invite.state,
             "created_at": invite.created_at.isoformat(),
             "expires_at": invite.expires_at.isoformat()}
+
+
+def invitation_compatibility(db: Session, profile: CandidateProfile | None, invite: Invitation):
+    role_payload = {}
+    if invite.role_version_id:
+        version = db.get(RoleVersion, invite.role_version_id)
+        if version and (not invite.need_id or version.need_id == invite.need_id):
+            role_payload = version.payload or {}
+    return evaluate_compatibility(
+        profile, role_payload, mode="invitation",
+        offer_terms={"salary_min_rub": invite.salary_min_rub,
+                     "salary_max_rub": invite.salary_max_rub,
+                     "work_format": invite.work_format},
+        role_version_id=invite.role_version_id,
+    )
+
+
+def candidate_invitation_data(db: Session, profile: CandidateProfile | None,
+                              invite: Invitation) -> dict:
+    compatibility = invitation_compatibility(db, profile, invite)
+    return invitation_data(invite) | {"compatibility": compatibility.model_dump(mode="json")}
 
 
 def attempt_data(attempt: AssessmentAttempt, include_answers: bool = False) -> dict:
@@ -195,12 +222,38 @@ def save_candidate(data: CandidateIn, user: User = Depends(get_user), db: Sessio
         problem("CONSENT_REQUIRED")
     if data.work_format not in ("remote", "hybrid", "office", "any"):
         problem("INVALID_WORK_FORMAT")
-    profile = db.get(CandidateProfile, user.id) or CandidateProfile(user_id=user.id)
+    profile = db.get(CandidateProfile, user.id)
+    created = profile is None
+    profile = profile or CandidateProfile(user_id=user.id, preferences_version=1)
+    prior_preferences = preferences_data(profile)
     for field in ("full_name", "contact_email", "contact_phone", "city", "summary", "skills",
                   "experience_months", "min_salary_rub", "work_format", "available"):
         setattr(profile, field, getattr(data, field))
     profile.consent_processing_at = profile.consent_processing_at or now() if data.consent_processing else None
     profile.published_at = profile.published_at or now() if data.published else None
+    if data.adult_hiring_confirmed is not None:
+        profile.adult_attested_at = (profile.adult_attested_at or now()) if data.adult_hiring_confirmed else None
+    formats = formats_from_legacy(data.work_format)
+    if created or (
+        prior_preferences["salary_min_rub"] != (data.min_salary_rub or None)
+        or prior_preferences["allowed_work_formats"] != formats
+        or prior_preferences["available"] != data.available
+    ):
+        preference_fields = (
+            "salary_min_rub", "allowed_work_formats", "allowed_cities", "excluded_industries",
+            "preferred_stack", "preferred_tasks", "max_take_home_minutes", "available",
+        )
+        existing_preferences = profile.preferences or {}
+        preferences = {field: existing_preferences.get(field, prior_preferences[field])
+                       for field in preference_fields}
+        preferences.update({
+            "salary_min_rub": data.min_salary_rub or None,
+            "allowed_work_formats": formats,
+            "available": data.available,
+        })
+        profile.preferences = preferences
+        profile.preferences_version = max(1, profile.preferences_version) + (0 if created else 1)
+        profile.preferences_confirmed_at = now()
     db.add(profile)
     db.commit()
     return candidate_private(profile)
@@ -430,7 +483,7 @@ def bank_candidates(specialization: str | None = None, grade: str | None = None,
                     fsp_only: bool = False, user: User = Depends(get_user), db: Session = Depends(get_db)):
     require(user, "employer")
     profiles = db.scalars(select(CandidateProfile)).all()
-    selected = [p for p in profiles if can_search(p) and
+    selected = [p for p in profiles if can_search(p) and not is_blocked(p, user.id) and
                 (not specialization or p.verified_specialization == specialization) and
                 (not grade or p.verified_grade == grade) and
                 (not stack or stack.lower() in {x.lower() for x in (p.skills or [])}) and
@@ -452,7 +505,8 @@ def search_candidates(data: SearchIn, user: User = Depends(get_user), db: Sessio
         if not parent or parent.employer_id != user.id or parent.need_id != need.id:
             problem("NOT_FOUND", 404)
     profiles = db.scalars(select(CandidateProfile)).all()
-    scored = [(p, score_profile(p, need)) for p in profiles if eligible(p, need, data.fsp_only, data.stack)]
+    scored = [(p, score_profile(p, need)) for p in profiles
+              if not is_blocked(p, user.id) and eligible(p, need, data.fsp_only, data.stack)]
     scored.sort(key=lambda item: (-item[1]["score"], -(item[0].test_score or 0), item[0].user_id))
     rows = [{"candidate_id": p.user_id, "match": result} for p, result in scored[:50]]
     snapshot = SearchSnapshot(employer_id=user.id, need_id=need.id, parent_id=data.parent_snapshot_id,
@@ -467,7 +521,8 @@ def render_snapshot(db: Session, snapshot: SearchSnapshot) -> dict:
     results = []
     for row in snapshot.results:
         candidate = db.get(CandidateProfile, row["candidate_id"])
-        if candidate and eligible(candidate, need, snapshot.filters.get("fsp_only", False), snapshot.filters.get("stack", [])):
+        if (candidate and not is_blocked(candidate, snapshot.employer_id)
+                and eligible(candidate, need, snapshot.filters.get("fsp_only", False), snapshot.filters.get("stack", []))):
             results.append(public_candidate(candidate, row["match"]))
     return {"id": snapshot.id, "need_id": snapshot.need_id, "parent_snapshot_id": snapshot.parent_id,
             "algorithm_version": snapshot.algorithm_version, "created_at": snapshot.created_at.isoformat(),
@@ -505,7 +560,7 @@ def read_snapshot(snapshot_id: str, user: User = Depends(get_user), db: Session 
 def candidate_card(candidate_id: str, user: User = Depends(get_user), db: Session = Depends(get_db)):
     require(user, "employer")
     profile = db.get(CandidateProfile, candidate_id)
-    if not profile or not can_search(profile):
+    if not profile or not can_search(profile) or is_blocked(profile, user.id):
         problem("NOT_FOUND", 404)
     return public_candidate(profile)
 
@@ -513,14 +568,16 @@ def candidate_card(candidate_id: str, user: User = Depends(get_user), db: Sessio
 @app.get("/api/v1/employer/candidates/{candidate_id}/contact")
 def candidate_contact(candidate_id: str, user: User = Depends(get_user), db: Session = Depends(get_db)):
     require(user, "employer")
-    grant = db.scalar(select(ContactGrant).where(ContactGrant.candidate_id == candidate_id,
-                                                 ContactGrant.employer_id == user.id,
-                                                 ContactGrant.revoked_at.is_(None)))
+    profile = db.get(CandidateProfile, candidate_id)
+    if not profile or is_blocked(profile, user.id):
+        problem("CONTACT_LOCKED", 403)
+    grant = db.scalar(select(ContactGrant).join(
+        Invitation, Invitation.id == ContactGrant.invitation_id
+    ).where(ContactGrant.candidate_id == candidate_id,
+             ContactGrant.employer_id == user.id,
+             ContactGrant.revoked_at.is_(None), Invitation.state == "accepted").limit(1))
     if not grant:
         problem("CONTACT_LOCKED", 403)
-    profile = db.get(CandidateProfile, candidate_id)
-    if not profile:
-        problem("NOT_FOUND", 404)
     return Response(content=json.dumps({"full_name": profile.full_name, "email": profile.contact_email,
                                         "phone": profile.contact_phone}, ensure_ascii=False),
                     media_type="application/json", headers={"Cache-Control": "no-store"})
@@ -538,13 +595,15 @@ def create_invitation(data: InvitationIn, idempotency_key: str = Header(min_leng
         if existing.request_hash != fingerprint:
             problem("IDEMPOTENCY_KEY_REUSED", 409)
         return invitation_data(existing)
-    candidate = db.get(CandidateProfile, data.candidate_id)
+    candidate = db.scalar(select(CandidateProfile).where(
+        CandidateProfile.user_id == data.candidate_id
+    ).with_for_update())
     if not candidate or not can_search(candidate):
         problem("NOT_FOUND", 404)
-    if data.salary_max_rub < data.salary_min_rub or data.salary_min_rub < candidate.min_salary_rub:
+    if is_blocked(candidate, user.id):
+        problem("COMPANY_BLOCKED", 409)
+    if data.salary_max_rub < data.salary_min_rub:
         problem("SALARY_RANGE_INVALID")
-    if data.work_format not in (candidate.work_format, "any") and candidate.work_format != "any":
-        problem("WORK_FORMAT_MISMATCH")
     need = db.get(HiringNeed, data.need_id) if data.need_id else None
     if data.need_id and (not need or need.employer_id != user.id):
         problem("NOT_FOUND", 404)
@@ -581,9 +640,10 @@ def sent_invitations(user: User = Depends(get_user), db: Session = Depends(get_d
 @app.get("/api/v1/candidate/invitations")
 def received_invitations(user: User = Depends(get_user), db: Session = Depends(get_db)):
     require(user, "candidate")
+    profile = db.get(CandidateProfile, user.id)
     invitations = db.scalars(select(Invitation).where(Invitation.candidate_id == user.id)
                              .order_by(Invitation.created_at.desc())).all()
-    return [invitation_data(x) for x in invitations]
+    return [candidate_invitation_data(db, profile, x) for x in invitations]
 
 
 @app.post("/api/v1/invitations/{invitation_id}/view", dependencies=[Depends(csrf_guard)])
@@ -606,6 +666,15 @@ def accept_invitation(invitation_id: str, user: User = Depends(get_user), db: Se
         problem("NOT_FOUND", 404)
     if invite.state == "accepted":
         return invitation_data(invite)
+    candidate = db.scalar(select(CandidateProfile).where(
+        CandidateProfile.user_id == user.id
+    ).with_for_update())
+    if not candidate or is_blocked(candidate, invite.employer_id):
+        problem("COMPANY_BLOCKED", 409)
+    if not can_search(candidate):
+        problem("INVITATION_NOT_AVAILABLE", 409)
+    if invitation_compatibility(db, candidate, invite).status == "incompatible":
+        problem("INVITATION_NOT_COMPATIBLE", 409)
     if invite.state not in ("sent", "viewed") or aware(invite.expires_at) <= now():
         problem("INVITATION_STATE_CONFLICT", 409)
     changed = db.execute(update(Invitation).where(Invitation.id == invite.id,

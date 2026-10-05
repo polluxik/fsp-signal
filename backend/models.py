@@ -73,10 +73,19 @@ class CandidateProfile(Base):
     available: Mapped[bool] = mapped_column(Boolean, default=True)
     min_salary_rub: Mapped[int] = mapped_column(Integer, default=0)
     work_format: Mapped[str] = mapped_column(String(20), default="remote")
+    preferences: Mapped[dict] = mapped_column(JSON, default=dict)
+    preferences_version: Mapped[int] = mapped_column(Integer, default=1)
+    preferences_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    adult_attested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    blocked_employer_ids: Mapped[list] = mapped_column(JSON, default=list)
+    verified_attempt_id: Mapped[str | None] = mapped_column(ForeignKey("assessment_attempts.id"))
     fsp_id: Mapped[str | None] = mapped_column(String(80))
     fsp_status: Mapped[str] = mapped_column(String(30), default="unlinked")
     fsp_result: Mapped[str | None] = mapped_column(String(40))
-    __table_args__ = (CheckConstraint("min_salary_rub >= 0", name="candidate_min_salary_nonnegative"),)
+    __table_args__ = (
+        CheckConstraint("min_salary_rub >= 0", name="candidate_min_salary_nonnegative"),
+        CheckConstraint("preferences_version >= 1", name="candidate_preferences_version"),
+    )
 
 
 class EmployerProfile(Base):

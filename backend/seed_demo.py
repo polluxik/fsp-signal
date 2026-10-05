@@ -83,6 +83,9 @@ def seed() -> None:
                 user = db.scalar(select(User).where(User.email == email))
                 if user is not None:
                     user.origin = "synthetic_fixture"
+                    profile = db.get(CandidateProfile, user.id)
+                    if profile and profile.adult_attested_at is None:
+                        profile.adult_attested_at = now()
                     continue
                 user = User(email=email, password_hash=hasher.hash("DemoPass123!"),
                             role="candidate", origin="synthetic_fixture", email_verified_at=now())
@@ -100,6 +103,7 @@ def seed() -> None:
                     skills=["Python", "PostgreSQL"] if specialization == "backend" else ["TypeScript", "React"],
                     experience_months=(index+4)*5, min_salary_rub=90000 if grade == "junior" else 170000,
                     work_format="remote", consent_processing_at=now(), published_at=now(), available=True,
+                    adult_attested_at=now(),
                     desired_specialization=specialization, claimed_grade=grade,
                     verified_specialization=specialization, verified_grade=grade, test_score=score,
                     verification_source="synthetic_fixture", competencies=competencies,

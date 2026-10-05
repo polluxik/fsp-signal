@@ -18,7 +18,7 @@ from .schemas import RoleCardIn
 FRESHNESS = timedelta(days=14)
 ROLE_TERM_FIELDS = (
     "title", "description", "specialization", "grade", "competencies", "stack",
-    "salary_min_rub", "salary_max_rub", "work_format", "work_city", "first_30_days",
+    "salary_min_rub", "salary_max_rub", "work_format", "work_city", "industry", "first_30_days",
     "interview_steps", "take_home_minutes", "response_sla_hours",
 )
 class RoleVersionError(DomainError):

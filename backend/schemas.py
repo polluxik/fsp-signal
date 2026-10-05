@@ -32,6 +32,7 @@ class CandidateIn(BaseModel):
     consent_processing: bool = False
     published: bool = False
     available: bool = True
+    adult_hiring_confirmed: bool | None = None
 
 
 class EmployerIn(BaseModel):
@@ -77,6 +78,7 @@ class RoleCardIn(BaseModel):
     salary_max_rub: int = Field(gt=0)
     work_format: Literal["remote", "hybrid", "office"]
     work_city: str | None = Field(default=None, max_length=120)
+    industry: str | None = Field(default=None, max_length=120)
     first_30_days: str = Field(min_length=10, max_length=2000)
     interview_steps: list[InterviewStepIn] = Field(min_length=1, max_length=5)
     take_home_minutes: int = Field(ge=0, le=240)
@@ -96,6 +98,11 @@ class RoleCardIn(BaseModel):
             if not separator or not local or "." not in domain:
                 raise ValueError("employer_contact must be an email address")
         return value
+
+    @field_validator("industry", "work_city")
+    @classmethod
+    def trim_optional_text(cls, value: str | None) -> str | None:
+        return value.strip() or None if value is not None else None
 
     @field_validator("competencies", "stack")
     @classmethod
@@ -154,6 +161,76 @@ class RoleCardOut(BaseModel):
     salary_currency: Literal["RUB"] = "RUB"
     salary_period: Literal["month"] = "month"
     salary_basis: Literal["gross"] = "gross"
+
+
+class CandidatePreferencesIn(BaseModel):
+    expected_version: int = Field(ge=1)
+    salary_min_rub: int | None = Field(default=None, ge=1)
+    allowed_work_formats: list[Literal["remote", "hybrid", "office"]] = Field(min_length=1, max_length=3)
+    allowed_cities: list[str] = Field(default_factory=list, max_length=20)
+    excluded_industries: list[str] = Field(default_factory=list, max_length=20)
+    preferred_stack: list[str] = Field(default_factory=list, max_length=30)
+    preferred_tasks: list[str] = Field(default_factory=list, max_length=30)
+    max_take_home_minutes: int | None = Field(default=None, ge=0, le=240)
+    available: bool = True
+    adult_hiring_confirmed: bool
+
+    @field_validator("allowed_cities", "excluded_industries", "preferred_stack", "preferred_tasks")
+    @classmethod
+    def normalize_preferences(cls, values: list[str]) -> list[str]:
+        cleaned = [value.strip() for value in values if value.strip()]
+        if len({value.casefold() for value in cleaned}) != len(cleaned):
+            raise ValueError("duplicate preference values are not allowed")
+        return cleaned
+
+    @field_validator("allowed_work_formats")
+    @classmethod
+    def normalize_formats(cls, values: list[str]) -> list[str]:
+        result = list(dict.fromkeys(values))
+        if not result:
+            raise ValueError("at least one work format is required")
+        return result
+
+
+class CandidatePreferencesOut(BaseModel):
+    version: int
+    salary_min_rub: int | None
+    allowed_work_formats: list[str]
+    allowed_cities: list[str]
+    excluded_industries: list[str]
+    preferred_stack: list[str]
+    preferred_tasks: list[str]
+    max_take_home_minutes: int | None
+    available: bool
+    adult_hiring_confirmed: bool
+
+
+class CompatibilityCheck(BaseModel):
+    code: str
+    status: Literal["pass", "unknown", "fail"]
+    public_text: str
+
+
+class CompatibilitySoftSignal(BaseModel):
+    code: str
+    matched: bool
+    public_text: str
+
+
+class CompatibilityReport(BaseModel):
+    status: Literal["compatible", "needs_clarification", "incompatible"]
+    checks: list[CompatibilityCheck]
+    soft_signals: list[CompatibilitySoftSignal] = Field(default_factory=list)
+    preference_version: int
+    role_version_id: str | None = None
+    compatibility_version: Literal["compat_v2"] = "compat_v2"
+
+
+class AccessChangeResult(BaseModel):
+    employer_id: str
+    blocked: bool
+    revoked_grants: int
+    withdrawn_invitations: int
 
 
 class StartAssessmentIn(BaseModel):

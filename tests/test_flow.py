@@ -88,7 +88,8 @@ def test_reverse_hiring_and_contact_boundary():
         profile = {"full_name":"Тестовый Кандидат", "contact_email":"secret@example.test",
                    "contact_phone":"+79990001122", "summary":"Не публиковать этот текст",
                    "skills":["Python","PostgreSQL"], "experience_months":36,
-                   "min_salary_rub":180000, "work_format":"remote", "consent_processing":True, "published":True}
+                   "min_salary_rub":180000, "work_format":"remote", "consent_processing":True,
+                   "published":True, "adult_hiring_confirmed":True}
         saved = candidate.put("/api/v1/candidate/profile", json=profile, headers=csrf(candidate))
         assert saved.status_code == 200, saved.text
 
@@ -157,15 +158,42 @@ def test_reverse_hiring_and_contact_boundary():
                  "employer_contact":"team@example.test"}
         blocked_salary = employer.post("/api/v1/employer/invitations", json=offer | {"salary_min_rub":170000},
                                        headers=csrf(employer) | {"Idempotency-Key":"salary-low"})
-        assert blocked_salary.status_code == 422
+        assert blocked_salary.status_code == 201, blocked_salary.text
+        assert "compatibility" not in employer.get("/api/v1/employer/invitations").text
+        low_candidate_invite = candidate.get("/api/v1/candidate/invitations").json()[0]
+        assert low_candidate_invite["id"] == blocked_salary.json()["id"]
+        assert low_candidate_invite["compatibility"]["status"] == "incompatible"
+        assert "180000" not in str(low_candidate_invite["compatibility"])
+        rejected_accept = candidate.post(
+            f"/api/v1/invitations/{blocked_salary.json()['id']}/accept", headers=csrf(candidate))
+        assert rejected_accept.status_code == 409
+        assert rejected_accept.json()["detail"] == "INVITATION_NOT_COMPATIBLE"
+        assert employer.get(f"/api/v1/employer/candidates/{person['id']}/contact").status_code == 403
+        assert candidate.post(f"/api/v1/invitations/{blocked_salary.json()['id']}/reject",
+                              headers=csrf(candidate)).status_code == 200
         sent = employer.post("/api/v1/employer/invitations", json=offer,
                              headers=csrf(employer) | {"Idempotency-Key":"good-invite"})
         assert sent.status_code == 201, sent.text
+        assert "compatibility" not in employer.get("/api/v1/employer/invitations").text
         invitation_id = sent.json()["id"]
         assert employer.get(f"/api/v1/employer/candidates/{person['id']}/contact").status_code == 403
 
         assert second_employer.get(f"/api/v1/employer/candidates/{person['id']}/contact").status_code == 403
-        assert candidate.get("/api/v1/candidate/invitations").json()[0]["salary_min_rub"] == 180000
+        received = candidate.get("/api/v1/candidate/invitations").json()[0]
+        assert received["salary_min_rub"] == 180000
+        assert received["compatibility"]["status"] == "compatible"
+        assert "min_salary_rub" not in str(received["compatibility"])
+        paused = candidate.put("/api/v1/candidate/profile", json=profile | {"published":False},
+                               headers=csrf(candidate))
+        assert paused.status_code == 200
+        unavailable_accept = candidate.post(f"/api/v1/invitations/{invitation_id}/accept",
+                                            headers=csrf(candidate))
+        assert unavailable_accept.status_code == 409
+        assert unavailable_accept.json()["detail"] == "INVITATION_NOT_AVAILABLE"
+        assert employer.get(f"/api/v1/employer/candidates/{person['id']}/contact").status_code == 403
+        resumed = candidate.put("/api/v1/candidate/profile", json=profile | {"published":True},
+                                headers=csrf(candidate))
+        assert resumed.status_code == 200
         accepted = candidate.post(f"/api/v1/invitations/{invitation_id}/accept", headers=csrf(candidate))
         assert accepted.status_code == 200, accepted.text
         assert employer.get(f"/api/v1/employer/candidates/{person['id']}/contact").json()["email"] == "secret@example.test"

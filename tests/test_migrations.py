@@ -41,6 +41,14 @@ def test_upgrade_backfills_only_known_legacy_role_and_keeps_it_private():
             ("candidate-1", "candidate@example.test", "not-a-login-hash", "candidate", "2026-10-01T00:00:00+00:00"),
         )
         connection.execute(
+            "INSERT INTO candidate_profiles (user_id,full_name,contact_email,contact_phone,city,summary,skills,"
+            "experience_months,verified_specialization,verified_grade,test_score,verification_source,competencies,"
+            "available,min_salary_rub,work_format,fsp_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            ("candidate-1", "Legacy Candidate", "candidate@example.test", "", "Москва", "Legacy profile",
+             json.dumps(["Python"]), 36, "backend", "middle", 80, "assessment",
+             json.dumps({"event_idempotency": 0.8}), 1, 220000, "any", "unlinked"),
+        )
+        connection.execute(
             "INSERT INTO hiring_needs (id,employer_id,title,description,specialization,grade,competencies,stack,"
             "salary_min_rub,salary_max_rub,work_format,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
             ("need-1", "employer-1", "Backend", "Known description", "backend", "middle",
@@ -67,6 +75,7 @@ def test_upgrade_backfills_only_known_legacy_role_and_keeps_it_private():
         connection = sqlite3.connect(database)
         connection.row_factory = sqlite3.Row
         user = connection.execute("SELECT origin FROM users WHERE id='employer-1'").fetchone()
+        profile = connection.execute("SELECT * FROM candidate_profiles WHERE user_id='candidate-1'").fetchone()
         need = connection.execute("SELECT * FROM hiring_needs WHERE id='need-1'").fetchone()
         role = connection.execute("SELECT * FROM role_versions WHERE need_id='need-1'").fetchone()
         invitation = connection.execute("SELECT role_version_id FROM invitations WHERE id='invite-1'").fetchone()
@@ -83,6 +92,14 @@ def test_upgrade_backfills_only_known_legacy_role_and_keeps_it_private():
         connection.close()
 
         assert user["origin"] == "legacy_import"
+        assert json.loads(profile["preferences"]) == {
+            "salary_min_rub": 220000, "allowed_work_formats": ["remote", "hybrid", "office"],
+            "allowed_cities": [], "excluded_industries": [], "preferred_stack": [],
+            "preferred_tasks": [], "max_take_home_minutes": None, "available": True,
+        }
+        assert profile["adult_attested_at"] is None
+        assert json.loads(profile["blocked_employer_ids"]) == []
+        assert profile["verified_attempt_id"] is None
         assert need["current_role_version"] == 1
         assert need["publication_state"] == "draft"
         assert not need["discoverable"] and need["confirmed_at"] is None
