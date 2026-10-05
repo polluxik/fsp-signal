@@ -4,7 +4,7 @@ import random
 import secrets
 from typing import Any
 
-BLUEPRINT_VERSION = "2026.1"
+BLUEPRINT_VERSION = "2026.2"
 COMPETENCIES = {
     "backend:junior": ["data_trace", "validation", "http_api"],
     "backend:middle": ["event_idempotency", "data_integrity", "failure_recovery"],
@@ -21,6 +21,12 @@ def part(identifier: str, prompt: str, points: int, answer: Any, phase: int = 1,
     return public, answer
 
 
+def structured_part(identifier: str, prompt: str, points: int, fields: list[dict], answer: dict,
+                    phase: int = 1):
+    return {"id": identifier, "prompt": prompt, "points": points, "phase": phase,
+            "type": "structured", "fields": fields}, answer
+
+
 def make_assessment(specialization: str, grade: str, seed: str | None = None):
     key = f"{specialization}:{grade}"
     if key not in COMPETENCIES:
@@ -29,12 +35,31 @@ def make_assessment(specialization: str, grade: str, seed: str | None = None):
     groups = []
 
     if key == "backend:middle":
-        a, b = rng.randint(30, 180), rng.randint(20, 140)
         groups = [
             ("event_idempotency", [
-                part("bm1", f"Баланс 0. События (A,+{a}), (B,+{b}), (A,+{a}). Сколько начислит ошибочный обработчик без проверки event_id?", 8, 2*a+b),
-                part("bm2", "Каков баланс после устранения повторов по event_id?", 8, a+b),
-                part("bm3", "Изменение условия: ID третьего события теперь C. Каков корректный баланс?", 14, 2*a+b, phase=2),
+                structured_part("bm1", "После сетевого таймаута одно платёжное событие может прийти повторно. Составьте правило обработки: ключ дедупликации, защита от параллельной записи и ответ на повтор.", 12, [
+                    {"id": "dedupe_key", "label": "Стабильный ключ события", "points": 4,
+                     "options": [{"value": "event_id", "label": "Исходный event_id"},
+                                 {"value": "payload_hash", "label": "Хеш текущего payload"},
+                                 {"value": "request_id", "label": "ID HTTP-запроса"}]},
+                    {"id": "concurrency_control", "label": "Защита от параллельной обработки", "points": 4,
+                     "options": [{"value": "unique_constraint", "label": "Уникальное ограничение в БД и транзакция"},
+                                 {"value": "select_then_insert", "label": "Сначала SELECT, потом INSERT без ограничения"},
+                                 {"value": "process_lock", "label": "Локальная блокировка одного процесса"}]},
+                    {"id": "replay_result", "label": "Ответ при повторной доставке", "points": 4,
+                     "options": [{"value": "stored_result", "label": "Вернуть сохранённый результат без второго эффекта"},
+                                 {"value": "apply_again", "label": "Применить событие ещё раз"},
+                                 {"value": "reject_all", "label": "Отклонить все последующие запросы"}]},
+                ], {"dedupe_key": "event_id", "concurrency_control": "unique_constraint",
+                    "replay_result": "stored_result"}),
+                part("bm2", "Минимальный тест, который отличает безопасный обработчик от ошибочного: какое событие повторить и что проверить?", 8, "same_id_once",
+                     options=[{"value": "same_id_once", "label": "Отправить один event_id дважды и проверить один побочный эффект"},
+                              {"value": "two_ids", "label": "Отправить два разных event_id и проверить два эффекта"},
+                              {"value": "same_body", "label": "Отправить одинаковый body с новыми event_id"}]),
+                part("bm3", "Изменение условия: тот же event_id повторно пришёл с другим payload. Как должен ответить обработчик?", 10, "conflict", phase=2,
+                     options=[{"value": "conflict", "label": "Вернуть конфликт и не повторять побочный эффект"},
+                              {"value": "apply_again", "label": "Применить новые данные как ещё одно событие"},
+                              {"value": "return_old", "label": "Молча вернуть старый результат, не проверяя payload"}]),
             ]),
             ("data_integrity", [
                 part("bm4", "Два потока одновременно создают запись с одним event_id. Как обеспечить отсутствие дублей?", 20, "unique",
@@ -133,13 +158,24 @@ def grade_attempt(questions: list, answer_key: dict, answers: dict):
         group_max[skill] = group_max.get(skill, 0) + question["points"]
         submitted = answers.get(question["id"])
         expected = answer_key[question["id"]]
-        if isinstance(expected, int):
+        if isinstance(expected, dict):
+            correct_points = 0
+            submitted_values = submitted if isinstance(submitted, dict) else {}
+            for field in question.get("fields", []):
+                field_id = field.get("id")
+                if field_id in expected and submitted_values.get(field_id) == expected[field_id]:
+                    correct_points += field.get("points", 0)
+            awarded = min(question["points"], correct_points)
+            correct = awarded == question["points"]
+        elif isinstance(expected, int):
             correct = str(submitted).strip() == str(expected)
+            awarded = question["points"] if correct else 0
         else:
             correct = isinstance(submitted, str) and submitted.strip().lower() == expected
+            awarded = question["points"] if correct else 0
         if question["phase"] == 2 and not correct:
             mutation_correct = False
-        group_scores[skill] = group_scores.get(skill, 0) + (question["points"] if correct else 0)
+        group_scores[skill] = group_scores.get(skill, 0) + awarded
     score = sum(group_scores.values())
     passed = (score >= 70 and mutation_correct and
               all(group_scores[name] * 2 >= max_points for name, max_points in group_max.items()))

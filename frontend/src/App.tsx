@@ -1,18 +1,25 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 
 type User = { id: string; email: string; role: 'candidate' | 'employer'; email_verified: boolean }
+type AchievementStory = {
+  title: string; context: string; personal_contribution: string; decision: string; result: string;
+  result_scope: 'individual' | 'team'; basis: string; share_with_employers: boolean; formatted_narrative?: string
+}
 type Profile = {
   full_name: string; contact_email: string; contact_phone: string; city: string; summary: string;
+  achievement_story?: AchievementStory | null;
   skills: string[]; experience_months: number; min_salary_rub: number; work_format: string;
   consent_processing: boolean; published: boolean; available: boolean;
   verified_specialization?: string | null; verified_grade?: string | null; test_score?: number | null;
   competencies?: Record<string, number>; fsp_status?: string; fsp_result?: string | null;
   next_grade_change_at?: string | null
 }
+type AnswerValue = string | number | Record<string, string | number>
 type Question = { id: string; competency: string; prompt: string; points: number; phase: number;
-  type: 'choice' | 'number'; options?: { value: string; label: string }[] }
+  type: 'choice' | 'number' | 'structured'; options?: { value: string; label: string }[];
+  fields?: { id: string; label: string; points: number; options: { value: string; label: string }[] }[] }
 type Attempt = { id: string; phase: number; state: string; score?: number; outcome?: string;
-  questions: Question[]; answers: Record<string, string | number>; verified_category?: string }
+  questions: Question[]; answers: Record<string, AnswerValue>; verified_category?: string }
 type Need = { id: string; title: string; description: string; specialization: string; grade: string;
   salary_min_rub: number; salary_max_rub: number; work_format: string; competencies: string[] }
 type Match = { score: number; components: Record<string, number>; reasons: string[]; gaps: string[] }
@@ -43,6 +50,10 @@ const emptyProfile: Profile = {
   full_name: '', contact_email: '', contact_phone: '', city: '', summary: '', skills: [],
   experience_months: 0, min_salary_rub: 0, work_format: 'remote', consent_processing: false,
   published: false, available: true,
+}
+const emptyAchievementStory: AchievementStory = {
+  title: '', context: '', personal_contribution: '', decision: '', result: '',
+  result_scope: 'individual', basis: '', share_with_employers: false,
 }
 
 function csrfToken(): string {
@@ -88,6 +99,7 @@ async function uploadResume(file: File): Promise<Pick<Profile, 'full_name' | 'co
   return data
 }
 function rubles(value: number): string { return new Intl.NumberFormat('ru-RU').format(value) + ' ₽' }
+function scalarAnswer(value: AnswerValue | undefined): string | number { return typeof value === 'object' ? '' : value ?? '' }
 function fmtDate(value: string): string { return new Date(value).toLocaleDateString('ru-RU') }
 function fmtMoment(value: string): string { return new Date(value).toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' }) }
 function statusName(value: string): string {
@@ -162,12 +174,13 @@ function Verify({ onDone }: { onDone: () => void }) {
 function CandidateApp({ me }: { me: User }) {
   const [tab, setTab] = useState('profile')
   const [profile, setProfile] = useState<Profile>(emptyProfile)
+  const [story, setStory] = useState<AchievementStory>(emptyAchievementStory)
   const [skillsText, setSkillsText] = useState('')
   const [invites, setInvites] = useState<Invite[]>([])
   const [history, setHistory] = useState<{ id: string; category: string; state: string; score: number | null; outcome: string | null; started_at: string }[]>([])
   const [grants, setGrants] = useState<{ id: string; employer_id: string; revoked_at: string | null }[]>([])
   const [attempt, setAttempt] = useState<Attempt | null>(null)
-  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [answers, setAnswers] = useState<Record<string, AnswerValue>>({})
   const [spec, setSpec] = useState('backend')
   const [grade, setGrade] = useState('junior')
   const [fspId, setFspId] = useState(`demo-${me.id}`)
@@ -180,7 +193,10 @@ function CandidateApp({ me }: { me: User }) {
       api<Profile | null>('/candidate/profile'), api<Invite[]>('/candidate/invitations'),
       api<typeof grants>('/candidate/contact-grants'), api<typeof history>('/candidate/assessment-history'),
     ])
-    if (p) { setProfile(p); setSkillsText((p.skills || []).join(', ')) }
+    if (p) {
+      setProfile(p); setSkillsText((p.skills || []).join(', '))
+      setStory({ ...emptyAchievementStory, ...(p.achievement_story ?? {}) })
+    }
     setInvites(i); setGrants(g); setHistory(h)
   }
   useEffect(() => { load().catch(err => setError(err.message)) }, [])
@@ -188,9 +204,20 @@ function CandidateApp({ me }: { me: User }) {
     setError(''); setFeedback('')
     try { await job(); await load(); setFeedback(success) } catch (err) { setError((err as Error).message) }
   }
+  function updateStory(patch: Partial<AchievementStory>) {
+    setStory(current => ({ ...current, ...patch, formatted_narrative: undefined }))
+  }
   async function saveProfile(event: FormEvent) {
     event.preventDefault()
+    const hasStory = [story.title, story.context, story.personal_contribution, story.decision, story.result, story.basis]
+      .some(value => value.trim())
+    if (hasStory && (!story.context.trim() || !story.personal_contribution.trim() || !story.result.trim())) {
+      setError('Для истории нужны три коротких пункта: контекст, ваш вклад и результат. Остальное можно пропустить.')
+      return
+    }
+    const { formatted_narrative: _preview, ...storyInput } = story
     await action(() => api('/candidate/profile', 'PUT', { ...profile,
+      achievement_story: hasStory ? storyInput : null,
       skills: skillsText.split(',').map(item => item.trim()).filter(Boolean) }), 'Профиль сохранён')
   }
   async function importResume(file?: File) {
@@ -216,7 +243,7 @@ function CandidateApp({ me }: { me: User }) {
   async function resumeTest(id: string) {
     setError('')
     try { const result = await api<Attempt>(`/candidate/assessment-attempts/${id}`)
-      setAttempt(result); setAnswers(Object.fromEntries(Object.entries(result.answers || {}).map(([key,value]) => [key,String(value)]))) }
+      setAttempt(result); setAnswers(result.answers || {}) }
     catch (err) { setError((err as Error).message) }
   }
   async function progressTest() {
@@ -224,7 +251,12 @@ function CandidateApp({ me }: { me: User }) {
     setError(''); setFeedback('')
     try {
       const current = attempt.questions.filter(q => q.phase === attempt.phase)
-      if (current.some(q => answers[q.id] === undefined || answers[q.id] === '')) {
+      if (current.some(q => {
+        const answer = answers[q.id]
+        if (q.type !== 'structured') return answer === undefined || answer === ''
+        return !q.fields?.every(field => typeof answer === 'object' && answer !== null &&
+          answer[field.id] !== undefined && answer[field.id] !== '')
+      })) {
         throw new Error('Ответьте на все вопросы текущего этапа')
       }
       const currentAnswers = Object.fromEntries(current.map(q => [q.id, answers[q.id]]))
@@ -258,6 +290,15 @@ function CandidateApp({ me }: { me: User }) {
             <label>Минимальная зарплата, ₽/мес. до налогов<input type="number" min="0" value={profile.min_salary_rub} onChange={e => setProfile({...profile,min_salary_rub:Number(e.target.value)})}/></label>
             <label>Формат<select value={profile.work_format} onChange={e => setProfile({...profile,work_format:e.target.value})}><option value="remote">Удалённо</option><option value="hybrid">Гибрид</option><option value="office">Офис</option><option value="any">Любой</option></select></label>
             <label className="full">Опыт и задачи<textarea rows={4} value={profile.summary} onChange={e => setProfile({...profile,summary:e.target.value})}/></label>
+            <div className="full"><div className="field-heading">Один рабочий эпизод — чтобы было понятно, что сделали именно вы</div><p className="small muted">Три коротких пункта сохраняют контекст, ваш вклад и результат. Решение и основание можно добавить, если помните. Мы соберём рассказ, но не будем додумывать факты или объявлять их проверенными.</p></div>
+            <label className="full">Контекст: какую задачу или проблему решали<input maxLength={700} value={story.context} onChange={e => updateStory({context:e.target.value})} placeholder="Например: повторная доставка события создавала риск двойной записи"/></label>
+            <label className="full">Ваш личный вклад: что сделали вы<input maxLength={700} value={story.personal_contribution} onChange={e => updateStory({personal_contribution:e.target.value})} placeholder="Например: добавил защиту повторной обработки по event ID"/></label>
+            <label className="full">Почему выбрали такой подход <span className="hint">необязательно</span><input maxLength={700} value={story.decision} onChange={e => updateStory({decision:e.target.value})} placeholder="Например: уникальное ограничение работает и при параллельных запросах"/></label>
+            <label className="full">Что изменилось <span className="hint">без точных цифр, если их нет</span><input maxLength={700} value={story.result} onChange={e => updateStory({result:e.target.value})} placeholder="Например: команда перестала вручную разбирать дубли"/></label>
+            <label>Масштаб результата<select value={story.result_scope} onChange={e => updateStory({result_scope:e.target.value as AchievementStory['result_scope']})}><option value="individual">Мой личный результат</option><option value="team">Результат команды</option></select></label>
+            <label>Основание или артефакт <span className="hint">необязательно</span><input maxLength={500} value={story.basis} onChange={e => updateStory({basis:e.target.value})} placeholder="Например: ссылка на PR; сейчас не приложена"/></label>
+            {story.formatted_narrative && <div className="full story-preview"><span className="small muted">Так рассказ сохранён для вас:</span><p>{story.formatted_narrative}</p></div>}
+            <div className="full check-list"><label><input type="checkbox" disabled={!story.context.trim() || !story.personal_contribution.trim() || !story.result.trim()} checked={story.share_with_employers} onChange={e => setStory({...story,share_with_employers:e.target.checked})}/> Отдельно разрешаю показать этот рассказ работодателям как заявленный мной, не независимо проверенный</label></div>
             <div className="full check-list"><label><input type="checkbox" checked={profile.consent_processing} onChange={e => setProfile({...profile,consent_processing:e.target.checked,published:e.target.checked ? profile.published : false})}/> Согласен на обработку данных профиля</label><label><input type="checkbox" checked={profile.published} disabled={!profile.consent_processing} onChange={e => setProfile({...profile,published:e.target.checked})}/> Публиковать проверенный профиль работодателям</label><label><input type="checkbox" checked={profile.available} onChange={e => setProfile({...profile,available:e.target.checked})}/> Принимать приглашения</label></div>
             <div className="full"><button className="primary">Сохранить профиль</button></div>
           </form>
@@ -267,7 +308,7 @@ function CandidateApp({ me }: { me: User }) {
           <div className="form-grid"><label>Отрасль<select value="it" disabled><option value="it">Информационные технологии</option></select></label><label>Специализация<select value={spec} onChange={e => setSpec(e.target.value)}><option value="backend">Backend</option><option value="frontend">Frontend</option></select></label><label>Предполагаемый грейд<select value={grade} onChange={e => setGrade(e.target.value)}><option value="junior">Junior</option><option value="middle">Middle</option></select></label></div>
           <button className="primary" onClick={startTest}>Начать тест</button><p className="small muted">Порог: 70/100, половина баллов в каждой группе и верный ответ после изменения условия. Провал не понижает подтверждённый грейд.</p>{history.length > 0 && <div className="history"><h3>История тестов</h3>{history.map(item => <div className="grant" key={item.id}><span>{item.category} · {fmtDate(item.started_at)} · {item.state === 'scored' ? `${item.score}/100, ${item.outcome === 'passed' ? 'пройден' : 'не пройден'}` : 'в процессе'}</span>{item.state === 'in_progress' && <button className="button subtle" onClick={() => resumeTest(item.id)}>Продолжить</button>}</div>)}</div>}</section>
           : <section className="card"><div className="section-title"><div><h2>Этап {attempt.phase} из 2</h2><p className="muted">{attempt.phase === 1 ? 'Решите основные задания' : 'Изменилось одно условие. Старые ответы зафиксированы.'}</p></div><span className="badge">20 минут от начала попытки</span></div>
-            {attempt.questions.filter(q => q.phase === attempt.phase).map((q, index) => <div className="question" key={q.id}><div className="question-top"><span>{index+1}. {skillNames[q.competency] ?? q.competency}</span><span>{q.points} баллов</span></div><p>{q.prompt}</p>{q.type === 'choice' ? <div className="options">{q.options?.map(o => <label key={o.value}><input type="radio" name={q.id} checked={answers[q.id] === o.value} onChange={() => setAnswers({...answers,[q.id]:o.value})}/>{o.label}</label>)}</div> : <input className="answer-input" type="number" aria-label={`Ответ на вопрос ${index+1}`} value={answers[q.id] ?? ''} onChange={e => setAnswers({...answers,[q.id]:e.target.value})}/>}</div>)}
+            {attempt.questions.filter(q => q.phase === attempt.phase).map((q, index) => <div className="question" key={q.id}><div className="question-top"><span>{index+1}. {skillNames[q.competency] ?? q.competency}</span><span>{q.points} баллов</span></div><p>{q.prompt}</p>{q.type === 'structured' ? <div className="form-grid">{q.fields?.map(field => { const current = answers[q.id]; const value = typeof current === 'object' && current !== null ? current[field.id] ?? '' : ''; return <label key={field.id}>{field.label}<select value={value} onChange={e => setAnswers({...answers,[q.id]:{...(typeof current === 'object' && current !== null ? current : {}),[field.id]:e.target.value}})}><option value="">Выберите вариант</option>{field.options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label> })}</div> : q.type === 'choice' ? <div className="options">{q.options?.map(o => <label key={o.value}><input type="radio" name={q.id} checked={answers[q.id] === o.value} onChange={() => setAnswers({...answers,[q.id]:o.value})}/>{o.label}</label>)}</div> : <input className="answer-input" type="number" aria-label={`Ответ на вопрос ${index+1}`} value={scalarAnswer(answers[q.id])} onChange={e => setAnswers({...answers,[q.id]:e.target.value})}/>}</div>)}
             <button className="primary" onClick={progressTest}>{attempt.phase === 1 ? 'Зафиксировать ответы и продолжить' : 'Отправить на проверку'}</button></section>}
       </>}
     {tab === 'offers' && <><div className="page-heading"><p className="eyebrow">ПРЕДЛОЖЕНИЯ</p><h1>Компания делает первый шаг</h1><p>Условия и зарплата видны до раскрытия ваших контактов.</p></div>{invites.length === 0 ? <div className="empty card">Пока нет приглашений. Завершите тест и опубликуйте профиль, чтобы компании могли вас найти.</div> : invites.map(invite => <article className="card offer-card" key={invite.id}><div className="section-title"><div><span className="eyebrow">{invite.company_name}</span><h2>{invite.offer_text}</h2></div><span className={`badge ${invite.state === 'accepted' ? 'green' : ''}`}>{statusName(invite.state)}</span></div><div className="salary">{rubles(invite.salary_min_rub)} — {rubles(invite.salary_max_rub)} <small>/ месяц, до налогов</small></div><p><strong>Почему выбрали вас:</strong> {invite.reason}</p><p className="muted">Контакт работодателя: {invite.employer_contact} · предложение до {fmtDate(invite.expires_at)}</p>{['sent','viewed'].includes(invite.state) && <div className="actions"><button className="primary" onClick={() => action(() => api(`/invitations/${invite.id}/accept`, 'POST'), 'Приглашение принято. Контакты открыты только этой компании.')}>Принять и раскрыть контакты этой компании</button><button className="button subtle" onClick={() => action(() => api(`/invitations/${invite.id}/reject`, 'POST'), 'Приглашение отклонено')}>Отклонить</button></div>}</article>)}</>}

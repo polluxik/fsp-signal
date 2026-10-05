@@ -100,6 +100,7 @@ def test_upgrade_backfills_only_known_legacy_role_and_keeps_it_private():
         assert profile["adult_attested_at"] is None
         assert json.loads(profile["blocked_employer_ids"]) == []
         assert profile["verified_attempt_id"] is None
+        assert json.loads(profile["achievement_story"]) == {}
         assert need["current_role_version"] == 1
         assert need["publication_state"] == "draft"
         assert not need["discoverable"] and need["confirmed_at"] is None

@@ -1,12 +1,13 @@
 """Versioned role-card HTTP boundary; business rules live in role_cards."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .assessment import COMPETENCIES
 from .db import get_db
 from .domain_errors import DomainError
+from .evidence import list_candidate_evidence
 from .models import CandidateProfile, HiringNeed, User, now
 from .preferences import block_employer, preferences_data, revoke_employer_contacts, save_preferences
 from .role_cards import (
@@ -15,7 +16,7 @@ from .role_cards import (
 )
 from .schemas import (
     AccessChangeResult, CandidatePreferencesIn, CandidatePreferencesOut,
-    PublishRoleIn, ReconfirmRoleIn, RoleCardOut, RoleMutationIn, RoleVersionIn,
+    EvidenceCard, PublishRoleIn, ReconfirmRoleIn, RoleCardOut, RoleMutationIn, RoleVersionIn,
 )
 from .security import csrf_guard, get_user, require
 
@@ -34,6 +35,13 @@ def _owned_need(db: Session, user: User, need_id: str) -> HiringNeed:
     if not need:
         raise HTTPException(status_code=404, detail="NOT_FOUND")
     return need
+
+
+@candidate_router.get("/evidence", response_model=list[EvidenceCard])
+def get_candidate_evidence(response: Response, user: User = Depends(get_user), db: Session = Depends(get_db)):
+    require(user, "candidate")
+    response.headers["Cache-Control"] = "no-store"
+    return list_candidate_evidence(db, user.id, audience="self")
 
 
 @router.get("/{need_id}/role-card", response_model=RoleCardOut)

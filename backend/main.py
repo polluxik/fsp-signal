@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from .assessment import BLUEPRINT_VERSION, COMPETENCIES, grade_attempt, make_assessment, public_questions
 from .config import settings
 from .db import Base, get_db
+from .evidence import build_achievement_narrative, build_achievement_story_record
 from .matching import (can_search, eligible, evaluate_compatibility, fsp_bonus,
                        public_candidate, score_profile, suggest_competencies)
 from .models import (AssessmentAttempt, CandidateProfile, ContactGrant, EmailToken, EmployerProfile,
@@ -63,6 +64,9 @@ def candidate_private(profile: CandidateProfile) -> dict:
         "id": profile.user_id, "full_name": profile.full_name,
         "contact_email": profile.contact_email, "contact_phone": profile.contact_phone,
         "city": profile.city, "summary": profile.summary, "skills": profile.skills or [],
+        "achievement_story": ({**(profile.achievement_story or {}),
+                                "formatted_narrative": build_achievement_narrative(profile.achievement_story)}
+                               if profile.achievement_story else None),
         "experience_months": profile.experience_months,
         "desired_specialization": profile.desired_specialization, "claimed_grade": profile.claimed_grade,
         "verified_specialization": profile.verified_specialization, "verified_grade": profile.verified_grade,
@@ -229,6 +233,9 @@ def save_candidate(data: CandidateIn, user: User = Depends(get_user), db: Sessio
     for field in ("full_name", "contact_email", "contact_phone", "city", "summary", "skills",
                   "experience_months", "min_salary_rub", "work_format", "available"):
         setattr(profile, field, getattr(data, field))
+    if "achievement_story" in data.model_fields_set:
+        profile.achievement_story = (build_achievement_story_record(data.achievement_story)
+                                     if data.achievement_story else {})
     profile.consent_processing_at = profile.consent_processing_at or now() if data.consent_processing else None
     profile.published_at = profile.published_at or now() if data.published else None
     if data.adult_hiring_confirmed is not None:
@@ -350,6 +357,15 @@ def save_answers(attempt_id: str, data: AnswersIn, user: User = Depends(get_user
     editable = {q["id"] for q in attempt.questions if q["phase"] == attempt.phase}
     if not set(data.answers).issubset(editable):
         problem("QUESTION_NOT_EDITABLE", 409)
+    for question in attempt.questions:
+        if question["id"] not in data.answers or question.get("type") != "structured":
+            continue
+        submitted = data.answers[question["id"]]
+        required_fields = {field["id"] for field in question.get("fields", [])}
+        if (not isinstance(submitted, dict) or set(submitted) != required_fields
+                or any(not isinstance(submitted[field], str) or not submitted[field].strip()
+                       for field in required_fields)):
+            problem("ANSWERS_INCOMPLETE", 409)
     merged = dict(attempt.answers or {})
     merged.update(data.answers)
     attempt.answers = merged
@@ -393,6 +409,7 @@ def submit_assessment(attempt_id: str, user: User = Depends(get_user), db: Sessi
         profile.verified_specialization, profile.verified_grade = attempt.specialization, attempt.grade
         profile.test_score, profile.competencies, profile.test_verified_at = score, competencies, now()
         profile.verification_source = "assessment"
+        profile.verified_attempt_id = attempt.id
         if changing:
             profile.grade_changed_at = now()
     db.commit()

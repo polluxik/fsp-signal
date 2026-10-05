@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 
 class RegisterIn(BaseModel):
@@ -19,12 +19,32 @@ class VerifyIn(BaseModel):
     token: str
 
 
+class AchievementStoryIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(default="", max_length=120)
+    context: str = Field(min_length=8, max_length=700)
+    personal_contribution: str = Field(min_length=8, max_length=700)
+    decision: str = Field(default="", max_length=700)
+    result: str = Field(min_length=8, max_length=700)
+    result_scope: Literal["individual", "team"] = "individual"
+    basis: str = Field(default="", max_length=500)
+    share_with_employers: bool = False
+    formatted_narrative: str | None = Field(default=None, max_length=5000)
+
+    @field_validator("title", "context", "personal_contribution", "decision", "result", "basis", mode="before")
+    @classmethod
+    def trim_story_text(cls, value: str):
+        return value.strip() if isinstance(value, str) else value
+
+
 class CandidateIn(BaseModel):
     full_name: str = Field(max_length=160)
     contact_email: str = Field(max_length=254)
     contact_phone: str = Field(default="", max_length=80)
     city: str = Field(default="", max_length=120)
     summary: str = Field(default="", max_length=4000)
+    achievement_story: AchievementStoryIn | None = None
     skills: list[str] = Field(default_factory=list, max_length=30)
     experience_months: int = Field(default=0, ge=0, le=720)
     min_salary_rub: int = Field(default=0, ge=0)
@@ -240,7 +260,37 @@ class StartAssessmentIn(BaseModel):
 
 
 class AnswersIn(BaseModel):
-    answers: dict[str, str | int]
+    answers: dict[str, str | int | dict[str, str | int]]
+
+
+class EvidenceCard(BaseModel):
+    id: str
+    competency: str | None
+    action: str
+    source_type: Literal["assessment_attempt", "achievement_story", "skill_claim", "legacy_aggregate"]
+    source_id: str | None
+    source_version: str
+    assessed_at: datetime | None
+    verification_level: Literal["verified_action", "declared", "aggregate", "synthetic_fixture"]
+    scope: str
+    limitations: list[str]
+    data_mode: Literal["real", "synthetic"]
+
+
+class EvidenceGap(BaseModel):
+    competency: str = Field(min_length=1, max_length=80)
+    status: Literal["unknown", "gap"]
+    question: str = Field(min_length=5, max_length=300)
+
+    @field_validator("competency", "question", mode="before")
+    @classmethod
+    def trim_gap_text(cls, value: str):
+        return value.strip() if isinstance(value, str) else value
+
+
+class MatchExplanation(BaseModel):
+    reasons: list[str] = Field(default_factory=list)
+    gaps: list[EvidenceGap] = Field(default_factory=list, max_length=20)
 
 
 class SearchIn(BaseModel):

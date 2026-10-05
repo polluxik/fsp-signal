@@ -57,6 +57,7 @@ class CandidateProfile(Base):
     contact_phone: Mapped[str] = mapped_column(String(80), default="")
     city: Mapped[str] = mapped_column(String(120), default="")
     summary: Mapped[str] = mapped_column(Text, default="")
+    achievement_story: Mapped[dict] = mapped_column(JSON, default=dict)
     skills: Mapped[list] = mapped_column(JSON, default=list)
     experience_months: Mapped[int] = mapped_column(Integer, default=0)
     desired_specialization: Mapped[str | None] = mapped_column(String(30))

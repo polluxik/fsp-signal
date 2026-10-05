@@ -1,6 +1,7 @@
 """End-to-end API rules, using the real evaluator and separate users."""
 
 import re
+from datetime import timedelta
 from io import BytesIO
 from urllib.parse import parse_qs, urlparse
 
@@ -11,7 +12,7 @@ from reportlab.pdfgen import canvas  # noqa: E402
 from backend.assessment import COMPETENCIES, grade_attempt, make_assessment  # noqa: E402
 from backend.db import SessionLocal  # noqa: E402
 from backend.main import app  # noqa: E402
-from backend.models import MailOutbox  # noqa: E402
+from backend.models import AssessmentAttempt, CandidateProfile, Invitation, MailOutbox, now  # noqa: E402
 
 
 def csrf(client: TestClient):
@@ -89,9 +90,23 @@ def test_reverse_hiring_and_contact_boundary():
                    "contact_phone":"+79990001122", "summary":"Не публиковать этот текст",
                    "skills":["Python","PostgreSQL"], "experience_months":36,
                    "min_salary_rub":180000, "work_format":"remote", "consent_processing":True,
-                   "published":True, "adult_hiring_confirmed":True}
+                   "published":True, "adult_hiring_confirmed":True,
+                   "achievement_story":{"title":"Устранение дублей",
+                       "context":"Повторная доставка события могла создать двойную запись.",
+                       "personal_contribution":"Я добавил защиту обработки по event ID.",
+                       "decision":"Выбрал уникальное ограничение в базе данных.",
+                       "result":"Команда перестала вручную разбирать дубли.",
+                       "result_scope":"team", "basis":"Самоописание, метрика не приложена.",
+                       "share_with_employers":False}}
         saved = candidate.put("/api/v1/candidate/profile", json=profile, headers=csrf(candidate))
         assert saved.status_code == 200, saved.text
+        assert "Результат команды:" in saved.json()["achievement_story"]["formatted_narrative"]
+        assert "Основание: со слов кандидата" in saved.json()["achievement_story"]["formatted_narrative"]
+        readback_story = candidate.get("/api/v1/candidate/profile").json()["achievement_story"]
+        roundtrip = candidate.put("/api/v1/candidate/profile",
+                                  json=profile | {"achievement_story":readback_story}, headers=csrf(candidate))
+        assert roundtrip.status_code == 200, roundtrip.text
+        assert roundtrip.json()["achievement_story"]["formatted_narrative"] == readback_story["formatted_narrative"]
 
         started = candidate.post("/api/v1/candidate/assessment-attempts",
                                  json={"specialization":"backend","grade":"middle"}, headers=csrf(candidate))
@@ -102,6 +117,13 @@ def test_reverse_hiring_and_contact_boundary():
             from backend.models import AssessmentAttempt
             key = db.get(AssessmentAttempt, attempt["id"]).answer_key
         first = {q["id"]: key[q["id"]] for q in attempt["questions"] if q["phase"] == 1}
+        incomplete_first = dict(first)
+        incomplete_first["bm1"] = dict(key["bm1"], replay_result="")
+        rejected_incomplete = candidate.put(
+            f"/api/v1/candidate/assessment-attempts/{attempt['id']}/answers",
+            json={"answers":incomplete_first}, headers=csrf(candidate))
+        assert rejected_incomplete.status_code == 409
+        assert rejected_incomplete.json()["detail"] == "ANSWERS_INCOMPLETE"
         assert candidate.put(f"/api/v1/candidate/assessment-attempts/{attempt['id']}/answers",
                              json={"answers":first}, headers=csrf(candidate)).status_code == 200
         advanced = candidate.post(f"/api/v1/candidate/assessment-attempts/{attempt['id']}/advance",
@@ -114,6 +136,32 @@ def test_reverse_hiring_and_contact_boundary():
         assert result.status_code == 200, result.text
         assert result.json()["verified_category"] == "backend:middle"
         assert result.json()["score"] == 100
+        with SessionLocal() as db:
+            assert db.get(CandidateProfile, person["id"]).verified_attempt_id == attempt["id"]
+
+        visible_evidence = candidate.get("/api/v1/candidate/evidence")
+        assert visible_evidence.status_code == 200, visible_evidence.text
+        assert visible_evidence.headers["cache-control"] == "no-store"
+        assert any(card["source_id"] == attempt["id"] and card["source_type"] == "assessment_attempt"
+                   for card in visible_evidence.json())
+        assert "answer_key" not in visible_evidence.text and '"answers"' not in visible_evidence.text
+
+        with SessionLocal() as db:
+            failed_questions, failed_key = make_assessment("backend", "middle", "badc0de")
+            failed_answers = dict(failed_key, bm3="apply_again")
+            failed_attempt = AssessmentAttempt(
+                candidate_id=person["id"], specialization="backend", grade="middle",
+                blueprint_version="2026.2", seed="badc0de", questions=failed_questions,
+                answer_key=failed_key, answers=failed_answers, phase=2, state="in_progress",
+                expires_at=now()+timedelta(minutes=5),
+            )
+            db.add(failed_attempt); db.commit()
+            failed_attempt_id = failed_attempt.id
+        failed_result = candidate.post(f"/api/v1/candidate/assessment-attempts/{failed_attempt_id}/submit",
+                                       headers=csrf(candidate))
+        assert failed_result.status_code == 200 and failed_result.json()["outcome"] == "failed"
+        with SessionLocal() as db:
+            assert db.get(CandidateProfile, person["id"]).verified_attempt_id == attempt["id"]
         assert candidate.get("/api/v1/candidate/passport.pdf").headers["content-type"] == "application/pdf"
 
         company_profile = {"company_name":"Финтех демо", "description":"Сервис событий",
@@ -131,6 +179,8 @@ def test_reverse_hiring_and_contact_boundary():
         assert "secret@example.test" not in found.text
         assert "Тестовый Кандидат" not in found.text
         assert "Не публиковать этот текст" not in found.text
+        assert "Повторная доставка события могла создать двойную запись." not in found.text
+        assert "Я добавил защиту обработки по event ID." not in found.text
         snapshot_id = found.json()["id"]
         history = employer.get("/api/v1/employer/searches").json()
         assert len(history) == 1 and history[0]["id"] == snapshot_id
@@ -207,8 +257,6 @@ def test_reverse_hiring_and_contact_boundary():
                               headers=csrf(employer) | {"Idempotency-Key":"next-invite"})
         assert again.status_code == 201
         with SessionLocal() as db:
-            from backend.models import Invitation, now
-            from datetime import timedelta
             expired = db.get(Invitation, again.json()["id"])
             expired.expires_at = now()-timedelta(seconds=1)
             db.commit()
