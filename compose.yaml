@@ -1,0 +1,69 @@
+services:
+  db:
+    image: postgres:17.11
+    environment:
+      POSTGRES_USER: fsp
+      POSTGRES_PASSWORD: demo_change_before_real_deploy
+      POSTGRES_DB: fsp_signal
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fsp -d fsp_signal"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+  api:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.api
+    environment: &app_env
+      APP_MODE: demo
+      DATABASE_URL: postgresql+psycopg://fsp:demo_change_before_real_deploy@db:5432/fsp_signal
+      PUBLIC_BASE_URL: http://localhost:8080
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_FROM: demo@example.test
+      FSP_PROVIDER: mock
+      SESSION_SECURE: "false"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/ready', timeout=2)"]
+      interval: 10s
+      timeout: 4s
+      retries: 12
+  worker:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.api
+    command: ["python", "-m", "backend.mail_worker"]
+    environment: *app_env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+  migrate:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.api
+    command: ["alembic", "upgrade", "head"]
+    environment: *app_env
+    depends_on:
+      db:
+        condition: service_healthy
+  web:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.web
+    ports:
+      - "127.0.0.1:8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+  mailpit:
+    image: axllent/mailpit:v1.31.3
+    ports:
+      - "127.0.0.1:8025:8025"
+
+volumes:
+  pgdata:
