@@ -8,7 +8,9 @@ from sqlalchemy import select
 from .assessment import COMPETENCIES
 from .config import settings
 from .db import SessionLocal
-from .models import CandidateProfile, EmployerProfile, HiringNeed, User, now
+from .models import CandidateProfile, EmployerProfile, HiringNeed, RoleVersion, User, now
+from .role_cards import create_role_version, publish_role
+from .schemas import RoleCardIn
 from .security import hasher
 
 
@@ -20,8 +22,10 @@ def seed() -> None:
         employer = db.scalar(select(User).where(User.email == "employer@demo.test"))
         if employer is None:
             employer = User(email="employer@demo.test", password_hash=hasher.hash("DemoPass123!"),
-                            role="employer", email_verified_at=now())
+                            role="employer", origin="synthetic_fixture", email_verified_at=now())
             db.add(employer); db.flush()
+        else:
+            employer.origin = "synthetic_fixture"
         if db.get(EmployerProfile, employer.id) is None:
             db.add(EmployerProfile(user_id=employer.id, company_name="Сигнал Финтех [демо]",
                                    description="Учебная компания: обработка событий и пользовательские кабинеты",
@@ -30,19 +34,47 @@ def seed() -> None:
         second = db.scalar(select(User).where(User.email == "other@demo.test"))
         if second is None:
             second = User(email="other@demo.test", password_hash=hasher.hash("DemoPass123!"),
-                          role="employer", email_verified_at=now())
+                          role="employer", origin="synthetic_fixture", email_verified_at=now())
             db.add(second); db.flush()
             db.add(EmployerProfile(user_id=second.id, company_name="Другая компания [демо]",
                                    description="Контроль границы доступа", industry="ИТ", contact_email="other@demo.test"))
+        else:
+            second.origin = "synthetic_fixture"
 
         need = db.scalar(select(HiringNeed).where(HiringNeed.employer_id == employer.id,
                                                   HiringNeed.title == "Backend Middle: события"))
         if need is None:
-            db.add(HiringNeed(employer_id=employer.id, title="Backend Middle: события",
+            need = HiringNeed(employer_id=employer.id, title="Backend Middle: события",
                               description="Обработка повторных платёжных событий без двойной записи",
                               specialization="backend", grade="middle",
                               competencies=["event_idempotency", "data_integrity"], stack=["Python", "PostgreSQL"],
-                              salary_min_rub=180000, salary_max_rub=230000, work_format="remote"))
+                              salary_min_rub=180000, salary_max_rub=230000, work_format="remote")
+            db.add(need)
+            db.flush()
+
+        current = db.scalar(select(RoleVersion).where(
+            RoleVersion.need_id == need.id, RoleVersion.version == need.current_role_version
+        )) if need.current_role_version else None
+        if not current or current.source != "synthetic_demo" or need.publication_state != "active":
+            card = RoleCardIn.model_validate({
+                "title": need.title, "description": need.description,
+                "specialization": "backend", "grade": "middle",
+                "competencies": ["event_idempotency", "data_integrity"],
+                "stack": ["Python", "PostgreSQL"],
+                "salary_min_rub": 180000, "salary_max_rub": 230000,
+                "work_format": "remote", "work_city": None,
+                "first_30_days": "Убрать повторную обработку платёжных событий без двойной записи.",
+                "interview_steps": [
+                    {"title": "Знакомство и опыт", "duration_minutes": 45},
+                    {"title": "Разбор рабочей задачи", "duration_minutes": 60},
+                ],
+                "take_home_minutes": 0, "response_sla_hours": 48,
+                "employer_contact": "team@demo.test", "active_headcount_attested": True,
+            })
+            role_version = create_role_version(db, employer.id, need.id, card,
+                                               need.current_role_version, now(), source="synthetic_demo")
+            publish_role(db, employer.id, need.id, expected_version=role_version.version,
+                         active_headcount_attested=True, discoverable=True, at=now())
 
         for category, skills in COMPETENCIES.items():
             specialization, grade = category.split(":")
@@ -50,9 +82,10 @@ def seed() -> None:
                 email = f"{specialization}-{grade}-{index+1}@demo.test"
                 user = db.scalar(select(User).where(User.email == email))
                 if user is not None:
+                    user.origin = "synthetic_fixture"
                     continue
                 user = User(email=email, password_hash=hasher.hash("DemoPass123!"),
-                            role="candidate", email_verified_at=now())
+                            role="candidate", origin="synthetic_fixture", email_verified_at=now())
                 db.add(user); db.flush()
                 base = 0.58 + index * .035
                 competencies = {name: round(min(.96, max(.5, base + rng.uniform(-.09, .09))), 3) for name in skills}

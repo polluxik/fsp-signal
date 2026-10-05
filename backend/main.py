@@ -20,6 +20,8 @@ from .models import (AssessmentAttempt, CandidateProfile, ContactGrant, EmailTok
                      HiringNeed, Invitation, LoginSession, MailOutbox, SearchSnapshot, User, now)
 from .passport import render_passport
 from .resume_import import MAX_PDF_BYTES, ResumeImportError, preview_pdf
+from .role_cards import create_initial_draft
+from .routes_v2 import router as v2_router
 from .schemas import (AnswersIn, CandidateIn, EmployerIn, FspLinkIn, InvitationIn, LoginIn,
                       NeedIn, RegisterIn, SearchIn, StartAssessmentIn, VerifyIn)
 from .security import aware, check_password, csrf_guard, digest, get_user, hasher, new_session, require, set_auth_cookies
@@ -31,6 +33,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="ФСП Сигнал", version="0.1.0", description="Демонстрационный API обратного найма",
               docs_url="/api/docs", openapi_url="/api/openapi.json", lifespan=lifespan)
+app.include_router(v2_router)
 
 
 def problem(code: str, status: int = 422) -> None:
@@ -131,7 +134,8 @@ def register(data: RegisterIn, db: Session = Depends(get_db)):
         problem("INVALID_ROLE")
     if db.scalar(select(User).where(User.email == email)):
         problem("EMAIL_ALREADY_USED", 409)
-    user = User(email=email, password_hash=hasher.hash(data.password), role=data.role)
+    user = User(email=email, password_hash=hasher.hash(data.password), role=data.role,
+                origin="direct_signup")
     db.add(user)
     db.flush()
     raw = secrets.token_urlsafe(36)
@@ -396,6 +400,8 @@ def create_need(data: NeedIn, user: User = Depends(get_user), db: Session = Depe
         problem("INVALID_COMPETENCY")
     need = HiringNeed(employer_id=user.id, **data.model_dump())
     db.add(need)
+    db.flush()
+    create_initial_draft(db, need, actor_id=user.id)
     db.commit()
     return {"id": need.id, **data.model_dump()}
 

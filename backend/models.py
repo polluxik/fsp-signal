@@ -23,8 +23,12 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(254), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(20))
+    origin: Mapped[str] = mapped_column(String(30), default="legacy_import")
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    __table_args__ = (
+        CheckConstraint("origin IN ('direct_signup','synthetic_fixture','legacy_import')", name="user_origin"),
+    )
 
 
 class EmailToken(Base):
@@ -97,8 +101,65 @@ class HiringNeed(Base):
     salary_min_rub: Mapped[int] = mapped_column(Integer)
     salary_max_rub: Mapped[int] = mapped_column(Integer)
     work_format: Mapped[str] = mapped_column(String(20))
+    current_role_version: Mapped[int] = mapped_column(Integer, default=0)
+    publication_state: Mapped[str] = mapped_column(String(20), default="draft")
+    discoverable: Mapped[bool] = mapped_column(Boolean, default=False)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
-    __table_args__ = (CheckConstraint("salary_min_rub > 0 AND salary_max_rub >= salary_min_rub", name="need_salary_range"),)
+    __table_args__ = (
+        CheckConstraint("salary_min_rub > 0 AND salary_max_rub >= salary_min_rub", name="need_salary_range"),
+        CheckConstraint("current_role_version >= 0", name="need_role_version_nonnegative"),
+        CheckConstraint("publication_state IN ('draft','active','paused','closed')", name="need_publication_state"),
+    )
+
+
+class RoleVersion(Base):
+    __tablename__ = "role_versions"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    need_id: Mapped[str] = mapped_column(ForeignKey("hiring_needs.id"), index=True)
+    version: Mapped[int] = mapped_column(Integer)
+    schema_version: Mapped[int] = mapped_column(Integer, default=1)
+    payload: Mapped[dict] = mapped_column(JSON)
+    terms_hash: Mapped[str] = mapped_column(String(64))
+    source: Mapped[str] = mapped_column(String(30))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    __table_args__ = (
+        UniqueConstraint("need_id", "version", name="role_version_need_version"),
+        CheckConstraint("version > 0", name="role_version_positive"),
+        CheckConstraint("source IN ('employer_declared','legacy_import','synthetic_demo')", name="role_version_source"),
+    )
+
+
+class RoleDecision(Base):
+    __tablename__ = "role_decisions"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    candidate_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    need_id: Mapped[str] = mapped_column(ForeignKey("hiring_needs.id"), index=True)
+    role_version_id: Mapped[str] = mapped_column(ForeignKey("role_versions.id"))
+    action: Mapped[str] = mapped_column(String(20), default="none")
+    preferences_version: Mapped[int] = mapped_column(Integer, default=1)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    __table_args__ = (
+        UniqueConstraint("candidate_id", "need_id", name="role_decision_candidate_need"),
+        CheckConstraint("action IN ('saved','hidden','interested','none')", name="role_decision_action"),
+    )
+
+
+class ProductEvent(Base):
+    __tablename__ = "product_events"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    type: Mapped[str] = mapped_column(String(50), index=True)
+    entity_type: Mapped[str] = mapped_column(String(40))
+    entity_id: Mapped[str] = mapped_column(String(36), index=True)
+    employer_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), index=True)
+    actor_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), index=True)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    data_mode: Mapped[str] = mapped_column(String(20), default="real")
+    dedupe_key: Mapped[str] = mapped_column(String(180), unique=True)
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    __table_args__ = (
+        CheckConstraint("data_mode IN ('real','synthetic')", name="product_event_data_mode"),
+    )
 
 
 class AssessmentAttempt(Base):
@@ -126,6 +187,7 @@ class SearchSnapshot(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     employer_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     need_id: Mapped[str] = mapped_column(ForeignKey("hiring_needs.id"))
+    role_version_id: Mapped[str | None] = mapped_column(ForeignKey("role_versions.id"))
     parent_id: Mapped[str | None] = mapped_column(ForeignKey("search_snapshots.id"))
     filters: Mapped[dict] = mapped_column(JSON, default=dict)
     results: Mapped[list] = mapped_column(JSON, default=list)
@@ -139,6 +201,7 @@ class Invitation(Base):
     employer_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     candidate_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     need_id: Mapped[str | None] = mapped_column(ForeignKey("hiring_needs.id"))
+    role_version_id: Mapped[str | None] = mapped_column(ForeignKey("role_versions.id"))
     company_name: Mapped[str] = mapped_column(String(160))
     offer_text: Mapped[str] = mapped_column(Text)
     reason: Mapped[str] = mapped_column(Text)
@@ -179,4 +242,3 @@ class MailOutbox(Base):
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     last_error: Mapped[str | None] = mapped_column(String(200))
-
