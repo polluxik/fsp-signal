@@ -15,7 +15,8 @@ from sqlalchemy.orm import Session
 from .assessment import BLUEPRINT_VERSION, COMPETENCIES, grade_attempt, make_assessment, public_questions
 from .config import settings
 from .db import Base, get_db
-from .evidence import build_achievement_narrative, build_achievement_story_record
+from .evidence import (build_achievement_narrative, build_achievement_story_record,
+                       list_candidate_evidence)
 from .invitations import (InvitationError, create_invitation as create_invitation_record,
                           transition_invitation)
 from .matching import (can_search, eligible, evaluate_compatibility, explain_profile, fsp_bonus,
@@ -729,6 +730,18 @@ def candidate_card(candidate_id: str, user: User = Depends(get_user), db: Sessio
     if not profile or not can_search(profile) or is_blocked(profile, user.id):
         problem("NOT_FOUND", 404)
     return public_candidate(profile)
+
+
+@app.get("/api/v1/employer/candidates/{candidate_id}/evidence")
+def candidate_evidence(candidate_id: str, response: Response,
+                        user: User = Depends(get_user), db: Session = Depends(get_db)):
+    require(user, "employer")
+    profile = db.get(CandidateProfile, candidate_id)
+    if not profile or not can_search(profile) or is_blocked(profile, user.id):
+        problem("NOT_FOUND", 404)
+    response.headers["Cache-Control"] = "no-store"
+    return [card.model_dump(mode="json")
+            for card in list_candidate_evidence(db, candidate_id, audience="employer")]
 
 
 @app.get("/api/v1/employer/candidates/{candidate_id}/contact")

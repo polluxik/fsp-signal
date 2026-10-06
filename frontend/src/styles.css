@@ -15,3 +15,91 @@ label textarea{resize:vertical}input:focus,select:focus,textarea:focus,button:fo
 .snapshot-history{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:.78rem;color:#746680;margin:10px 0 25px}.snapshot-history .button{min-height:32px;padding:7px 10px;font-size:.75rem}
 @media(max-width:960px){.landing{grid-template-columns:1fr}.hero{padding:50px 6vw 22px}.hero-mark{margin-bottom:40px}.hero-steps{margin-top:30px}.auth-card{margin:20px auto 40px;width:min(460px,90%)}.shell{grid-template-columns:1fr}.sidebar{min-height:auto;display:flex;flex-direction:row;overflow-x:auto;padding:12px 14px;gap:2px;border-right:0;border-bottom:1px solid #eee7f3}.sidebar .overline,.sidebar-bottom{display:none}.sidebar button{white-space:nowrap}.content{padding:30px 20px 60px}.topbar{padding:0 20px}}
 @media(max-width:620px){.form-grid,.summary-grid{grid-template-columns:1fr}.content{padding:26px 15px 50px}.section-title,.results-heading{flex-wrap:wrap}.search-bar>*{width:100%}.search-bar .inline-check{justify-content:flex-start}.candidate-grid{grid-template-columns:1fr}.top-id{display:none}.hero h1{font-size:2.7rem}.hero-steps{gap:12px}.auth-card{padding:25px}.role-choice{gap:8px}.actions>*{width:100%}}
+
+/* Versioned hiring and candidate-control screens */
+button:active,.button:active,.primary:active{transform:scale(.98)}
+button:disabled{cursor:not-allowed}
+.text-button{border:0;background:transparent;color:#5b1997;font-weight:800;text-decoration:underline;text-underline-offset:3px;padding:4px 0}
+.field-error{color:#a32c36;font-size:.84rem;font-weight:700;margin:0}
+.preference-intro{max-width:72ch;line-height:1.65;margin:8px 0 24px}
+.preferences-panel{padding:26px}
+.preference-fieldset{border:0;border-top:1px solid #eee7f3;margin:0;padding:16px 0 0;min-width:0}
+.preference-fieldset legend{font-size:.84rem;font-weight:800;color:#42384f;padding:0 12px 0 0}
+.preference-fieldset legend .hint{display:block;margin-top:5px}
+.preference-submit{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.loading-panel{min-height:150px}
+.skeleton-line{height:15px;width:62%;border-radius:8px;background:linear-gradient(90deg,#f0edf3 20%,#faf9fb 42%,#f0edf3 64%);background-size:220% 100%;animation:skeleton-glide 1.3s ease-in-out infinite;margin:10px 0}
+.skeleton-line.short{width:38%}
+@keyframes skeleton-glide{to{background-position-x:-220%}}
+.role-editor-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(280px,.75fr);align-items:start;gap:22px}
+.role-editor{padding:26px}
+.role-preview{position:sticky;top:88px;min-width:0}
+.role-preview>.eyebrow{margin:0 0 12px}
+.role-selector{margin-bottom:18px}
+.role-selector>label{flex:1;min-width:250px}
+.role-card{background:#fff;border:1px solid #e8e1ed;border-radius:17px;padding:22px;color:#302739}
+.role-preview .role-card,.role-search-preview .role-card{box-shadow:0 12px 32px rgba(57,25,86,.05)}
+.role-card-topline{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.role-card h3{font-size:1.3rem;line-height:1.3;margin:12px 0 8px}
+.role-salary{font-size:1.15rem;font-weight:850;letter-spacing:-.03em;color:#4c2171;margin:14px 0}
+.role-salary span{display:block;margin-top:4px;font-size:.73rem;font-weight:600;letter-spacing:0;color:#777184}
+.role-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;border-top:1px solid #eee7f3;border-bottom:1px solid #eee7f3;padding:13px 0;margin:15px 0}
+.role-facts div{display:flex;flex-direction:column;gap:4px}
+.role-facts span{font-size:.68rem;color:#81768c}
+.role-facts strong{font-size:.8rem;line-height:1.45}
+.role-detail{margin:17px 0}
+.role-detail h4{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:#776b84;margin:0 0 7px}
+.role-detail p,.role-detail li{font-size:.85rem;line-height:1.6;color:#4d4454}
+.role-detail p{margin-bottom:8px}
+.role-detail ol,.role-detail ul{padding-left:20px;margin:7px 0}
+.role-task-list{display:flex;flex-wrap:wrap;gap:7px;padding:0!important;list-style:none}
+.role-task-list li{background:#f5f1f7;border-radius:999px;padding:6px 10px;font-size:.72rem}
+.role-stack{font-size:.8rem;line-height:1.5}
+.unknown-value{color:#867b90;font-size:.8rem;font-style:italic}
+.role-details-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;border-top:1px solid #eee7f3;padding-top:2px}
+.role-editor-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid #eee7f3;padding-top:18px}
+.attestation-label{flex-direction:row;align-items:flex-start;line-height:1.5;padding:13px;background:#f7f3f8;border-radius:10px}
+.attestation-label input{margin-top:2px!important;flex:0 0 16px}
+.interview-steps{border-top:1px solid #eee7f3;padding-top:17px}
+.interview-step-row{display:grid;grid-template-columns:minmax(0,1fr) 100px auto;align-items:end;gap:12px;border-top:1px solid #f0ebf3;padding:12px 0}
+.remove-step{min-height:42px}
+.role-search-preview{max-width:580px;margin:17px 0 25px}
+.role-search-preview .role-card{padding:19px}
+.role-search-preview .role-card h3{font-size:1.1rem}
+.evidence-panel{margin:18px 0}
+.evidence-panel>p{font-size:.85rem;line-height:1.6;max-width:74ch}
+.evidence-list{display:grid;gap:10px;margin-top:16px}
+.evidence-item{border-top:1px solid #ebe5ef;padding:15px 2px 9px}
+.evidence-item-heading{display:flex;align-items:center;gap:10px}
+.evidence-item-heading>div{display:flex;flex-wrap:wrap;gap:7px}
+.evidence-item-heading input{width:16px;height:16px;accent-color:#6927a5;flex:0 0 auto}
+.evidence-action{font-size:.88rem;line-height:1.65;margin:12px 0 8px;color:#352c3d;white-space:pre-line}
+.evidence-limitations{padding-left:19px;color:#7b7184;font-size:.76rem;line-height:1.55}
+.evidence-limitations li+li{margin-top:4px}
+.synthetic-note{color:#896124;background:#fff7e8;border-radius:7px;padding:8px 10px}
+.evidence-empty{padding:24px!important}
+.evidence-loading{padding:8px 0 16px}
+.selectable-evidence{border-top:1px solid #eee7f3;padding-top:18px}
+.selectable-evidence .section-title{margin-bottom:5px}
+.invitation-review{width:min(760px,100%);padding:30px}
+.invitation-review>.role-card{margin-top:18px}
+.compatibility-summary{margin:15px 0;padding:15px 17px;border-radius:11px;background:#f6f2f8;color:#493357;border-left:3px solid #8a5ba9}
+.compatibility-summary.compatible{background:#edf7f0;border-color:#41905b;color:#285638}
+.compatibility-summary.incompatible{background:#fff0f0;border-color:#c33b45;color:#832d34}
+.compatibility-summary.needs_clarification{background:#fff8e9;border-color:#c18a2f;color:#72521e}
+.compatibility-summary>strong{font-size:.88rem;line-height:1.5}
+.compatibility-check{margin:9px 0 0;font-size:.8rem;line-height:1.5}
+.compatibility-check.fail{font-weight:800}
+.invitation-evidence{border-top:1px solid #eee7f3;margin-top:18px;padding-top:15px}
+.invitation-evidence h3{font-size:.95rem}
+.invitation-evidence-item{border-top:1px solid #f0ebf3;padding:12px 0}
+.invitation-evidence-item p{font-size:.83rem;line-height:1.55;margin:8px 0}
+.accept-confirm{flex-direction:row;align-items:flex-start;line-height:1.55;padding:13px;background:#f7f3f8;border-radius:10px}
+.accept-confirm input{margin-top:2px!important;flex:0 0 16px}
+.pinned-contact{display:flex;flex-direction:column;gap:6px;background:#f7f3f8;border-radius:10px;padding:13px}
+.pinned-contact .field-heading{margin:0}
+.pinned-contact strong{font-size:.87rem}
+.invitation-review .actions{border-top:1px solid #eee7f3;padding-top:14px}
+@media(max-width:1050px){.role-editor-grid{grid-template-columns:minmax(0,1fr)}.role-preview{position:static}.role-preview .role-card{max-width:none}}
+@media(max-width:620px){.preferences-panel,.role-editor,.invitation-review{padding:19px}.role-details-grid{grid-template-columns:1fr;gap:0}.interview-step-row{grid-template-columns:minmax(0,1fr) 82px}.remove-step{grid-column:1/-1;justify-self:start}.preference-submit{align-items:flex-start;flex-direction:column}.role-card{padding:17px}.role-facts{grid-template-columns:1fr 1fr}.invitation-review{max-height:96dvh}.selectable-evidence .section-title{align-items:flex-start}}
+@media(prefers-reduced-motion:reduce){.skeleton-line{animation:none}.primary,.button{transition:none}}
