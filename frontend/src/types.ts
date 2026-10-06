@@ -165,7 +165,7 @@ export type EvidenceCard = {
 export type CompatibilityReport = {
   status: 'compatible' | 'needs_clarification' | 'incompatible'
   checks: { code: string; status: 'pass' | 'unknown' | 'fail'; public_text: string }[]
-  soft_signals: { code: string; status: 'match' | 'unknown'; public_text: string }[]
+  soft_signals: { code: string; matched: boolean; public_text: string }[]
   preference_version: number
   role_version_id: string | null
   compatibility_version: 'compat_v2'

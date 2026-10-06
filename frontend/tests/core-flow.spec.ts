@@ -84,14 +84,62 @@ test('role facts, selected evidence, explicit acceptance, and pair-scoped contac
   const target = snapshot.results.find((item: { id: string }) => item.id === candidateId)
   expect(target, `candidate ${candidateId} not found in ${JSON.stringify(snapshot.results.map((item: { id: string }) => item.id))}`).toBeTruthy()
   const targetAlias = target.alias as string
+  const alternate = snapshot.results.find((item: { id: string }) => item.id !== candidateId)
+  if (!alternate) throw new Error('Expected another candidate in the search results to exercise the evidence request race')
+  const alternateAlias = alternate.alias as string
+  const evidenceByCandidate = await employerPage.evaluate(async ([targetId, alternateId]) => {
+    const readEvidence = async (id: string) => {
+      const response = await fetch(`/api/v1/employer/candidates/${id}/evidence`)
+      if (!response.ok) throw new Error(`Evidence request failed with ${response.status}`)
+      return await response.json() as { id: string }[]
+    }
+    return { target: await readEvidence(targetId), alternate: await readEvidence(alternateId) }
+  }, [candidateId, alternate.id])
+  const targetEvidenceIds = new Set(evidenceByCandidate.target.map(card => card.id))
+  expect(evidenceByCandidate.alternate.some(card => !targetEvidenceIds.has(card.id))).toBeTruthy()
+
+  let releaseStaleEvidence!: () => void
+  let signalEvidenceRequestStarted!: () => void
+  let signalStaleRouteFinished!: () => void
+  const staleEvidenceGate = new Promise<void>(resolve => { releaseStaleEvidence = resolve })
+  const evidenceRequestStarted = new Promise<void>(resolve => { signalEvidenceRequestStarted = resolve })
+  const staleRouteFinished = new Promise<void>(resolve => { signalStaleRouteFinished = resolve })
+  await employerPage.route(`**/api/v1/employer/candidates/${alternate.id}/evidence`, async route => {
+    signalEvidenceRequestStarted()
+    await staleEvidenceGate
+    try { await route.continue() } catch { /* closing the candidate modal may abort this request */ }
+    finally { signalStaleRouteFinished() }
+  })
+  await employerPage.locator('.candidate-card').filter({ hasText: alternateAlias })
+    .getByRole('button', { name: /Пригласить с условиями/ }).click()
+  await expect(employerPage.getByRole('dialog')).toBeVisible()
+  await evidenceRequestStarted
+  await employerPage.getByRole('button', { name: 'Закрыть' }).click()
   await employerPage.locator('.candidate-card').filter({ hasText: targetAlias })
     .getByRole('button', { name: /Пригласить с условиями/ }).click()
   await expect(employerPage.getByRole('dialog')).toBeVisible()
   const selectedEvidence = employerPage.getByRole('checkbox', { name: 'Добавить: Ранее сохранённая категория' })
   await expect(selectedEvidence).toBeChecked()
   await expect(employerPage.getByRole('checkbox', { name: 'Добавить: Навык из профиля' }).first()).not.toBeChecked()
+  let submittedEvidenceIds: string[] | null = null
+  await employerPage.route('**/api/v1/employer/invitations', async route => {
+    if (route.request().method() === 'POST') {
+      submittedEvidenceIds = route.request().postDataJSON().evidence_ids as string[]
+    }
+    await route.continue()
+  })
+  releaseStaleEvidence()
+  await staleRouteFinished
+  await employerPage.evaluate(() => new Promise<void>(resolve =>
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
   await employerPage.getByRole('button', { name: /Отправить с выбранным основанием/ }).click()
+  await expect.poll(() => submittedEvidenceIds).not.toBeNull()
+  expect(submittedEvidenceIds?.every(id => targetEvidenceIds.has(id))).toBeTruthy()
   await expect(employerPage.getByRole('status')).toContainText('Приглашение отправлено')
+
+  await employerPage.unroute(`**/api/v1/employer/candidates/${alternate.id}/evidence`)
+  await employerPage.unroute('**/api/v1/employer/invitations')
+  await expect(employerPage.getByRole('dialog')).toHaveCount(0)
 
   await candidatePage.getByRole('button', { name: 'Приглашения' }).click()
   await candidatePage.getByRole('button', { name: 'Проверить условия' }).click()
@@ -99,8 +147,28 @@ test('role facts, selected evidence, explicit acceptance, and pair-scoped contac
   await expect(acceptButton).toBeDisabled()
   await candidatePage.getByRole('checkbox', { name: /проверил.*принимаю именно эту версию/ }).check()
   await expect(acceptButton).toBeEnabled()
+  let returnStaleAcceptance = true
+  await candidatePage.route('**/api/v1/invitations/*/accept', async route => {
+    if (returnStaleAcceptance) {
+      returnStaleAcceptance = false
+      await route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ detail: 'TERMS_VERSION_CONFLICT' }) })
+      return
+    }
+    await route.continue()
+  })
+  await acceptButton.click()
+  await expect(candidatePage.getByRole('dialog')).toHaveCount(0)
+  await expect(candidatePage.getByRole('alert')).toContainText('Условия приглашения изменились')
+  await candidatePage.getByRole('button', { name: 'Проверить условия' }).click()
+  await expect(candidatePage.getByRole('dialog')).toBeVisible()
+  const reviewedTerms = candidatePage.getByRole('checkbox', { name: /проверил.*принимаю именно эту версию/ })
+  await expect(reviewedTerms).not.toBeChecked()
+  await expect(acceptButton).toBeDisabled()
+  await reviewedTerms.check()
   await acceptButton.click()
   await expect(candidatePage.getByRole('status')).toContainText('Контакты доступны только этой компании')
+  await candidatePage.getByRole('button', { name: 'ФСП ID и доступ' }).click()
+  await expect(candidatePage.getByText(/Отзыв закроет компании дальнейший доступ.*уже увидела или сохранила/)).toBeVisible()
 
   await employerPage.getByRole('button', { name: 'Приглашения' }).click()
   await employerPage.getByRole('button', { name: new RegExp(`Показать контакты кандидата #${candidateId.slice(0, 8)}`) }).click()

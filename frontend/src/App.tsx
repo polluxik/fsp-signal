@@ -255,7 +255,24 @@ function CandidateApp({ me }: { me: User }) {
             <button className="primary" onClick={progressTest}>{attempt.phase === 1 ? 'Зафиксировать ответы и продолжить' : 'Отправить на проверку'}</button></section>}
       </>}
     {tab === 'offers' && <InvitationPanel invites={invites} onChanged={load}/>}
-      {tab === 'fsp' && <><div className="page-heading"><p className="eyebrow">ИСТОЧНИК ДОСТИЖЕНИЙ</p><h1>Связь с ФСП ID</h1><p>История соревнований дополняет тест. Если истории нет, вы участвуете в подборе на равных.</p></div><section className="card"><h2>Состояние связи</h2><Notice>{profile.fsp_status === 'mock' ? 'Подключена демонстрационная запись. Это не реальный реестр ФСП.' : profile.fsp_status === 'unverified' ? 'ID введён, но принадлежность не подтверждена.' : 'ФСП ID не подключён.'}</Notice><label>ФСП ID<input value={fspId} onChange={e => setFspId(e.target.value)}/></label><p className="small muted">Для локальной демонстрации используйте ID: demo-{me.id}. Произвольный ID останется неподтверждённым.</p><div className="actions"><button className="primary" onClick={() => action(() => api('/candidate/fsp-link','POST',{participant_id:fspId}), 'Статус связи обновлён')}>Связать ID</button><button className="button subtle" onClick={() => action(() => api('/candidate/fsp-link','DELETE'), 'Связь удалена')}>Отключить</button></div></section><section className="card"><h2>Доступ компаний к контактам</h2>{grants.length === 0 ? <p className="muted">Никому не открыт.</p> : grants.map(grant => <div className="grant" key={grant.id}><span>Компания #{grant.employer_id.slice(0,8)} · {grant.revoked_at ? 'доступ отозван' : 'доступ открыт'}</span>{!grant.revoked_at && <button className="button subtle" onClick={() => action(() => api(`/candidate/contact-grants/${grant.id}/revoke`,'POST'), 'Доступ отозван')}>Отозвать</button>}</div>)}</section></>}
+      {tab === 'fsp' && <>
+        <div className="page-heading"><p className="eyebrow">ИСТОЧНИК ДОСТИЖЕНИЙ</p><h1>Связь с ФСП ID</h1>
+          <p>История соревнований дополняет тест. Если истории нет, вы участвуете в подборе на равных.</p></div>
+        <section className="card"><h2>Состояние связи</h2>
+          <Notice>{profile.fsp_status === 'mock' ? 'Подключена демонстрационная запись. Это не реальный реестр ФСП.' : profile.fsp_status === 'unverified' ? 'ID введён, но принадлежность не подтверждена.' : 'ФСП ID не подключён.'}</Notice>
+          <label>ФСП ID<input value={fspId} onChange={e => setFspId(e.target.value)}/></label>
+          <p className="small muted">Для локальной демонстрации используйте ID: demo-{me.id}. Произвольный ID останется неподтверждённым.</p>
+          <div className="actions"><button className="primary" onClick={() => action(() => api('/candidate/fsp-link','POST',{participant_id:fspId}), 'Статус связи обновлён')}>Связать ID</button>
+            <button className="button subtle" onClick={() => action(() => api('/candidate/fsp-link','DELETE'), 'Связь удалена')}>Отключить</button></div>
+        </section>
+        <section className="card"><h2>Доступ компаний к контактам</h2>
+          {grants.some(grant => !grant.revoked_at) && <p className="small muted">Отзыв закроет компании дальнейший доступ к контактам, но не удалит данные, которые она уже увидела или сохранила.</p>}
+          {grants.length === 0 ? <p className="muted">Никому не открыт.</p> : grants.map(grant => <div className="grant" key={grant.id}>
+            <span>Компания #{grant.employer_id.slice(0,8)} · {grant.revoked_at ? 'доступ отозван' : 'доступ открыт'}</span>
+            {!grant.revoked_at && <button className="button subtle" onClick={() => action(() => api(`/candidate/contact-grants/${grant.id}/revoke`,'POST'), 'Доступ отозван')}>Отозвать</button>}
+          </div>)}
+        </section>
+      </>}
     </main></div>
   </div>
 }
@@ -291,6 +308,7 @@ function EmployerApp({ me }: { me: User }) {
   const [feedback, setFeedback] = useState('')
   const inviteRequest = useRef<{ fingerprint: string; key: string } | null>(null)
   const bankRequest = useRef<AbortController | null>(null)
+  const evidenceRequest = useRef<AbortController | null>(null)
   async function load() {
     setContacts({})
     const [c, n, o, b, h] = await Promise.all([api<typeof company | null>('/employer/company'),
@@ -302,6 +320,7 @@ function EmployerApp({ me }: { me: User }) {
     else setShowNeedForm(true)
   }
   useEffect(() => { load().catch(err => setError(err.message)) }, [])
+  useEffect(() => () => evidenceRequest.current?.abort(), [])
   useEffect(() => {
     if (tab !== 'offers') return
     const controller = new AbortController()
@@ -376,7 +395,17 @@ function EmployerApp({ me }: { me: User }) {
     try { setBank(await api<Candidate[]>(`/employer/candidates?${params}`, 'GET', undefined, { signal: controller.signal })) }
     catch (err) { if ((err as Error).name !== 'AbortError') setError((err as Error).message) }
   }
+  function clearSelectedCandidate() {
+    evidenceRequest.current?.abort()
+    evidenceRequest.current = null
+    setSelected(null)
+    setCandidateEvidence([])
+    setSelectedEvidenceIds([])
+    setEvidenceBusy(false)
+  }
   async function choose(candidate: Candidate) {
+    evidenceRequest.current?.abort()
+    evidenceRequest.current = null
     setSelected(candidate)
     setCandidateEvidence([])
     setSelectedEvidenceIds([])
@@ -396,15 +425,25 @@ function EmployerApp({ me }: { me: User }) {
       salary_max_rub:roleCard.payload.salary_max_rub ?? need?.salary_max_rub ?? 230000,
       work_format:roleCard.payload.work_format ?? 'remote', employer_contact:(roleCard.payload.employer_contact ?? company.contact_email) || me.email })
     setTab('search')
+    const controller = new AbortController()
+    evidenceRequest.current = controller
     try {
-      const cards = await api<EvidenceCard[]>(`/employer/candidates/${candidate.id}/evidence`)
+      const cards = await api<EvidenceCard[]>(`/employer/candidates/${candidate.id}/evidence`, 'GET', undefined, { signal: controller.signal })
+      if (evidenceRequest.current !== controller) return
       setCandidateEvidence(cards)
       const preferred = cards.find(card => card.competency && (roleCard.payload.competencies ?? []).includes(card.competency)
         && ['verified_action', 'synthetic_fixture', 'aggregate'].includes(card.verification_level))
         ?? cards.find(card => card.source_type === 'assessment_attempt' || card.source_type === 'legacy_aggregate')
         ?? cards[0]
       setSelectedEvidenceIds(preferred ? [preferred.id] : [])
-    } catch (err) { setError((err as Error).message) } finally { setEvidenceBusy(false) }
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError' && evidenceRequest.current === controller) setError((err as Error).message)
+    } finally {
+      if (evidenceRequest.current === controller) {
+        evidenceRequest.current = null
+        setEvidenceBusy(false)
+      }
+    }
   }
   async function sendInvite(event: FormEvent) {
     event.preventDefault(); if (!selected) return
@@ -421,7 +460,7 @@ function EmployerApp({ me }: { me: User }) {
       }
       await api('/employer/invitations','POST',body,{ idempotencyKey:inviteRequest.current.key })
       inviteRequest.current = null
-      setSelected(null); setCandidateEvidence([]); setSelectedEvidenceIds([]); await load(); setFeedback('Приглашение отправлено с зафиксированными условиями и выбранным основанием.')
+      clearSelectedCandidate(); await load(); setFeedback('Приглашение отправлено с зафиксированными условиями и выбранным основанием.')
     } catch (err) { setError((err as Error).message) } finally { setInviteBusy(false) }
   }
   async function showContact(candidateId: string) {
@@ -460,15 +499,15 @@ function EmployerApp({ me }: { me: User }) {
         <ul className="reasons">{candidate.match.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>
         {candidate.match.gaps.length > 0 && <p className="gap">{candidate.match.gaps.join('; ')}</p>}
       </>}
-      <button className="button outline" disabled={staleSearch || !activeRoleCard || activeRoleCard.publication_state !== 'active' || !activeRoleCard.fresh}
+      <button className="button outline" disabled={evidenceBusy || inviteBusy || staleSearch || !activeRoleCard || activeRoleCard.publication_state !== 'active' || !activeRoleCard.fresh}
         onClick={() => void choose(candidate)}>Пригласить с условиями →</button>
     </article>
   }
-  return <div className="workspace"><header className="topbar"><span className="logo">ФСП <strong>СИГНАЛ</strong></span><span className="top-id">{company.company_name || me.email}</span></header><div className="shell"><aside className="sidebar"><p className="overline">КАБИНЕТ РАБОТОДАТЕЛЯ</p>{[['search','Найти специалиста'],['need','Роль и условия'],['bank','Банк кандидатов'],['offers','Приглашения'],['company','Компания']].map(([id,label]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => {setTab(id);setSelected(null);setError('');setFeedback('')}}>{label}</button>)}<div className="sidebar-bottom"><p className="small muted">В этой демонстрации достижения ФСП синтетические.</p></div></aside><main className="content">
+  return <div className="workspace"><header className="topbar"><span className="logo">ФСП <strong>СИГНАЛ</strong></span><span className="top-id">{company.company_name || me.email}</span></header><div className="shell"><aside className="sidebar"><p className="overline">КАБИНЕТ РАБОТОДАТЕЛЯ</p>{[['search','Найти специалиста'],['need','Роль и условия'],['bank','Банк кандидатов'],['offers','Приглашения'],['company','Компания']].map(([id,label]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => {setTab(id);clearSelectedCandidate();setError('');setFeedback('')}}>{label}</button>)}<div className="sidebar-bottom"><p className="small muted">В этой демонстрации достижения ФСП синтетические.</p></div></aside><main className="content">
     {error && <Notice tone="bad">{error}</Notice>}{feedback && <Notice tone="good">{feedback}</Notice>}
     {tab === 'company' && <><div className="page-heading"><p className="eyebrow">КОМПАНИЯ</p><h1>Кто приглашает кандидата?</h1><p>Название и способ связи будут указаны в каждом предложении.</p></div><section className="card"><form className="form-grid" onSubmit={saveCompany}><label>Название компании<input value={company.company_name} onChange={e => setCompany({...company,company_name:e.target.value})} required/></label><label>Направление деятельности<input value={company.industry} onChange={e => setCompany({...company,industry:e.target.value})}/></label><label className="full">О команде<textarea rows={4} value={company.description} onChange={e => setCompany({...company,description:e.target.value})}/></label><label>Контактный email<input type="email" value={company.contact_email} onChange={e => setCompany({...company,contact_email:e.target.value})} required/></label><div className="full"><button className="primary">Сохранить компанию</button></div></form></section></>}
     {tab === 'need' && needs.length > 0 && <><div className="page-heading"><p className="eyebrow">РОЛЬ И УСЛОВИЯ</p><h1>Сделайте вакансию понятной до отклика</h1><p>Сначала короткая потребность, затем задача первых 30 дней, зарплата, нагрузка и прозрачные этапы отбора.</p></div>
-      <section className="search-bar card role-selector"><label>Потребность команды<select value={needId} onChange={event => { setNeedId(event.target.value); setSearch(null); setSelected(null) }}>{needs.map(item => <option key={item.id} value={item.id}>{item.title} · {item.grade}</option>)}</select></label>
+      <section className="search-bar card role-selector"><label>Потребность команды<select value={needId} onChange={event => { setNeedId(event.target.value); setSearch(null); clearSelectedCandidate() }}>{needs.map(item => <option key={item.id} value={item.id}>{item.title} · {item.grade}</option>)}</select></label>
         {!showNeedForm && <button className="button outline" onClick={() => setShowNeedForm(true)}>Новая потребность</button>}
       </section>
       {activeNeed && !showNeedForm && <RoleEditor key={activeNeed.id} need={activeNeed} companyContact={company.contact_email || me.email} onSaved={onRoleSaved}/>}
@@ -497,9 +536,9 @@ function EmployerApp({ me }: { me: User }) {
           : <div className="empty card">Кандидаты пока не найдены. Проверьте категорию, бюджет или фильтр ФСП.</div>}
         {search.unavailable_count > 0 && <p className="muted">Недоступно профилей в этой подборке: {search.unavailable_count}.</p>}
       </>}
-      {selected && <div className="modal-backdrop" onClick={() => { if (!inviteBusy) setSelected(null) }}>
+      {selected && <div className="modal-backdrop" onClick={() => { if (!inviteBusy) clearSelectedCandidate() }}>
         <section className="modal card" role="dialog" aria-modal="true" aria-labelledby="invite-title" onClick={event => event.stopPropagation()}>
-          <button className="close" type="button" disabled={inviteBusy} onClick={() => setSelected(null)} aria-label="Закрыть">×</button>
+          <button className="close" type="button" disabled={inviteBusy} onClick={clearSelectedCandidate} aria-label="Закрыть">×</button>
           <p className="eyebrow">ПЕРСОНАЛЬНОЕ ПРИГЛАШЕНИЕ · УСЛОВИЯ ЗАФИКСИРОВАНЫ</p><h2 id="invite-title">{selected.alias}</h2>
           <p className="muted">Кандидат увидит эту версию до решения. Контакты откроются вашей компании только после явного согласия.</p>
           {activeRoleCard && <RoleCard role={activeRoleCard.payload} status={activeRoleCard.publication_state} confirmedAt={activeRoleCard.confirmed_at}/>}

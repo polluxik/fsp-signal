@@ -35,6 +35,11 @@ function roleFrom(invite: Invite): Partial<RoleCardPayload> {
   }
 }
 
+const reopenAfterAcceptanceConflict = new Set([
+  'INVITATION_STATE_CONFLICT', 'TERMS_VERSION_CONFLICT', 'PREFERENCES_VERSION_CONFLICT',
+  'ROLE_VERSION_CONFLICT', 'ROLE_STALE', 'CONDITIONS_INCOMPATIBLE',
+])
+
 export default function InvitationPanel({ invites, onChanged }: Props) {
   const [active, setActive] = useState<Invite | null>(null)
   const [confirmed, setConfirmed] = useState(false)
@@ -80,7 +85,15 @@ export default function InvitationPanel({ invites, onChanged }: Props) {
       setConfirmed(false)
       setFeedback('Вы приняли именно эту версию условий. Контакты доступны только этой компании.')
       await onChanged()
-    } catch (err) { setError((err as Error).message) } finally { setBusy(false) }
+    } catch (err) {
+      setConfirmed(false)
+      setError((err as Error).message)
+      const code = (err as { code?: string }).code
+      if (code && reopenAfterAcceptanceConflict.has(code)) {
+        setActive(null)
+        try { await onChanged() } catch (refreshError) { setError((refreshError as Error).message) }
+      }
+    } finally { setBusy(false) }
   }
 
   async function reject(invite: Invite) {
