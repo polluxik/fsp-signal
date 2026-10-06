@@ -8,6 +8,7 @@ import secrets
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, Response, UploadFile
 from fastapi.responses import StreamingResponse
+from pydantic import ValidationError
 from sqlalchemy import func, inspect, select, text, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -16,8 +17,8 @@ from .assessment import BLUEPRINT_VERSION, COMPETENCIES, grade_attempt, make_ass
 from .config import settings
 from .db import Base, get_db
 from .evidence import build_achievement_narrative, build_achievement_story_record
-from .matching import (can_search, eligible, evaluate_compatibility, fsp_bonus,
-                       public_candidate, score_profile, suggest_competencies)
+from .matching import (can_search, eligible, evaluate_compatibility, explain_profile, fsp_bonus,
+                       public_candidate, score_profile, score_profile_v2, suggest_competencies)
 from .models import (AssessmentAttempt, CandidateProfile, ContactGrant, EmailToken, EmployerProfile,
                      HiringNeed, Invitation, LoginSession, MailOutbox, RoleVersion,
                      SearchSnapshot, User, now)
@@ -27,7 +28,8 @@ from .resume_import import MAX_PDF_BYTES, ResumeImportError, preview_pdf
 from .role_cards import create_initial_draft
 from .routes_v2 import candidate_router, router as v2_router
 from .schemas import (AnswersIn, CandidateIn, EmployerIn, FspLinkIn, InvitationIn, LoginIn,
-                      NeedIn, RegisterIn, SearchIn, StartAssessmentIn, VerifyIn)
+                      NeedIn, RegisterIn, RoleCardIn, SearchIn, SearchOut, StartAssessmentIn,
+                      VerifyIn)
 from .security import aware, check_password, csrf_guard, digest, get_user, hasher, new_session, require, set_auth_cookies
 
 @asynccontextmanager
@@ -480,9 +482,18 @@ def create_need(data: NeedIn, user: User = Depends(get_user), db: Session = Depe
 def list_needs(user: User = Depends(get_user), db: Session = Depends(get_db)):
     require(user, "employer")
     needs = db.scalars(select(HiringNeed).where(HiringNeed.employer_id == user.id).order_by(HiringNeed.created_at.desc())).all()
+    if not needs:
+        return []
+    versions = db.scalars(select(RoleVersion).where(
+        RoleVersion.need_id.in_([need.id for need in needs])
+    )).all()
+    current_versions = {(version.need_id, version.version): version for version in versions}
     return [{"id": n.id, "title": n.title, "description": n.description,
              "specialization": n.specialization, "grade": n.grade,
-             "competencies": n.competencies, "salary_min_rub": n.salary_min_rub,
+             "competencies": n.competencies, "stack": n.stack or [],
+             "role_version_id": (current_versions.get((n.id, n.current_role_version)).id
+                                 if current_versions.get((n.id, n.current_role_version)) else None),
+             "salary_min_rub": n.salary_min_rub,
              "salary_max_rub": n.salary_max_rub, "work_format": n.work_format} for n in needs]
 
 
@@ -505,46 +516,179 @@ def bank_candidates(specialization: str | None = None, grade: str | None = None,
                 (not grade or p.verified_grade == grade) and
                 (not stack or stack.lower() in {x.lower() for x in (p.skills or [])}) and
                 (not fsp_only or bool(fsp_bonus(p)))]
+    def bank_score(profile: CandidateProfile) -> float:
+        if settings.match_algorithm_version == "match_v2":
+            return float(profile.test_score or 0)
+        return 90 * (profile.test_score or 0) / 100 + 10 * fsp_bonus(profile)
+
     selected.sort(key=lambda p: (p.verified_specialization, p.verified_grade,
-                                 -(90*(p.test_score or 0)/100 + 10*fsp_bonus(p)), p.user_id))
-    return [public_candidate(p) | {"bank_score": round(90*(p.test_score or 0)/100 + 10*fsp_bonus(p), 1)}
+                                 -bank_score(p), p.user_id))
+    return [public_candidate(p) | {
+        "bank_score": round(bank_score(p), 1),
+        "bank_score_algorithm_version": settings.match_algorithm_version,
+    }
             for p in selected[:50]]
 
 
-@app.post("/api/v1/employer/searches", dependencies=[Depends(csrf_guard)], status_code=201)
+def _current_role_version(db: Session, need: HiringNeed) -> RoleVersion | None:
+    if need.current_role_version < 1:
+        return None
+    return db.scalar(select(RoleVersion).where(
+        RoleVersion.need_id == need.id,
+        RoleVersion.version == need.current_role_version,
+    ))
+
+
+def _search_role_data(need: HiringNeed, role_version: RoleVersion | None) -> dict:
+    if role_version:
+        return dict(role_version.payload or {})
+    return {
+        "title": need.title, "description": need.description,
+        "specialization": need.specialization, "grade": need.grade,
+        "competencies": need.competencies or [], "stack": need.stack or [],
+        "salary_min_rub": need.salary_min_rub, "salary_max_rub": need.salary_max_rub,
+        "work_format": need.work_format,
+    }
+
+
+def _assessment_snapshot_source(db: Session, profile: CandidateProfile) -> dict:
+    source = {
+        "type": profile.verification_source or ("legacy_aggregate" if profile.test_score is not None else "unknown"),
+        "source_id": None,
+        "source_version": "legacy-aggregate/v1" if profile.test_score is not None else None,
+        "assessed_at": profile.test_verified_at.isoformat() if profile.test_verified_at else None,
+    }
+    if not profile.verified_attempt_id:
+        return source
+    attempt = db.get(AssessmentAttempt, profile.verified_attempt_id)
+    if (not attempt or attempt.candidate_id != profile.user_id or attempt.state != "scored"
+            or attempt.outcome != "passed"
+            or (attempt.specialization, attempt.grade) !=
+            (profile.verified_specialization, profile.verified_grade)):
+        return source
+    _, passed, _, _ = grade_attempt(attempt.questions or [], attempt.answer_key or {}, attempt.answers or {})
+    if not passed:
+        return source
+    return {
+        "type": "assessment_attempt", "source_id": attempt.id,
+        "source_version": f"{attempt.blueprint_version}/fixed-rubric-v1",
+        "assessed_at": attempt.submitted_at.isoformat() if attempt.submitted_at else source["assessed_at"],
+    }
+
+
+def _search_input_snapshot(db: Session, profile: CandidateProfile) -> dict:
+    prefs = preferences_data(profile)
+    return {
+        "category": {
+            "specialization": profile.verified_specialization,
+            "grade": profile.verified_grade,
+        },
+        "test_score": profile.test_score,
+        "competencies": dict(profile.competencies or {}),
+        "assessment_source": _assessment_snapshot_source(db, profile),
+        "preferences_version": prefs["version"],
+    }
+
+
+@app.post("/api/v1/employer/searches", dependencies=[Depends(csrf_guard)], status_code=201,
+          response_model=SearchOut)
 def search_candidates(data: SearchIn, user: User = Depends(get_user), db: Session = Depends(get_db)):
     require(user, "employer")
     need = db.get(HiringNeed, data.need_id)
     if not need or need.employer_id != user.id:
         problem("NOT_FOUND", 404)
+    current_role = _current_role_version(db, need)
+    if data.role_version_id:
+        role_version = db.get(RoleVersion, data.role_version_id)
+        if not role_version or role_version.need_id != need.id:
+            problem("NOT_FOUND", 404)
+        if not current_role or current_role.id != role_version.id:
+            problem("ROLE_VERSION_CONFLICT", 409)
+    else:
+        role_version = current_role
+    role_version_id = role_version.id if role_version else None
     if data.parent_snapshot_id:
         parent = db.get(SearchSnapshot, data.parent_snapshot_id)
         if not parent or parent.employer_id != user.id or parent.need_id != need.id:
             problem("NOT_FOUND", 404)
+        if parent.role_version_id != role_version_id:
+            problem("ROLE_VERSION_CONFLICT", 409)
+    role_data = _search_role_data(need, role_version)
+    try:
+        role_card = RoleCardIn.model_validate(role_data)
+    except ValidationError:
+        role_card = None
+    algorithm_version = settings.match_algorithm_version
+    if algorithm_version == "match_v2" and role_card is None:
+        problem("ROLE_CARD_INCOMPLETE", 409)
     profiles = db.scalars(select(CandidateProfile)).all()
-    scored = [(p, score_profile(p, need)) for p in profiles
-              if not is_blocked(p, user.id) and eligible(p, need, data.fsp_only, data.stack)]
-    scored.sort(key=lambda item: (-item[1]["score"], -(item[0].test_score or 0), item[0].user_id))
-    rows = [{"candidate_id": p.user_id, "match": result} for p, result in scored[:50]]
+    scored = []
+    for profile in profiles:
+        if is_blocked(profile, user.id) or not eligible(profile, role_data, data.fsp_only, data.stack):
+            continue
+        if algorithm_version == "match_v2":
+            result = score_profile_v2(profile, role_card).model_dump(mode="json")
+            if result["score"] is None:
+                continue
+        else:
+            result = score_profile(profile, need)
+            result["explanation"] = explain_profile(profile, role_data).model_dump(mode="json")
+        scored.append((profile, result))
+    scored.sort(key=lambda item: (item[1]["score"] is None, -(item[1]["score"] or 0),
+                                  -(item[0].test_score or 0), item[0].user_id))
+    rows = [{"candidate_id": profile.user_id, "match": result,
+             "snapshot_inputs": _search_input_snapshot(db, profile)}
+            for profile, result in scored[:50]]
     snapshot = SearchSnapshot(employer_id=user.id, need_id=need.id, parent_id=data.parent_snapshot_id,
-                              filters={"fsp_only": data.fsp_only, "stack": data.stack}, results=rows)
+                              role_version_id=role_version_id,
+                              algorithm_version=algorithm_version,
+                              filters={"fsp_only": data.fsp_only, "stack": list(data.stack)}, results=rows)
     db.add(snapshot)
     db.commit()
-    return render_snapshot(db, snapshot)
+    return render_search_snapshot(db, snapshot, user.id)
+
+
+def _changed_candidate_inputs(before: dict, after: dict) -> bool:
+    return any(before.get(key) != after.get(key) for key in (
+        "category", "test_score", "competencies", "assessment_source", "preferences_version",
+    ))
+
+
+def render_search_snapshot(db: Session, snapshot: SearchSnapshot, employer_id: str) -> dict:
+    if snapshot.employer_id != employer_id:
+        problem("NOT_FOUND", 404)
+    need = db.get(HiringNeed, snapshot.need_id)
+    if not need:
+        problem("NOT_FOUND", 404)
+    current_role = _current_role_version(db, need)
+    role_changed = snapshot.role_version_id != (current_role.id if current_role else None)
+    pinned_role = db.get(RoleVersion, snapshot.role_version_id) if snapshot.role_version_id else None
+    role_data = _search_role_data(need, pinned_role)
+    filters = snapshot.filters or {}
+    results = []
+    for row in snapshot.results or []:
+        candidate = db.get(CandidateProfile, row["candidate_id"])
+        if (candidate and not is_blocked(candidate, snapshot.employer_id)
+                and eligible(candidate, role_data, filters.get("fsp_only", False), filters.get("stack", []))):
+            card = public_candidate(candidate, row["match"])
+            before = row.get("snapshot_inputs")
+            card["snapshot_inputs"] = before
+            card["changed_since_search"] = (
+                None if before is None else
+                role_changed or _changed_candidate_inputs(before, _search_input_snapshot(db, candidate))
+            )
+            results.append(card)
+    return {"id": snapshot.id, "need_id": snapshot.need_id, "parent_snapshot_id": snapshot.parent_id,
+            "role_version_id": snapshot.role_version_id,
+            "algorithm_version": snapshot.algorithm_version, "created_at": snapshot.created_at.isoformat(),
+            "filters": filters, "results": results,
+            "unavailable_count": len(snapshot.results or [])-len(results),
+            "changed_since_search": role_changed}
 
 
 def render_snapshot(db: Session, snapshot: SearchSnapshot) -> dict:
-    need = db.get(HiringNeed, snapshot.need_id)
-    results = []
-    for row in snapshot.results:
-        candidate = db.get(CandidateProfile, row["candidate_id"])
-        if (candidate and not is_blocked(candidate, snapshot.employer_id)
-                and eligible(candidate, need, snapshot.filters.get("fsp_only", False), snapshot.filters.get("stack", []))):
-            results.append(public_candidate(candidate, row["match"]))
-    return {"id": snapshot.id, "need_id": snapshot.need_id, "parent_snapshot_id": snapshot.parent_id,
-            "algorithm_version": snapshot.algorithm_version, "created_at": snapshot.created_at.isoformat(),
-            "filters": snapshot.filters, "results": results,
-            "unavailable_count": len(snapshot.results)-len(results)}
+    """Compatibility wrapper for callers that already checked snapshot ownership."""
+    return render_search_snapshot(db, snapshot, snapshot.employer_id)
 
 
 @app.get("/api/v1/employer/searches")
@@ -559,18 +703,19 @@ def list_searches(need_id: str | None = None, user: User = Depends(get_user), db
         query = query.where(SearchSnapshot.need_id == need_id)
     snapshots = db.scalars(query.order_by(SearchSnapshot.created_at.desc(), SearchSnapshot.id.desc()).limit(30)).all()
     return [{"id": item.id, "need_id": item.need_id, "parent_snapshot_id": item.parent_id,
+             "role_version_id": item.role_version_id,
              "algorithm_version": item.algorithm_version, "created_at": item.created_at.isoformat(),
              "filters": item.filters, "result_count": len(item.results or [])}
             for item in snapshots]
 
 
-@app.get("/api/v1/employer/searches/{snapshot_id}")
+@app.get("/api/v1/employer/searches/{snapshot_id}", response_model=SearchOut)
 def read_snapshot(snapshot_id: str, user: User = Depends(get_user), db: Session = Depends(get_db)):
     require(user, "employer")
     snapshot = db.get(SearchSnapshot, snapshot_id)
     if not snapshot or snapshot.employer_id != user.id:
         problem("NOT_FOUND", 404)
-    return render_snapshot(db, snapshot)
+    return render_search_snapshot(db, snapshot, user.id)
 
 
 @app.get("/api/v1/employer/candidates/{candidate_id}")

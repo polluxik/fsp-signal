@@ -10,7 +10,8 @@ from .config import settings
 from .models import CandidateProfile, HiringNeed
 from .preferences import preferences_data
 from .schemas import (
-    CompatibilityCheck, CompatibilityReport, CompatibilitySoftSignal, RoleCardIn,
+    CompatibilityCheck, CompatibilityReport, CompatibilitySoftSignal, EvidenceGap,
+    MatchExplanation, MatchResult, RoleCardIn,
 )
 
 
@@ -66,20 +67,42 @@ def can_search(profile: CandidateProfile) -> bool:
                 profile.verified_grade and profile.test_score is not None)
 
 
-def eligible(profile: CandidateProfile, need: HiringNeed, fsp_only: bool = False, stack: list[str] | None = None) -> bool:
+def _role_data(role: HiringNeed | RoleCardIn | dict) -> dict:
+    if isinstance(role, RoleCardIn):
+        return role.model_dump(mode="json")
+    if isinstance(role, dict):
+        return role
+    return {
+        "title": role.title, "description": role.description,
+        "specialization": role.specialization, "grade": role.grade,
+        "competencies": role.competencies or [], "stack": role.stack or [],
+        "salary_min_rub": role.salary_min_rub, "salary_max_rub": role.salary_max_rub,
+        "work_format": role.work_format,
+    }
+
+
+def eligible(profile: CandidateProfile, need: HiringNeed | RoleCardIn | dict,
+             fsp_only: bool = False, stack: list[str] | None = None) -> bool:
     if not can_search(profile):
         return False
-    if (profile.verified_specialization, profile.verified_grade) != (need.specialization, need.grade):
+    role = _role_data(need)
+    if (profile.verified_specialization, profile.verified_grade) != (
+        role.get("specialization"), role.get("grade")
+    ):
         return False
-    preferences = preferences_data(profile)
-    salary_floor = preferences["salary_min_rub"]
-    if salary_floor is not None and need.salary_max_rub < salary_floor:
-        return False
-    if need.work_format != "any" and need.work_format not in preferences["allowed_work_formats"]:
+    report = evaluate_compatibility(profile, role, mode="search")
+    if any(check.status == "fail" for check in report.checks):
         return False
     if fsp_only and not fsp_bonus(profile):
         return False
-    if stack and not {x.lower() for x in stack}.issubset({x.lower() for x in (profile.skills or [])}):
+    required_stack = {
+        value.strip().casefold()
+        for value in [*(role.get("stack") or []), *(stack or [])]
+        if isinstance(value, str) and value.strip()
+    }
+    candidate_stack = {value.strip().casefold() for value in (profile.skills or [])
+                       if isinstance(value, str) and value.strip()}
+    if not required_stack.issubset(candidate_stack):
         return False
     return True
 
@@ -119,7 +142,7 @@ def evaluate_compatibility(
 
     formats = prefs["allowed_work_formats"]
     work_format = (offer_terms or {}).get("work_format", role_data.get("work_format")) if mode == "invitation" else role_data.get("work_format")
-    if not formats or work_format is None:
+    if not formats or work_format is None or work_format == "any":
         format_status, format_text = "unknown", "Не хватает сведений для сравнения формата работы."
     elif work_format in formats:
         format_status, format_text = "pass", "Формат работы совместим с выбранными условиями."
@@ -234,6 +257,127 @@ def score_profile(profile: CandidateProfile, need: HiringNeed) -> dict:
                        else "Есть подтверждённое достижение ФСП")
     return {"score": score, "components": components, "reasons": reasons, "gaps": gaps,
             "algorithm_version": "match_v1"}
+
+
+def lexical_similarity_for_role(role: RoleCardIn, profile: CandidateProfile) -> float | None:
+    allowed = set(COMPETENCIES.get(f"{role.specialization}:{role.grade}", []))
+    required = set(role.competencies) & allowed
+    values = profile.competencies or {}
+    known = {
+        name: float(score) for name in required
+        if isinstance((score := values.get(name)), (int, float)) and not isinstance(score, bool)
+        and math.isfinite(float(score)) and 0 <= float(score) <= 1
+    }
+    if not known:
+        return None
+    verified = [name for name, score in known.items() if score >= 0.5]
+    left = tokens(f"{role.title} {role.description} {' '.join(role.competencies)}")
+    right = tokens(" ".join(f"{name} {SKILL_NAMES.get(name, '')}" for name in verified))
+    if not left or not right:
+        return 0.0
+    overlap = sum(min(left[word], right[word]) for word in left.keys() & right.keys())
+    return min(1.0, overlap / math.sqrt(sum(left.values()) * sum(right.values())))
+
+
+def _verified_competencies(profile: CandidateProfile, selected: list[str]) -> dict[str, float]:
+    if not profile.verified_attempt_id:
+        return {}
+    values = profile.competencies or {}
+    verified: dict[str, float] = {}
+    for name in selected:
+        score = values.get(name)
+        if (isinstance(score, (int, float)) and not isinstance(score, bool)
+                and math.isfinite(float(score)) and 0 <= float(score) <= 1):
+            verified[name] = float(score)
+    return verified
+
+
+def explain_profile(profile: CandidateProfile, role: HiringNeed | RoleCardIn | dict) -> MatchExplanation:
+    """Describe known and unknown evidence without turning absent data into a deficit."""
+    data = _role_data(role)
+    specialization = data.get("specialization")
+    grade = data.get("grade")
+    allowed = COMPETENCIES.get(f"{specialization}:{grade}", [])
+    selected = [name for name in (data.get("competencies") or []) if name in allowed]
+    if not selected:
+        selected = list(allowed)
+    verified = _verified_competencies(profile, selected)
+    reasons: list[str] = []
+    if (profile.verified_specialization, profile.verified_grade) == (specialization, grade):
+        reasons.append(f"Подтверждена категория {specialization} {grade}.")
+    if isinstance(profile.test_score, int) and 0 <= profile.test_score <= 100:
+        reasons.append(f"Результат профильного assessment: {profile.test_score}/100.")
+    gaps: list[EvidenceGap] = []
+    for name in selected:
+        value = verified.get(name)
+        label = SKILL_NAMES.get(name, name)
+        if value is None:
+            gaps.append(EvidenceGap(
+                competency=name, status="unknown",
+                question="Попросить короткий пример решения этой задачи.",
+            ))
+        elif value < 0.5:
+            gaps.append(EvidenceGap(
+                competency=name, status="gap",
+                question="Обсудить ход решения и возможный способ проверки навыка.",
+            ))
+        else:
+            reasons.append(f"В assessment подтверждена компетенция «{label}» ({round(value * 100)}%).")
+    if not profile.verified_attempt_id and selected:
+        reasons.append("Нет данных по отдельным заданиям; компетенции остаются неизвестными, а не нулевыми.")
+    return MatchExplanation(reasons=reasons, gaps=gaps)
+
+
+def score_profile_v2(profile: CandidateProfile, role: RoleCardIn) -> MatchResult:
+    """Score only comparable, versioned role evidence; unknown evidence is not a zero."""
+    component_names = ("competencies", "assessment", "text")
+    empty_components = {name: None for name in component_names}
+    if (profile.verified_specialization, profile.verified_grade) != (role.specialization, role.grade):
+        reason = "Категории роли и кандидата не совпадают; общий балл не рассчитывается."
+        explanation = MatchExplanation(reasons=[reason])
+        return MatchResult(score=None, components=empty_components, evidence_coverage=0.0, reasons=[reason],
+                           explanation=explanation, algorithm_version="match_v2")
+
+    allowed = COMPETENCIES.get(f"{role.specialization}:{role.grade}", [])
+    selected = [name for name in role.competencies if name in allowed]
+    verified = _verified_competencies(profile, selected)
+    competency_score = sum(verified.values()) / len(verified) if verified else None
+    assessment_score = (float(profile.test_score) / 100
+                        if isinstance(profile.test_score, int) and 0 <= profile.test_score <= 100 else None)
+    text_score = (lexical_similarity_for_role(role, profile) if profile.verified_attempt_id else None)
+    components = {
+        "competencies": round(competency_score, 3) if competency_score is not None else None,
+        "assessment": round(assessment_score, 3) if assessment_score is not None else None,
+        "text": round(text_score, 3) if text_score is not None else None,
+    }
+    weights = {"competencies": 0.60, "assessment": 0.35, "text": 0.05}
+    included_weight = sum(weights[name] for name, value in components.items() if value is not None)
+    score = (round(100 * sum(weights[name] * value for name, value in components.items()
+                              if value is not None) / included_weight, 1)
+             if included_weight else None)
+    competency_coverage = len(verified) / len(selected) if selected else 0.0
+    evidence_coverage = (
+        weights["competencies"] * competency_coverage
+        + (weights["assessment"] if components["assessment"] is not None else 0.0)
+        + (weights["text"] if components["text"] is not None else 0.0)
+    )
+
+    explanation = explain_profile(profile, role)
+    if text_score is not None:
+        explanation = explanation.model_copy(update={
+            "reasons": [*explanation.reasons,
+                        "Текстовый сигнал использует только подтверждённые компетенции этой роли."],
+        })
+    text_gaps = [
+        (f"Пока нет данных по компетенции «{SKILL_NAMES.get(gap.competency, gap.competency)}»."
+         if gap.status == "unknown" else
+         f"В подтверждённом assessment есть пробел по компетенции «{SKILL_NAMES.get(gap.competency, gap.competency)}».")
+        for gap in explanation.gaps
+    ]
+    return MatchResult(score=score, components=components,
+                       evidence_coverage=round(evidence_coverage, 2),
+                       reasons=explanation.reasons, gaps=text_gaps,
+                       explanation=explanation, algorithm_version="match_v2")
 
 
 def public_candidate(profile: CandidateProfile, result: dict | None = None) -> dict:

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
@@ -293,11 +293,35 @@ class MatchExplanation(BaseModel):
     gaps: list[EvidenceGap] = Field(default_factory=list, max_length=20)
 
 
+class MatchResult(BaseModel):
+    score: float | None
+    components: dict[str, float | None]
+    evidence_coverage: float
+    reasons: list[str] = Field(default_factory=list)
+    gaps: list[str] = Field(default_factory=list)
+    explanation: MatchExplanation
+    algorithm_version: Literal["match_v1", "match_v2"]
+
+
 class SearchIn(BaseModel):
     need_id: str
+    role_version_id: str | None = None
     parent_snapshot_id: str | None = None
     fsp_only: bool = False
     stack: list[str] = Field(default_factory=list)
+
+
+class SearchOut(BaseModel):
+    id: str
+    need_id: str
+    parent_snapshot_id: str | None
+    role_version_id: str | None = None
+    algorithm_version: str
+    created_at: datetime
+    filters: dict[str, Any]
+    results: list[dict[str, Any]]
+    unavailable_count: int
+    changed_since_search: bool = False
 
 
 class InvitationIn(BaseModel):
