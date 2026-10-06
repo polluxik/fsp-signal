@@ -17,6 +17,85 @@ async function currentUserId(page: import('@playwright/test').Page): Promise<str
   })
 }
 
+test('candidate discovers roles, saves and hides them, then restores with undo', async ({ browser }) => {
+  const newCandidate = await browser.newPage()
+  await signIn(newCandidate, 'new-candidate@demo.test')
+  await expect(newCandidate.getByRole('heading', { name: 'Роли с понятными условиями' })).toBeVisible()
+  await expect(newCandidate.locator('.match-badge.not_assessed').first()).toBeVisible()
+  const untouchedProfile = await newCandidate.evaluate(async () =>
+    (await fetch('/api/v1/candidate/profile')).json())
+  expect(untouchedProfile).toBeNull()
+  await newCandidate.close()
+
+  const candidate = await browser.newPage()
+  await signIn(candidate, 'backend-middle-1@demo.test')
+  await expect(candidate.getByRole('heading', { name: 'Роли с понятными условиями' })).toBeVisible()
+
+  await candidate.getByRole('button', { name: 'Условия поиска' }).click()
+  await candidate.getByLabel(/Минимум, ₽ в месяц/).fill('')
+  await candidate.getByRole('checkbox', { name: 'Гибрид' }).check()
+  await candidate.getByRole('checkbox', { name: 'Офис' }).check()
+  await candidate.getByRole('button', { name: 'Сохранить условия' }).click()
+  await expect(candidate.getByRole('status')).toContainText('Условия обновлены')
+
+  const feedResponsePromise = candidate.waitForResponse(response =>
+    response.url().includes('/api/v1/candidate/roles') && response.request().method() === 'GET')
+  await candidate.getByRole('button', { name: 'Для меня' }).click()
+  const feedResponse = await feedResponsePromise
+  expect(feedResponse.ok()).toBeTruthy()
+  const initialFeed = await feedResponse.json()
+  expect(initialFeed.items).toHaveLength(5)
+  expect(JSON.stringify(initialFeed)).not.toContain('employer_contact')
+  expect(JSON.stringify(initialFeed)).not.toContain('@demo.test')
+  await expect(candidate.locator('[data-testid="discovery-role"]')).toHaveCount(5)
+  await expect(candidate.getByText('Нужно уточнить условия').first()).toBeVisible()
+  await candidate.getByRole('button', { name: 'Показать ещё 5' }).click()
+  await expect(candidate.locator('[data-testid="discovery-role"]')).toHaveCount(6)
+
+  const savedRole = candidate.locator('[data-testid="discovery-role"]')
+    .filter({ hasText: 'Frontend Middle: надёжные сценарии' })
+  const bumpedPreferences = await candidate.evaluate(async () => {
+    const current = await fetch('/api/v1/candidate/preferences').then(response => response.json())
+    const token = decodeURIComponent(document.cookie.split('; ').find(item => item.startsWith('fsp_csrf='))?.split('=')[1] ?? '')
+    const { version, ...payload } = current
+    const response = await fetch('/api/v1/candidate/preferences', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', 'x-csrf-token': token },
+      body: JSON.stringify({ ...payload, expected_version: version }),
+    })
+    return { status: response.status, version: (await response.json()).version }
+  })
+  expect(bumpedPreferences.status).toBe(200)
+  await savedRole.getByRole('button', { name: 'Сохранить' }).click()
+  await expect(candidate.locator('.feed-error')).toContainText('ваши условия обновились')
+  await expect(savedRole.getByRole('button', { name: 'Сохранить' })).toBeVisible()
+  await savedRole.getByRole('button', { name: 'Сохранить' }).click()
+  await expect(savedRole.getByRole('button', { name: 'Сохранено' })).toBeVisible()
+  await candidate.reload()
+  await candidate.getByLabel('Только сохранённые').check()
+  await expect(candidate.locator('[data-testid="discovery-role"]')).toHaveCount(1)
+  await expect(candidate.locator('[data-testid="discovery-role"]')
+    .filter({ hasText: 'Frontend Middle: надёжные сценарии' })).toHaveCount(1)
+  await candidate.getByLabel('Только сохранённые').uncheck()
+
+  const hiddenRole = candidate.locator('[data-testid="discovery-role"]')
+    .filter({ hasText: 'Backend Middle: платёжные события' })
+  await hiddenRole.getByRole('button', { name: 'Скрыть' }).click()
+  await expect(candidate.locator('.undo-notice')).toContainText('Роль скрыта из вашей ленты.')
+  await expect(hiddenRole).toHaveCount(0)
+  await candidate.getByRole('button', { name: 'Вернуть роль' }).click()
+  await expect(candidate.locator('[data-testid="discovery-role"]')
+    .filter({ hasText: 'Backend Middle: платёжные события' })).toHaveCount(1)
+  await candidate.locator('[data-testid="discovery-role"]')
+    .filter({ hasText: 'Backend Middle: платёжные события' })
+    .getByRole('button', { name: 'Скрыть' }).click()
+  await candidate.reload()
+  await expect(candidate.locator('[data-testid="discovery-role"]')
+    .filter({ hasText: 'Backend Middle: платёжные события' })).toHaveCount(0)
+
+  await candidate.close()
+})
+
 test('candidate preferences persist without publishing and stay private from employers', async ({ browser }) => {
   const candidate = await browser.newPage()
   await signIn(candidate, 'backend-middle-1@demo.test')
@@ -28,6 +107,7 @@ test('candidate preferences persist without publishing and stay private from emp
   await expect(candidate.locator('.notice')).toContainText('Условия обновлены')
 
   await candidate.reload()
+  await candidate.getByRole('button', { name: 'Мой профиль' }).click()
   await candidate.getByRole('button', { name: 'Условия поиска' }).click()
   await expect(candidate.getByLabel(/Минимум, ₽ в месяц/)).toHaveValue('175000')
   await candidate.getByRole('button', { name: 'Мой профиль' }).click()
@@ -41,6 +121,7 @@ test('candidate preferences persist without publishing and stay private from emp
   await candidate.getByRole('button', { name: 'Сохранить профиль' }).click()
   await expect(candidate.getByRole('status')).toContainText('Профиль сохранён')
   await candidate.reload()
+  await candidate.getByRole('button', { name: 'Мой профиль' }).click()
   await expect(candidate.getByLabel('Контекст: какую задачу или проблему решали'))
     .toHaveValue('Повторная доставка события могла создать двойную запись в расчётах.')
   await expect(candidate.getByLabel(/Отдельно разрешаю показать этот рассказ/)).not.toBeChecked()
@@ -51,6 +132,15 @@ test('candidate preferences persist without publishing and stay private from emp
   const forbidden = await employer.evaluate(async () => (await fetch('/api/v1/candidate/preferences')).status)
   expect(forbidden).toBe(403)
   await candidate.close()
+  await employer.close()
+})
+
+test('seed role provenance is visible in the employer role preview', async ({ browser }) => {
+  const employer = await browser.newPage()
+  await signIn(employer, 'employer@demo.test')
+  await employer.getByRole('button', { name: 'Роль и условия' }).click()
+  await expect(employer.getByRole('heading', { name: 'Сделайте вакансию понятной до отклика' })).toBeVisible()
+  await expect(employer.getByText('Синтетическая вакансия').first()).toBeVisible()
   await employer.close()
 })
 

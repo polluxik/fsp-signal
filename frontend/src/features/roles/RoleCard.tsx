@@ -5,6 +5,7 @@ type Props = {
   status?: RoleCardOut['publication_state']
   confirmedAt?: string | null
   recordedAt?: string
+  source?: string | null
   compact?: boolean
 }
 
@@ -30,15 +31,22 @@ function statusName(status?: Props['status']): string {
   return ({ draft: 'Черновик', active: 'Опубликована', paused: 'На паузе', closed: 'Закрыта' } as Record<string, string>)[status ?? ''] ?? 'Условия роли'
 }
 
-export default function RoleCard({ role, status, confirmedAt, recordedAt, compact = false }: Props) {
+export default function RoleCard({ role, status, confirmedAt, recordedAt, source, compact = false }: Props) {
   if (!role) return <div className="empty role-empty">Условия роли пока не заполнены.</div>
   const salaryComplete = typeof role.salary_min_rub === 'number' && role.salary_min_rub > 0
     && typeof role.salary_max_rub === 'number' && role.salary_max_rub >= role.salary_min_rub
   const location = role.work_format === 'remote' ? 'Удалённо' : role.work_city || 'Город не указан'
   const tasks = role.competencies?.map(item => competencyNames[item] ?? item) ?? []
+  const sourceLabel = source === 'synthetic_demo' ? 'Синтетическая вакансия'
+    : source === 'employer_declared' ? 'Заявлено работодателем'
+      : source === 'legacy_import' ? 'Импортированные условия · источник не подтверждён' : null
+  const sourceClass = source === 'synthetic_demo' ? 'synthetic-badge' : source === 'legacy_import' ? 'unknown-source-badge' : ''
   return <article className={`role-card ${compact ? 'compact' : ''}`}>
     <div className="role-card-topline"><span className="eyebrow">{role.specialization && role.grade ? `${role.specialization.toUpperCase()} · ${role.grade.toUpperCase()}` : 'РОЛЬ'}</span>
-      <span className={`badge ${status === 'active' ? 'green' : ''}`}>{statusName(status)}</span></div>
+      <div className="role-source-badges">
+        {sourceLabel && <span className={`badge ${sourceClass}`}>{sourceLabel}</span>}
+        <span className={`badge ${status === 'active' ? 'green' : ''}`}>{statusName(status)}</span>
+      </div></div>
     <h3>{role.title || 'Название роли не заполнено'}</h3>
     <p className="role-salary">{salaryComplete ? `${rubles(role.salary_min_rub!)} — ${rubles(role.salary_max_rub!)}` : 'Диапазон зарплаты не указан'}
       <span>в месяц · до налогов</span></p>

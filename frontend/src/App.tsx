@@ -6,6 +6,7 @@ import EvidencePanel from './features/evidence/EvidencePanel'
 import InvitationPanel from './features/invitations/InvitationPanel'
 import PreferencesPanel from './features/preferences/PreferencesPanel'
 import RoleCard from './features/roles/RoleCard'
+import RoleFeed from './features/roles/RoleFeed'
 import RoleEditor from './features/roles/RoleEditor'
 
 const skillNames: Record<string, string> = {
@@ -105,7 +106,7 @@ function Verify({ onDone }: { onDone: () => void }) {
 }
 
 function CandidateApp({ me }: { me: User }) {
-  const [tab, setTab] = useState('profile')
+  const [tab, setTab] = useState('roles')
   const [profile, setProfile] = useState<Profile>(emptyProfile)
   const [story, setStory] = useState<AchievementStory>(emptyAchievementStory)
   const [skillsText, setSkillsText] = useState('')
@@ -210,11 +211,12 @@ function CandidateApp({ me }: { me: User }) {
   return <div className="workspace">
     <header className="topbar"><span className="logo">ФСП <strong>СИГНАЛ</strong></span><span className="top-id">{me.email}</span></header>
     <div className="shell"><aside className="sidebar"><p className="overline">КАБИНЕТ КАНДИДАТА</p>
-      {[['profile','Мой профиль'],['preferences','Условия поиска'],['evidence','Доказательства'],['test','Проверка навыков'],['offers','Приглашения'],['fsp','ФСП ID и доступ']].map(([id, label]) =>
+      {[['roles','Для меня'],['profile','Мой профиль'],['preferences','Условия поиска'],['evidence','Доказательства'],['test','Проверка навыков'],['offers','Приглашения'],['fsp','ФСП ID и доступ']].map(([id, label]) =>
         <button key={id} className={tab === id ? 'active' : ''} onClick={() => { setTab(id); setError(''); setFeedback('') }}>{label}</button>)}
       <div className="sidebar-bottom"><CategoryBadge spec={profile.verified_specialization} grade={profile.verified_grade}/><p className="small muted">Контакты открываются только по вашему решению.</p></div>
     </aside><main className="content">
       {error && <Notice tone="bad">{error}</Notice>}{feedback && <Notice tone="good">{feedback}</Notice>}
+      {tab === 'roles' && <RoleFeed onNavigate={setTab}/>}
       {tab === 'preferences' && <><div className="page-heading"><p className="eyebrow">ВАШИ ПРАВИЛА</p><h1>Подборка под ваши условия</h1><p>Сохранённые ограничения фильтруют выдачу. Их значения остаются закрытыми от компаний.</p></div><PreferencesPanel/></>}
       {tab === 'evidence' && <><div className="page-heading"><p className="eyebrow">ФАКТЫ О ВАШЕЙ РАБОТЕ</p><h1>Проверенное отдельно от заявленного</h1><p>Короткий ввод помогает быстро начать; в истории достижений можно сохранить контекст, личный вклад, решение, результат и его основание.</p></div><EvidencePanel/></>}
       {tab === 'profile' && <><div className="page-heading"><p className="eyebrow">ПАСПОРТ НАВЫКОВ</p><h1>Пусть навыки говорят за вас</h1><p>Работодатель увидит категорию после теста. Контакты остаются закрытыми до принятия приглашения.</p></div>
@@ -524,7 +526,7 @@ function EmployerApp({ me }: { me: User }) {
       </section>
       {needs.length === 0 && <Notice>Создайте профиль компании и заполните условия первой роли.</Notice>}
       {activeRoleCard && <div className="role-search-preview"><RoleCard role={activeRoleCard.payload} status={activeRoleCard.publication_state}
-        confirmedAt={activeRoleCard.confirmed_at} compact/><button className="text-button" onClick={() => setTab('need')}>Изменить условия роли</button></div>}
+        confirmedAt={activeRoleCard.confirmed_at} source={activeRoleCard.source} compact/><button className="text-button" onClick={() => setTab('need')}>Изменить условия роли</button></div>}
       {needs.length > 0 && (!activeRoleCard || activeRoleCard.publication_state !== 'active' || !activeRoleCard.fresh) &&
         <Notice>Подборка доступна только по опубликованной актуальной роли. <button className="text-button" onClick={() => setTab('need')}>Оформить роль</button></Notice>}
       {snapshots.some(item => item.need_id === needId) && <div className="snapshot-history"><span>Сохранённые подборки:</span>
@@ -541,7 +543,8 @@ function EmployerApp({ me }: { me: User }) {
           <button className="close" type="button" disabled={inviteBusy} onClick={clearSelectedCandidate} aria-label="Закрыть">×</button>
           <p className="eyebrow">ПЕРСОНАЛЬНОЕ ПРИГЛАШЕНИЕ · УСЛОВИЯ ЗАФИКСИРОВАНЫ</p><h2 id="invite-title">{selected.alias}</h2>
           <p className="muted">Кандидат увидит эту версию до решения. Контакты откроются вашей компании только после явного согласия.</p>
-          {activeRoleCard && <RoleCard role={activeRoleCard.payload} status={activeRoleCard.publication_state} confirmedAt={activeRoleCard.confirmed_at}/>}
+          {activeRoleCard && <RoleCard role={activeRoleCard.payload} status={activeRoleCard.publication_state}
+            confirmedAt={activeRoleCard.confirmed_at} source={activeRoleCard.source}/>}
           <EvidencePanel mode="select" candidateId={selected.id} externalCards={candidateEvidence} externalLoading={evidenceBusy}
             selectedIds={selectedEvidenceIds} onSelectedIdsChange={setSelectedEvidenceIds}/>
           <form className="form-grid" onSubmit={sendInvite}>

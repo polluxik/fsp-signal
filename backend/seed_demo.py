@@ -14,6 +14,96 @@ from .schemas import RoleCardIn
 from .security import hasher
 
 
+DISCOVERY_ROLE_FIXTURES = (
+    {
+        "title": "Backend Junior: полезные API",
+        "description": "Развивать API кабинета и разбирать реальные ошибки валидации.",
+        "specialization": "backend", "grade": "junior",
+        "competencies": ["data_trace", "validation", "http_api"],
+        "stack": ["Python", "FastAPI"], "salary_min_rub": 100000, "salary_max_rub": 140000,
+        "work_format": "remote", "work_city": None,
+        "first_30_days": "Добавить понятную валидацию в один пользовательский сценарий.",
+        "industry": "ИТ", "take_home_minutes": 0,
+    },
+    {
+        "title": "Backend Middle: платёжные события",
+        "description": "Убрать повторную обработку платежей и улучшить восстановление после сбоев.",
+        "specialization": "backend", "grade": "middle",
+        "competencies": ["event_idempotency", "data_integrity", "failure_recovery"],
+        "stack": ["Python", "PostgreSQL"], "salary_min_rub": 190000, "salary_max_rub": 250000,
+        "work_format": "hybrid", "work_city": "Москва",
+        "first_30_days": "Согласовать безопасную обработку повторных событий.",
+        "industry": "Финтех", "take_home_minutes": 0,
+    },
+    {
+        "title": "Frontend Junior: интерфейс кабинета",
+        "description": "Собирать доступные формы и исправлять несогласованные состояния интерфейса.",
+        "specialization": "frontend", "grade": "junior",
+        "competencies": ["javascript_trace", "ui_state", "forms"],
+        "stack": ["TypeScript", "React"], "salary_min_rub": 110000, "salary_max_rub": 150000,
+        "work_format": "office", "work_city": "Казань",
+        "first_30_days": "Упростить одну форму и добавить обработку ошибок отправки.",
+        "industry": "ИТ", "take_home_minutes": 30,
+    },
+    {
+        "title": "Frontend Middle: надёжные сценарии",
+        "description": "Улучшить отзывчивость кабинета и защитить запросы от гонок и потери состояния.",
+        "specialization": "frontend", "grade": "middle",
+        "competencies": ["request_races", "derived_state", "error_recovery"],
+        "stack": ["TypeScript", "React"], "salary_min_rub": 200000, "salary_max_rub": 270000,
+        "work_format": "remote", "work_city": None,
+        "first_30_days": "Найти и устранить один конфликт параллельных запросов.",
+        "industry": "ИТ", "take_home_minutes": 0,
+    },
+    {
+        "title": "Backend Junior: выгрузки без потерь",
+        "description": "Поддерживать API выгрузок и находить ошибки в обработке данных.",
+        "specialization": "backend", "grade": "junior",
+        "competencies": ["data_trace", "validation", "http_api"],
+        "stack": ["Python", "FastAPI"], "salary_min_rub": 120000, "salary_max_rub": 165000,
+        "work_format": "remote", "work_city": None,
+        "first_30_days": "Добавить проверку целостности для одного вида выгрузки.",
+        "industry": "ИТ", "take_home_minutes": 30,
+    },
+)
+
+
+def _seed_discovery_roles(db, employer: User, at) -> None:
+    for index, fixture in enumerate(DISCOVERY_ROLE_FIXTURES):
+        need = db.scalar(select(HiringNeed).where(
+            HiringNeed.employer_id == employer.id, HiringNeed.title == fixture["title"]
+        ))
+        if need is not None:
+            continue
+        card_data = {
+            **fixture,
+            "interview_steps": [{"title": "Знакомство и разбор опыта", "duration_minutes": 45}],
+            "response_sla_hours": 48,
+            "employer_contact": "other@demo.test",
+            "active_headcount_attested": True,
+        }
+        card = RoleCardIn.model_validate(card_data)
+        need = HiringNeed(
+            employer_id=employer.id,
+            title=card.title,
+            description=card.description,
+            specialization=card.specialization,
+            grade=card.grade,
+            competencies=card.competencies,
+            stack=card.stack,
+            salary_min_rub=card.salary_min_rub,
+            salary_max_rub=card.salary_max_rub,
+            work_format=card.work_format,
+        )
+        db.add(need)
+        db.flush()
+        fixture_at = at - timedelta(seconds=index)
+        version = create_role_version(db, employer.id, need.id, card, need.current_role_version,
+                                      fixture_at, source="synthetic_demo")
+        publish_role(db, employer.id, need.id, expected_version=version.version,
+                     active_headcount_attested=True, discoverable=True, at=fixture_at)
+
+
 def seed() -> None:
     if settings.app_mode != "demo":
         raise SystemExit("Synthetic seed is allowed only in APP_MODE=demo")
@@ -40,6 +130,16 @@ def seed() -> None:
                                    description="Контроль границы доступа", industry="ИТ", contact_email="other@demo.test"))
         else:
             second.origin = "synthetic_fixture"
+
+        _seed_discovery_roles(db, second, now())
+
+        browser_candidate = db.scalar(select(User).where(User.email == "new-candidate@demo.test"))
+        if browser_candidate is None:
+            browser_candidate = User(email="new-candidate@demo.test", password_hash=hasher.hash("DemoPass123!"),
+                                     role="candidate", origin="synthetic_fixture", email_verified_at=now())
+            db.add(browser_candidate)
+        else:
+            browser_candidate.origin = "synthetic_fixture"
 
         need = db.scalar(select(HiringNeed).where(HiringNeed.employer_id == employer.id,
                                                   HiringNeed.title == "Backend Middle: события"))
@@ -112,7 +212,7 @@ def seed() -> None:
                     fsp_status=fsp, fsp_result="finalist" if fsp == "mock" else None)
                 db.add(profile)
         db.commit()
-    print("Seed ready: two employers, 48 synthetic candidates, one hiring need.")
+    print("Seed ready: two employers, 48 assessment profiles, one profile-free candidate, six discovery roles.")
     print("Demo accounts: employer@demo.test / DemoPass123!, other@demo.test / DemoPass123!")
     print("Register a new candidate to demonstrate a real assessment.")
 

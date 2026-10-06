@@ -183,6 +183,38 @@ class RoleCardOut(BaseModel):
     salary_basis: Literal["gross"] = "gross"
 
 
+class CandidateRoleCard(BaseModel):
+    title: str
+    description: str
+    specialization: Literal["backend", "frontend"]
+    grade: Literal["junior", "middle"]
+    competencies: list[str]
+    stack: list[str]
+    salary_min_rub: int
+    salary_max_rub: int
+    work_format: Literal["remote", "hybrid", "office"]
+    work_city: str | None = None
+    industry: str | None = None
+    first_30_days: str
+    interview_steps: list[InterviewStepIn]
+    take_home_minutes: int
+    response_sla_hours: Literal[24, 48, 72]
+
+
+class RoleDecisionIn(BaseModel):
+    action: Literal["saved", "hidden", "none"]
+    expected_role_version: str = Field(min_length=36, max_length=36)
+    expected_preferences_version: int = Field(ge=1)
+
+
+class RoleDecisionOut(BaseModel):
+    need_id: str
+    action: Literal["saved", "hidden", "none"]
+    role_version_id: str
+    preferences_version: int
+    updated_at: datetime
+
+
 class CandidatePreferencesIn(BaseModel):
     expected_version: int = Field(ge=1)
     salary_min_rub: int | None = Field(default=None, ge=1)
@@ -244,6 +276,27 @@ class CompatibilityReport(BaseModel):
     preference_version: int
     role_version_id: str | None = None
     compatibility_version: Literal["compat_v2"] = "compat_v2"
+
+
+class CandidateRoleFeedItem(BaseModel):
+    need_id: str
+    role_version_id: str
+    role_version: int
+    company_name: str
+    role: CandidateRoleCard
+    confirmed_at: datetime
+    preferences_version: int
+    data_mode: Literal["real", "synthetic", "unknown"]
+    match_state: Literal["compatible", "needs_clarification", "not_assessed"]
+    compatibility: CompatibilityReport | None = None
+    decision: Literal["saved", "hidden", "none"] = "none"
+
+
+class RoleFeedOut(BaseModel):
+    items: list[CandidateRoleFeedItem]
+    next_cursor: str | None = None
+    limit: int
+    empty_state: Literal["no_active_roles", "no_compatible_roles", "no_saved_roles"] | None = None
 
 
 class AccessChangeResult(BaseModel):

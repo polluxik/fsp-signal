@@ -1,7 +1,10 @@
 """Versioned role-card HTTP boundary; business rules live in role_cards."""
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .assessment import COMPETENCIES
@@ -10,13 +13,15 @@ from .domain_errors import DomainError
 from .evidence import list_candidate_evidence
 from .models import CandidateProfile, HiringNeed, User, now
 from .preferences import block_employer, preferences_data, revoke_employer_contacts, save_preferences
+from .role_discovery import RoleDiscoveryError, discover_roles, save_role_decision
 from .role_cards import (
     close_role, create_role_version, pause_role, publish_role,
     reconfirm_role, role_card_data,
 )
 from .schemas import (
     AccessChangeResult, CandidatePreferencesIn, CandidatePreferencesOut,
-    EvidenceCard, PublishRoleIn, ReconfirmRoleIn, RoleCardOut, RoleMutationIn, RoleVersionIn,
+    EvidenceCard, PublishRoleIn, ReconfirmRoleIn, RoleCardOut, RoleDecisionIn,
+    RoleDecisionOut, RoleFeedOut, RoleMutationIn, RoleVersionIn,
 )
 from .security import csrf_guard, get_user, require
 
@@ -42,6 +47,43 @@ def get_candidate_evidence(response: Response, user: User = Depends(get_user), d
     require(user, "candidate")
     response.headers["Cache-Control"] = "no-store"
     return list_candidate_evidence(db, user.id, audience="self")
+
+
+@candidate_router.get("/roles", response_model=RoleFeedOut)
+def get_candidate_roles(response: Response, cursor: str | None = Query(default=None, max_length=512),
+                        limit: int = Query(default=5, ge=1, le=20),
+                        specialization: Literal["backend", "frontend"] | None = None,
+                        grade: Literal["junior", "middle"] | None = None,
+                        work_format: Literal["remote", "hybrid", "office"] | None = None,
+                        saved_only: bool = False,
+                        user: User = Depends(get_user), db: Session = Depends(get_db)):
+    require(user, "candidate")
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return discover_roles(db, user.id, cursor, limit, specialization=specialization,
+                              grade=grade, work_format=work_format, saved_only=saved_only)
+    except RoleDiscoveryError as exc:
+        _raise_role_error(exc)
+
+
+@candidate_router.put("/role-decisions/{need_id}", response_model=RoleDecisionOut,
+                      dependencies=[Depends(csrf_guard)])
+def put_candidate_role_decision(need_id: str, data: RoleDecisionIn,
+                                user: User = Depends(get_user), db: Session = Depends(get_db)):
+    require(user, "candidate")
+    try:
+        result = save_role_decision(
+            db, user.id, need_id, data.action, data.expected_role_version,
+            data.expected_preferences_version, now(),
+        )
+        db.commit()
+        return result
+    except RoleDiscoveryError as exc:
+        db.rollback()
+        _raise_role_error(exc)
+    except IntegrityError as exc:
+        db.rollback()
+        _raise_role_error(RoleDiscoveryError("ROLE_DECISION_CONFLICT", 409))
 
 
 @router.get("/{need_id}/role-card", response_model=RoleCardOut)

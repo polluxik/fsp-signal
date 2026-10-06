@@ -40,6 +40,7 @@ button:disabled{cursor:not-allowed}
 .role-card{background:#fff;border:1px solid #e8e1ed;border-radius:17px;padding:22px;color:#302739}
 .role-preview .role-card,.role-search-preview .role-card{box-shadow:0 12px 32px rgba(57,25,86,.05)}
 .role-card-topline{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.role-source-badges{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-wrap:wrap}
 .role-card h3{font-size:1.3rem;line-height:1.3;margin:12px 0 8px}
 .role-salary{font-size:1.15rem;font-weight:850;letter-spacing:-.03em;color:#4c2171;margin:14px 0}
 .role-salary span{display:block;margin-top:4px;font-size:.73rem;font-weight:600;letter-spacing:0;color:#777184}
@@ -100,6 +101,31 @@ button:disabled{cursor:not-allowed}
 .pinned-contact .field-heading{margin:0}
 .pinned-contact strong{font-size:.87rem}
 .invitation-review .actions{border-top:1px solid #eee7f3;padding-top:14px}
+.discovery-filters{display:grid;grid-template-columns:repeat(3,minmax(130px,1fr)) minmax(180px,auto);align-items:end;gap:15px;padding:18px 20px!important;margin-bottom:24px!important}
+.discovery-filters .inline-check{min-height:44px;white-space:nowrap}
+.feed-section{margin:25px 0 34px}
+.feed-section>.results-heading{margin:0 0 14px}
+.feed-list{display:grid;gap:17px}
+.discovery-role{background:#fff;border:1px solid #e9e3f0;border-radius:18px;padding:20px;box-shadow:0 10px 34px rgba(57,25,86,.035)}
+.discovery-role-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin-bottom:8px}
+.discovery-company{font-size:.81rem;font-weight:800;color:#62546d;margin:3px 0 0}
+.discovery-badges{display:flex;gap:7px;justify-content:flex-end;flex-wrap:wrap}
+.synthetic-badge{background:#fff4df;color:#8a5d10}
+.unknown-source-badge{background:#f3eeee;color:#6e5353}
+.match-badge.compatible{background:#dcf5e5;color:#1d8242}
+.match-badge.needs_clarification{background:#fff0d5;color:#805c17}
+.match-badge.not_assessed{background:#f0ecf3;color:#65586f}
+.discovery-role .role-card{border:0;padding:6px 0 2px;box-shadow:none}
+.discovery-role .compatibility-summary{margin-top:4px}
+.compatibility-unknowns{font-size:.8rem;line-height:1.5;margin:8px 0 0;padding-left:20px}
+.discovery-actions{display:flex;flex-wrap:wrap;gap:10px;border-top:1px solid #eee7f3;padding-top:15px;margin-top:14px}
+.discovery-actions button{min-width:132px}
+.undo-notice{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#f1ebf8}
+.feed-error{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.feed-more{display:flex;justify-content:center;padding:4px 0 20px}
+.discovery-empty{margin-top:20px}
+@media(max-width:800px){.discovery-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.discovery-filters{grid-template-columns:1fr;padding:16px!important}.discovery-role{padding:15px}.discovery-role-heading{flex-direction:column}.discovery-badges{justify-content:flex-start}.discovery-actions button{flex:1}}
 @media(max-width:1050px){.role-editor-grid{grid-template-columns:minmax(0,1fr)}.role-preview{position:static}.role-preview .role-card{max-width:none}}
 @media(max-width:620px){.preferences-panel,.role-editor,.invitation-review{padding:19px}.role-details-grid{grid-template-columns:1fr;gap:0}.interview-step-row{grid-template-columns:minmax(0,1fr) 82px}.remove-step{grid-column:1/-1;justify-self:start}.preference-submit{align-items:flex-start;flex-direction:column}.role-card{padding:17px}.role-facts{grid-template-columns:1fr 1fr}.invitation-review{max-height:96dvh}.selectable-evidence .section-title{align-items:flex-start}}
 @media(prefers-reduced-motion:reduce){.skeleton-line{animation:none}.primary,.button{transition:none}}

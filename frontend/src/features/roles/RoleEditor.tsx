@@ -306,7 +306,7 @@ export default function RoleEditor({ need, companyContact, onSaved }: Props) {
       </form>
     </section>
     <aside className="role-preview"><p className="eyebrow">ТАК УСЛОВИЯ УВИДИТ КАНДИДАТ</p>
-      <RoleCard role={previewPayload} status={role?.publication_state} confirmedAt={role?.confirmed_at}/>
+      <RoleCard role={previewPayload} status={role?.publication_state} confirmedAt={role?.confirmed_at} source={role?.source}/>
       <p className="small muted">Опубликованные условия версионируются. При изменении кандидат заново решает, подходит ли ему новая версия.</p>
     </aside>
   </div>

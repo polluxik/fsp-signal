@@ -110,6 +110,42 @@ export type RoleCardOut = {
   salary_basis: 'gross'
 }
 
+export type CandidateRoleCard = Omit<RoleCardPayload, 'employer_contact' | 'active_headcount_attested'>
+export type CandidateRoleDecision = 'saved' | 'hidden' | 'none'
+export type CandidateRoleFeedItem = {
+  need_id: string
+  role_version_id: string
+  role_version: number
+  company_name: string
+  role: CandidateRoleCard
+  confirmed_at: string
+  preferences_version: number
+  data_mode: 'real' | 'synthetic' | 'unknown'
+  match_state: 'compatible' | 'needs_clarification' | 'not_assessed'
+  compatibility: {
+    status: 'compatible' | 'needs_clarification' | 'incompatible'
+    checks: { code: string; status: 'pass' | 'unknown' | 'fail'; public_text: string }[]
+    soft_signals: { code: string; matched: boolean; public_text: string }[]
+    preference_version: number
+    role_version_id: string | null
+    compatibility_version: 'compat_v2'
+  } | null
+  decision: CandidateRoleDecision
+}
+export type CandidateRoleFeed = {
+  items: CandidateRoleFeedItem[]
+  next_cursor: string | null
+  limit: number
+  empty_state: 'no_active_roles' | 'no_compatible_roles' | 'no_saved_roles' | null
+}
+export type CandidateRoleDecisionResult = {
+  need_id: string
+  action: CandidateRoleDecision
+  role_version_id: string
+  preferences_version: number
+  updated_at: string
+}
+
 export type Match = {
   score: number | null
   components: Record<string, number | null>
