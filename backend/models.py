@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import (Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, JSON, String, Text,
+                        UniqueConstraint, text)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
@@ -220,6 +221,13 @@ class Invitation(Base):
     salary_max_rub: Mapped[int] = mapped_column(Integer)
     work_format: Mapped[str] = mapped_column(String(20))
     state: Mapped[str] = mapped_column(String(20), default="sent")
+    terms_snapshot: Mapped[dict | None] = mapped_column(JSON)
+    terms_hash: Mapped[str | None] = mapped_column(String(64))
+    evidence_refs: Mapped[list] = mapped_column(JSON, default=list)
+    explanation_snapshot: Mapped[dict | None] = mapped_column(JSON)
+    compatibility_snapshot: Mapped[dict | None] = mapped_column(JSON)
+    state_version: Mapped[int] = mapped_column(Integer, default=1)
+    response_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     idempotency_key: Mapped[str] = mapped_column(String(100))
     request_hash: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
@@ -227,7 +235,13 @@ class Invitation(Base):
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     __table_args__ = (
         CheckConstraint("salary_min_rub > 0 AND salary_max_rub >= salary_min_rub", name="invitation_salary_range"),
+        CheckConstraint("state IN ('sent','viewed','accepted','rejected','withdrawn','expired')",
+                        name="invitation_state"),
+        CheckConstraint("state_version >= 1", name="invitation_state_version"),
         UniqueConstraint("employer_id", "idempotency_key", name="invitation_idempotency"),
+        Index("uq_invitations_active_pair", "employer_id", "candidate_id", unique=True,
+              sqlite_where=text("state IN ('sent','viewed')"),
+              postgresql_where=text("state IN ('sent','viewed')")),
     )
 
 

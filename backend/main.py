@@ -2,11 +2,10 @@
 
 from datetime import timedelta
 from contextlib import asynccontextmanager
-import hashlib
 import json
 import secrets
 
-from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, Response, UploadFile
+from fastapi import Body, Depends, FastAPI, File, Header, HTTPException, Request, Response, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 from sqlalchemy import func, inspect, select, text, update
@@ -17,6 +16,8 @@ from .assessment import BLUEPRINT_VERSION, COMPETENCIES, grade_attempt, make_ass
 from .config import settings
 from .db import Base, get_db
 from .evidence import build_achievement_narrative, build_achievement_story_record
+from .invitations import (InvitationError, create_invitation as create_invitation_record,
+                          transition_invitation)
 from .matching import (can_search, eligible, evaluate_compatibility, explain_profile, fsp_bonus,
                        public_candidate, score_profile, score_profile_v2, suggest_competencies)
 from .models import (AssessmentAttempt, CandidateProfile, ContactGrant, EmailToken, EmployerProfile,
@@ -27,9 +28,9 @@ from .preferences import formats_from_legacy, is_blocked, preferences_data
 from .resume_import import MAX_PDF_BYTES, ResumeImportError, preview_pdf
 from .role_cards import create_initial_draft
 from .routes_v2 import candidate_router, router as v2_router
-from .schemas import (AnswersIn, CandidateIn, EmployerIn, FspLinkIn, InvitationIn, LoginIn,
-                      NeedIn, RegisterIn, RoleCardIn, SearchIn, SearchOut, StartAssessmentIn,
-                      VerifyIn)
+from .schemas import (AcceptInvitationIn, AnswersIn, CandidateIn, EmployerIn, FspLinkIn,
+                      InvitationCommandIn, InvitationOut, InvitationV2In, LoginIn, NeedIn,
+                      RegisterIn, RoleCardIn, SearchIn, SearchOut, StartAssessmentIn, VerifyIn)
 from .security import aware, check_password, csrf_guard, digest, get_user, hasher, new_session, require, set_auth_cookies
 
 @asynccontextmanager
@@ -88,18 +89,25 @@ def candidate_private(profile: CandidateProfile) -> dict:
 def invitation_data(invite: Invitation) -> dict:
     return {"id": invite.id, "candidate_id": invite.candidate_id, "company_name": invite.company_name,
             "employer_id": invite.employer_id, "need_id": invite.need_id,
+            "role_version_id": invite.role_version_id,
             "offer_text": invite.offer_text, "reason": invite.reason,
             "employer_contact": invite.employer_contact,
             "salary_min_rub": invite.salary_min_rub, "salary_max_rub": invite.salary_max_rub,
             "salary_period": "month", "salary_basis": "gross", "work_format": invite.work_format,
             "state": "expired" if invite.state in ("sent", "viewed") and aware(invite.expires_at) <= now() else invite.state,
             "created_at": invite.created_at.isoformat(),
-            "expires_at": invite.expires_at.isoformat()}
+            "expires_at": invite.expires_at.isoformat(),
+            "terms_snapshot": invite.terms_snapshot, "terms_hash": invite.terms_hash,
+            "evidence_refs": invite.evidence_refs or [],
+            "explanation_snapshot": invite.explanation_snapshot,
+            "state_version": invite.state_version,
+            "response_due_at": invite.response_due_at.isoformat() if invite.response_due_at else None}
 
 
 def invitation_compatibility(db: Session, profile: CandidateProfile | None, invite: Invitation):
-    role_payload = {}
-    if invite.role_version_id:
+    snapshot_role = (invite.terms_snapshot or {}).get("role")
+    role_payload = snapshot_role if isinstance(snapshot_role, dict) else {}
+    if not role_payload and invite.role_version_id:
         version = db.get(RoleVersion, invite.role_version_id)
         if version and (not invite.need_id or version.need_id == invite.need_id):
             role_payload = version.payload or {}
@@ -115,7 +123,10 @@ def invitation_compatibility(db: Session, profile: CandidateProfile | None, invi
 def candidate_invitation_data(db: Session, profile: CandidateProfile | None,
                               invite: Invitation) -> dict:
     compatibility = invitation_compatibility(db, profile, invite)
-    return invitation_data(invite) | {"compatibility": compatibility.model_dump(mode="json")}
+    return invitation_data(invite) | {
+        "compatibility": compatibility.model_dump(mode="json"),
+        "compatibility_at_send": invite.compatibility_snapshot,
+    }
 
 
 def attempt_data(attempt: AssessmentAttempt, include_answers: bool = False) -> dict:
@@ -132,13 +143,6 @@ def get_attempt(db: Session, user: User, attempt_id: str) -> AssessmentAttempt:
     if not attempt or attempt.candidate_id != user.id:
         problem("NOT_FOUND", 404)
     return attempt
-
-
-def get_invitation(db: Session, user: User, invitation_id: str) -> Invitation:
-    invitation = db.get(Invitation, invitation_id)
-    if not invitation or user.id not in (invitation.candidate_id, invitation.employer_id):
-        problem("NOT_FOUND", 404)
-    return invitation
 
 
 @app.get("/api/v1/health/live")
@@ -745,53 +749,34 @@ def candidate_contact(candidate_id: str, user: User = Depends(get_user), db: Ses
                     media_type="application/json", headers={"Cache-Control": "no-store"})
 
 
-@app.post("/api/v1/employer/invitations", dependencies=[Depends(csrf_guard)], status_code=201)
-def create_invitation(data: InvitationIn, idempotency_key: str = Header(min_length=8, max_length=100),
+@app.post("/api/v1/employer/invitations", dependencies=[Depends(csrf_guard)], status_code=201,
+          response_model=InvitationOut, response_model_exclude_none=True)
+def create_invitation(data: InvitationV2In, idempotency_key: str = Header(min_length=8, max_length=100),
                       user: User = Depends(get_user), db: Session = Depends(get_db)):
     require(user, "employer")
-    employer = employer_for(db, user)
-    fingerprint = hashlib.sha256(data.model_dump_json().encode()).hexdigest()
-    existing = db.scalar(select(Invitation).where(Invitation.employer_id == user.id,
-                                                   Invitation.idempotency_key == idempotency_key))
-    if existing:
-        if existing.request_hash != fingerprint:
-            problem("IDEMPOTENCY_KEY_REUSED", 409)
-        return invitation_data(existing)
-    candidate = db.scalar(select(CandidateProfile).where(
-        CandidateProfile.user_id == data.candidate_id
-    ).with_for_update())
-    if not candidate or not can_search(candidate):
-        problem("NOT_FOUND", 404)
-    if is_blocked(candidate, user.id):
-        problem("COMPANY_BLOCKED", 409)
-    if data.salary_max_rub < data.salary_min_rub:
-        problem("SALARY_RANGE_INVALID")
-    need = db.get(HiringNeed, data.need_id) if data.need_id else None
-    if data.need_id and (not need or need.employer_id != user.id):
-        problem("NOT_FOUND", 404)
-    if need and (candidate.verified_specialization, candidate.verified_grade) != (need.specialization, need.grade):
-        problem("CATEGORY_MISMATCH")
-    active = db.scalar(select(Invitation).where(Invitation.employer_id == user.id,
-                                                Invitation.candidate_id == data.candidate_id,
-                                                Invitation.state.in_(["sent", "viewed"])))
-    if active and aware(active.expires_at) > now():
-        problem("ACTIVE_INVITATION_EXISTS", 409)
-    invite = Invitation(employer_id=user.id, candidate_id=data.candidate_id, need_id=data.need_id,
-                        company_name=employer.company_name, offer_text=data.offer_text, reason=data.reason,
-                        employer_contact=data.employer_contact, salary_min_rub=data.salary_min_rub,
-                        salary_max_rub=data.salary_max_rub, work_format=data.work_format,
-                        idempotency_key=idempotency_key, request_hash=fingerprint,
-                        expires_at=now()+timedelta(days=7))
-    db.add(invite)
-    db.flush()
-    recipient = db.get(User, candidate.user_id)
-    db.add(MailOutbox(recipient=recipient.email, subject="Новое приглашение — ФСП Сигнал",
-                      body=f"Компания {employer.company_name} прислала предложение. Откройте кабинет: {settings.public_base_url}"))
-    db.commit()
-    return invitation_data(invite)
+    try:
+        invitation = create_invitation_record(db, user.id, data, idempotency_key, now())
+        db.commit()
+    except InvitationError as exc:
+        db.rollback()
+        problem(exc.code, exc.status)
+    except IntegrityError:
+        # A concurrent request may have won either the idempotency key or active-pair index.
+        db.rollback()
+        try:
+            invitation = create_invitation_record(db, user.id, data, idempotency_key, now())
+            db.commit()
+        except InvitationError as exc:
+            db.rollback()
+            problem(exc.code, exc.status)
+        except IntegrityError:
+            db.rollback()
+            problem("ACTIVE_INVITATION_EXISTS", 409)
+    return invitation_data(invitation)
 
 
-@app.get("/api/v1/employer/invitations")
+@app.get("/api/v1/employer/invitations", response_model=list[InvitationOut],
+         response_model_exclude_none=True)
 def sent_invitations(user: User = Depends(get_user), db: Session = Depends(get_db)):
     require(user, "employer")
     invitations = db.scalars(select(Invitation).where(Invitation.employer_id == user.id)
@@ -799,7 +784,7 @@ def sent_invitations(user: User = Depends(get_user), db: Session = Depends(get_d
     return [invitation_data(x) for x in invitations]
 
 
-@app.get("/api/v1/candidate/invitations")
+@app.get("/api/v1/candidate/invitations", response_model=list[InvitationOut])
 def received_invitations(user: User = Depends(get_user), db: Session = Depends(get_db)):
     require(user, "candidate")
     profile = db.get(CandidateProfile, user.id)
@@ -808,73 +793,74 @@ def received_invitations(user: User = Depends(get_user), db: Session = Depends(g
     return [candidate_invitation_data(db, profile, x) for x in invitations]
 
 
-@app.post("/api/v1/invitations/{invitation_id}/view", dependencies=[Depends(csrf_guard)])
-def view_invitation(invitation_id: str, user: User = Depends(get_user), db: Session = Depends(get_db)):
+@app.post("/api/v1/invitations/{invitation_id}/view", dependencies=[Depends(csrf_guard)],
+          response_model=InvitationOut)
+def view_invitation(invitation_id: str, data: InvitationCommandIn | None = Body(default=None),
+                    user: User = Depends(get_user), db: Session = Depends(get_db)):
     require(user, "candidate")
-    invite = get_invitation(db, user, invitation_id)
-    if invite.candidate_id != user.id:
-        problem("NOT_FOUND", 404)
-    if invite.state == "sent" and aware(invite.expires_at) > now():
-        invite.state = "viewed"
+    try:
+        invite = transition_invitation(
+            db, user.id, invitation_id, "view",
+            data.expected_state_version if data else None, None, now(),
+        )
         db.commit()
+    except InvitationError as exc:
+        db.rollback()
+        problem(exc.code, exc.status)
     return invitation_data(invite)
 
 
-@app.post("/api/v1/invitations/{invitation_id}/accept", dependencies=[Depends(csrf_guard)])
-def accept_invitation(invitation_id: str, user: User = Depends(get_user), db: Session = Depends(get_db)):
+@app.post("/api/v1/invitations/{invitation_id}/accept", dependencies=[Depends(csrf_guard)],
+          response_model=InvitationOut)
+def accept_invitation(invitation_id: str, data: AcceptInvitationIn | None = Body(default=None),
+                      user: User = Depends(get_user), db: Session = Depends(get_db)):
     require(user, "candidate")
-    invite = get_invitation(db, user, invitation_id)
-    if invite.candidate_id != user.id:
-        problem("NOT_FOUND", 404)
-    if invite.state == "accepted":
-        return invitation_data(invite)
-    candidate = db.scalar(select(CandidateProfile).where(
-        CandidateProfile.user_id == user.id
-    ).with_for_update())
-    if not candidate or is_blocked(candidate, invite.employer_id):
-        problem("COMPANY_BLOCKED", 409)
-    if not can_search(candidate):
-        problem("INVITATION_NOT_AVAILABLE", 409)
-    if invitation_compatibility(db, candidate, invite).status == "incompatible":
-        problem("INVITATION_NOT_COMPATIBLE", 409)
-    if invite.state not in ("sent", "viewed") or aware(invite.expires_at) <= now():
-        problem("INVITATION_STATE_CONFLICT", 409)
-    changed = db.execute(update(Invitation).where(Invitation.id == invite.id,
-                                                  Invitation.state.in_(["sent", "viewed"]),
-                                                  Invitation.expires_at > now())
-                         .values(state="accepted", decided_at=now()).execution_options(synchronize_session=False))
-    if changed.rowcount != 1:
-        db.rollback()
-        problem("INVITATION_STATE_CONFLICT", 409)
-    db.add(ContactGrant(invitation_id=invite.id, employer_id=invite.employer_id, candidate_id=invite.candidate_id))
     try:
+        invite = transition_invitation(
+            db, user.id, invitation_id, "accept",
+            data.expected_state_version if data else None, data, now(),
+        )
         db.commit()
+    except InvitationError as exc:
+        db.rollback()
+        problem(exc.code, exc.status)
     except IntegrityError:
         db.rollback()
         problem("INVITATION_STATE_CONFLICT", 409)
-    db.refresh(invite)
     return invitation_data(invite)
 
 
-@app.post("/api/v1/invitations/{invitation_id}/reject", dependencies=[Depends(csrf_guard)])
-def reject_invitation(invitation_id: str, user: User = Depends(get_user), db: Session = Depends(get_db)):
+@app.post("/api/v1/invitations/{invitation_id}/reject", dependencies=[Depends(csrf_guard)],
+          response_model=InvitationOut)
+def reject_invitation(invitation_id: str, data: InvitationCommandIn | None = Body(default=None),
+                      user: User = Depends(get_user), db: Session = Depends(get_db)):
     require(user, "candidate")
-    invite = get_invitation(db, user, invitation_id)
-    if invite.candidate_id != user.id or invite.state not in ("sent", "viewed") or aware(invite.expires_at) <= now():
-        problem("INVITATION_STATE_CONFLICT", 409)
-    invite.state, invite.decided_at = "rejected", now()
-    db.commit()
+    try:
+        invite = transition_invitation(
+            db, user.id, invitation_id, "reject",
+            data.expected_state_version if data else None, None, now(),
+        )
+        db.commit()
+    except InvitationError as exc:
+        db.rollback()
+        problem(exc.code, exc.status)
     return invitation_data(invite)
 
 
-@app.post("/api/v1/invitations/{invitation_id}/withdraw", dependencies=[Depends(csrf_guard)])
-def withdraw_invitation(invitation_id: str, user: User = Depends(get_user), db: Session = Depends(get_db)):
+@app.post("/api/v1/invitations/{invitation_id}/withdraw", dependencies=[Depends(csrf_guard)],
+          response_model=InvitationOut)
+def withdraw_invitation(invitation_id: str, data: InvitationCommandIn | None = Body(default=None),
+                        user: User = Depends(get_user), db: Session = Depends(get_db)):
     require(user, "employer")
-    invite = get_invitation(db, user, invitation_id)
-    if invite.employer_id != user.id or invite.state not in ("sent", "viewed"):
-        problem("INVITATION_STATE_CONFLICT", 409)
-    invite.state, invite.decided_at = "withdrawn", now()
-    db.commit()
+    try:
+        invite = transition_invitation(
+            db, user.id, invitation_id, "withdraw",
+            data.expected_state_version if data else None, None, now(),
+        )
+        db.commit()
+    except InvitationError as exc:
+        db.rollback()
+        problem(exc.code, exc.status)
     return invitation_data(invite)
 
 

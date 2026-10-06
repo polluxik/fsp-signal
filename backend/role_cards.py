@@ -9,9 +9,11 @@ from pydantic import ValidationError
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from .config import settings
 from .domain_errors import DomainError
 from .models import HiringNeed, Invitation, RoleVersion, User, now
-from .product_events import write_product_event
+from .product_events import (product_event_data_mode, write_invitation_event,
+                             write_product_event)
 from .schemas import RoleCardIn
 
 
@@ -50,7 +52,7 @@ def _record_role_event(db: Session, need: HiringNeed, actor_id: str, event_type:
         dedupe_key=(f"role:{need.id}:v{version}:{event_type}"
                     if event_type in ("role_version_created", "role_closed")
                     else f"role:{need.id}:v{version}:{event_type}:{_utc(at).isoformat()}"),
-        data_mode="synthetic" if user and user.origin == "synthetic_fixture" else "real",
+        data_mode=product_event_data_mode(settings.app_mode, user),
         payload=payload, at=at,
     )
 
@@ -149,7 +151,9 @@ def _cancel_obsolete_pending(db: Session, need: HiringNeed, current_version_id: 
     )).all()
     for invitation in pending:
         invitation.state = "withdrawn"
+        invitation.state_version += 1
         invitation.decided_at = at
+        write_invitation_event(db, invitation, "invitation_withdrawn", need.employer_id, at)
 
 
 def publish_role(db: Session, employer_id: str, need_id: str, *, expected_version: int,

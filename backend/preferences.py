@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from .domain_errors import DomainError
 from .models import CandidateProfile, ContactGrant, Invitation, User, now
+from .product_events import write_invitation_event
 from .schemas import CandidatePreferencesIn
 
 
@@ -138,7 +139,9 @@ def block_employer(db: Session, candidate_id: str, employer_id: str,
     )).all()
     for invitation in pending:
         invitation.state = "withdrawn"
+        invitation.state_version += 1
         invitation.decided_at = at
+        write_invitation_event(db, invitation, "invitation_withdrawn", candidate_id, at)
     revoked = _revoke_grants(db, candidate_id, employer_id, at)
     db.flush()
     return AccessChangeResult(employer_id, True, revoked, len(pending))

@@ -247,9 +247,13 @@ def test_role_card_owner_scope_and_csrf_are_enforced():
 
 
 def test_republication_withdraws_only_pending_invites_pinned_to_an_older_version():
-    with TestClient(app) as employer_client, TestClient(app) as candidate_client:
+    with (TestClient(app) as employer_client, TestClient(app) as candidate_client,
+          TestClient(app) as legacy_candidate_client):
         employer = register_verified(employer_client, "role-version-owner@example.test", "employer")
         candidate = register_verified(candidate_client, "role-version-candidate@example.test", "candidate")
+        legacy_candidate = register_verified(
+            legacy_candidate_client, "role-version-legacy-candidate@example.test", "candidate",
+        )
         employer_client.put("/api/v1/employer/company", json={
             "company_name": "Version Co", "description": "", "industry": "ИТ",
             "contact_email": "team@example.test",
@@ -280,7 +284,10 @@ def test_republication_withdraws_only_pending_invites_pinned_to_an_older_version
             for state, key in (("sent", "pending-old-role-1"), ("accepted", "accepted-old-role"),
                                ("sent", "legacy-unpinned-role")):
                 db.add(Invitation(
-                    employer_id=employer["id"], candidate_id=candidate["id"], need_id=need_id,
+                    employer_id=employer["id"],
+                    candidate_id=(legacy_candidate["id"] if key == "legacy-unpinned-role"
+                                  else candidate["id"]),
+                    need_id=need_id,
                     role_version_id=None if key == "legacy-unpinned-role" else pinned.id,
                     company_name="Version Co", offer_text="Discuss this role with the team.",
                     reason="Your tested event-handling work is relevant.", employer_contact="team@example.test",
@@ -304,7 +311,15 @@ def test_republication_withdraws_only_pending_invites_pinned_to_an_older_version
         )
         assert republished.status_code == 200, republished.text
         with SessionLocal() as db:
-            states = {item.idempotency_key: item.state for item in db.scalars(select(Invitation)).all()}
-        assert states["pending-old-role-1"] == "withdrawn"
-        assert states["accepted-old-role"] == "accepted"
-        assert states["legacy-unpinned-role"] == "sent"
+            invitations = {item.idempotency_key: (item.state, item.state_version)
+                           for item in db.scalars(select(Invitation)).all()}
+            withdrawn_events = db.scalars(select(ProductEvent).where(
+                ProductEvent.entity_id.in_(select(Invitation.id).where(
+                    Invitation.idempotency_key == "pending-old-role-1"
+                )),
+                ProductEvent.type == "invitation_withdrawn",
+            )).all()
+        assert invitations["pending-old-role-1"] == ("withdrawn", 2)
+        assert invitations["accepted-old-role"] == ("accepted", 1)
+        assert invitations["legacy-unpinned-role"] == ("sent", 1)
+        assert len(withdrawn_events) == 1

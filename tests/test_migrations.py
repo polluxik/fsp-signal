@@ -14,14 +14,18 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _alembic(database_url: str, revision: str) -> None:
+def _alembic_result(database_url: str, revision: str) -> subprocess.CompletedProcess:
     environment = os.environ.copy()
     environment.update({"APP_MODE": "test", "DATABASE_URL": database_url})
     environment.pop("TEST_DATABASE_URL", None)
-    result = subprocess.run(
+    return subprocess.run(
         [sys.executable, "-m", "alembic", "-c", str(ROOT / "alembic.ini"), "upgrade", revision],
         cwd=ROOT, env=environment, text=True, capture_output=True,
     )
+
+
+def _alembic(database_url: str, revision: str) -> None:
+    result = _alembic_result(database_url, revision)
     assert result.returncode == 0, result.stdout + result.stderr
 
 
@@ -114,3 +118,60 @@ def test_upgrade_backfills_only_known_legacy_role_and_keeps_it_private():
         assert invitation["role_version_id"] is None
         assert search["role_version_id"] is None
         assert events == 0
+
+
+def _legacy_invitation_database(database: Path, invitations: list[tuple[str, str]]) -> str:
+    url = f"sqlite:///{database}"
+    _alembic(url, "d4a7b2f019ce")
+    connection = sqlite3.connect(database)
+    connection.executemany(
+        "INSERT INTO users (id,email,password_hash,role,origin,created_at) VALUES (?,?,?,?,?,?)",
+        [
+            ("employer-duplicate", "duplicate-employer@example.test", "not-a-login-hash",
+             "employer", "direct_signup", "2026-10-01T00:00:00+00:00"),
+            ("candidate-duplicate", "duplicate-candidate@example.test", "not-a-login-hash",
+             "candidate", "direct_signup", "2026-10-01T00:00:00+00:00"),
+        ],
+    )
+    connection.executemany(
+        "INSERT INTO invitations (id,employer_id,candidate_id,need_id,role_version_id,company_name,"
+        "offer_text,reason,employer_contact,salary_min_rub,salary_max_rub,work_format,state,"
+        "idempotency_key,request_hash,created_at,expires_at,decided_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        [(
+            f"invite-{suffix}", "employer-duplicate", "candidate-duplicate", None, None,
+            "Duplicate Co", "Discuss the role with our team.", "Legacy invitation.",
+            "team@example.test", 180000, 220000, "remote", state, f"key-{suffix}",
+            (suffix[0] * 64), "2026-10-01T00:00:00+00:00", "2026-10-08T00:00:00+00:00", None,
+        ) for suffix, state in invitations],
+    )
+    connection.commit()
+    connection.close()
+    return url
+
+
+def test_invitation_migration_diagnoses_live_duplicate_pairs_without_deleting_them():
+    with tempfile.TemporaryDirectory(prefix="signal-invitation-upgrade-") as directory:
+        database = Path(directory) / "duplicates.sqlite3"
+        url = _legacy_invitation_database(database, [("one", "sent"), ("two", "sent")])
+        result = _alembic_result(url, "head")
+        diagnostic = result.stdout + result.stderr
+        assert result.returncode != 0
+        assert "resolve live duplicate pairs without deleting records" in diagnostic
+        connection = sqlite3.connect(database)
+        invitation_ids = {row[0] for row in connection.execute("SELECT id FROM invitations")}
+        connection.close()
+        assert invitation_ids == {"invite-one", "invite-two"}
+
+
+def test_invitation_migration_diagnoses_accepted_rows_without_a_grant():
+    with tempfile.TemporaryDirectory(prefix="signal-invitation-grant-upgrade-") as directory:
+        database = Path(directory) / "accepted.sqlite3"
+        url = _legacy_invitation_database(database, [("accepted", "accepted")])
+        result = _alembic_result(url, "head")
+        diagnostic = result.stdout + result.stderr
+        assert result.returncode != 0
+        assert "accepted invitations without a contact grant" in diagnostic
+        connection = sqlite3.connect(database)
+        invitation_ids = {row[0] for row in connection.execute("SELECT id FROM invitations")}
+        connection.close()
+        assert invitation_ids == {"invite-accepted"}

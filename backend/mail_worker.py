@@ -5,11 +5,12 @@ from email.message import EmailMessage
 import smtplib
 import time
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 
 from .config import settings
 from .db import SessionLocal
-from .models import Invitation, MailOutbox, now
+from .invitations import expire_due_invitations
+from .models import MailOutbox, now
 
 
 def deliver_one() -> bool:
@@ -41,11 +42,9 @@ def deliver_one() -> bool:
 
 def expire_invitations() -> int:
     with SessionLocal() as db:
-        result = db.execute(update(Invitation).where(Invitation.state.in_(["sent", "viewed"]),
-                                                      Invitation.expires_at <= now())
-                            .values(state="expired", decided_at=now()).execution_options(synchronize_session=False))
+        expired = expire_due_invitations(db, now())
         db.commit()
-        return result.rowcount
+        return expired
 
 
 def main() -> None:

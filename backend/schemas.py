@@ -335,5 +335,70 @@ class InvitationIn(BaseModel):
     employer_contact: str = Field(min_length=5, max_length=254)
 
 
+class InvitationV2In(InvitationIn):
+    model_config = ConfigDict(extra="forbid")
+
+    role_version_id: str | None = Field(default=None, min_length=1, max_length=36)
+    inline_role_card: RoleCardIn | None = None
+    evidence_ids: list[str] = Field(default_factory=list, max_length=12)
+
+    @field_validator("evidence_ids")
+    @classmethod
+    def unique_evidence_ids(cls, values: list[str]) -> list[str]:
+        if any(not value.strip() for value in values) or len(set(values)) != len(values):
+            raise ValueError("evidence_ids must be non-empty and unique")
+        return values
+
+    @model_validator(mode="after")
+    def validate_v2_reference(self):
+        has_version = self.role_version_id is not None
+        has_inline = self.inline_role_card is not None
+        is_v2 = has_version or has_inline or bool(self.evidence_ids)
+        if has_version and has_inline:
+            raise ValueError("choose either role_version_id or inline_role_card")
+        if is_v2 and not (has_version or has_inline):
+            raise ValueError("v2 invitation requires a pinned role or inline role card")
+        if is_v2 and not self.evidence_ids:
+            raise ValueError("v2 invitation requires at least one evidence reference")
+        return self
+
+
+class InvitationCommandIn(BaseModel):
+    expected_state_version: int | None = Field(default=None, ge=1)
+
+
+class AcceptInvitationIn(InvitationCommandIn):
+    expected_terms_hash: str = Field(min_length=64, max_length=64)
+    expected_preferences_version: int = Field(ge=1)
+
+
+class InvitationOut(BaseModel):
+    id: str
+    candidate_id: str
+    company_name: str
+    employer_id: str
+    need_id: str | None
+    role_version_id: str | None = None
+    offer_text: str
+    reason: str
+    employer_contact: str
+    salary_min_rub: int
+    salary_max_rub: int
+    salary_period: Literal["month"] = "month"
+    salary_basis: Literal["gross"] = "gross"
+    work_format: str
+    state: Literal["sent", "viewed", "accepted", "rejected", "withdrawn", "expired"]
+    created_at: datetime
+    expires_at: datetime
+    terms_snapshot: dict[str, Any] | None = None
+    terms_hash: str | None = None
+    evidence_refs: list[EvidenceCard] = Field(default_factory=list)
+    explanation_snapshot: dict[str, Any] | None = None
+    compatibility_at_send: CompatibilityReport | None = None
+    state_version: int = 1
+    response_due_at: datetime | None = None
+    compatibility: CompatibilityReport | None = None
+
+
 class FspLinkIn(BaseModel):
     participant_id: str = Field(min_length=5, max_length=80)

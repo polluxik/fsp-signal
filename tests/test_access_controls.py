@@ -5,7 +5,8 @@ from sqlalchemy import select
 
 from backend.db import SessionLocal
 from backend.main import app
-from backend.models import CandidateProfile, ContactGrant, HiringNeed, Invitation, SearchSnapshot, now
+from backend.models import (CandidateProfile, ContactGrant, HiringNeed, Invitation, ProductEvent,
+                            SearchSnapshot, now)
 from test_flow import csrf, register_verified
 
 
@@ -112,10 +113,17 @@ def test_block_revokes_every_company_grant_and_pending_invite_but_not_other_empl
             )).all()
             states = {invite.idempotency_key: invite.state
                       for invite in db.scalars(select(Invitation)).all()}
+            blocked_invitation = db.get(Invitation, first_pending_id)
+            blocked_events = db.scalars(select(ProductEvent).where(
+                ProductEvent.entity_id == first_pending_id,
+                ProductEvent.type == "invitation_withdrawn",
+            )).all()
         assert all(grant.revoked_at is not None for grant in first_grants)
         assert second_grants[0].revoked_at is None
         assert states["first-pending"] == "withdrawn"
         assert states["first-accepted"] == "accepted"
+        assert blocked_invitation.state_version == 2
+        assert len(blocked_events) == 1
 
         paused = candidate.put("/api/v1/candidate/profile", json={
             "full_name": "Кандидат", "contact_email": "candidate-private@example.test",
@@ -135,3 +143,19 @@ def test_block_revokes_every_company_grant_and_pending_invite_but_not_other_empl
         assert revoke.json()["blocked"] is False
         assert revoke.json()["revoked_grants"] == 2
         assert revoke.json()["withdrawn_invitations"] == 0
+        with SessionLocal() as db:
+            second_accepted_id = db.scalar(select(Invitation.id).where(
+                Invitation.employer_id == second_employer["id"],
+                Invitation.idempotency_key == "second-accepted",
+            ))
+        repeated_accept = candidate.post(
+            f"/api/v1/invitations/{second_accepted_id}/accept", headers=csrf(candidate),
+        )
+        assert repeated_accept.status_code == 200
+        assert repeated_accept.json()["state"] == "accepted"
+        with SessionLocal() as db:
+            still_revoked = db.scalars(select(ContactGrant).where(
+                ContactGrant.candidate_id == person["id"],
+                ContactGrant.employer_id == second_employer["id"],
+            )).all()
+        assert all(grant.revoked_at is not None for grant in still_revoked)

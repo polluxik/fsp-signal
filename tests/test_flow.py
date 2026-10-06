@@ -175,7 +175,8 @@ def test_reverse_hiring_and_contact_boundary():
         need_id = created.json()["id"]
         found = employer.post("/api/v1/employer/searches", json={"need_id":need_id}, headers=csrf(employer))
         assert found.status_code == 201, found.text
-        assert found.json()["results"][0]["id"] == person["id"]
+        search_results = found.json()["results"]
+        assert search_results[0]["id"] == person["id"]
         assert "secret@example.test" not in found.text
         assert "Тестовый Кандидат" not in found.text
         assert "Не публиковать этот текст" not in found.text
@@ -184,7 +185,7 @@ def test_reverse_hiring_and_contact_boundary():
         snapshot_id = found.json()["id"]
         history = employer.get("/api/v1/employer/searches").json()
         assert len(history) == 1 and history[0]["id"] == snapshot_id
-        assert history[0]["result_count"] == 1
+        assert history[0]["result_count"] == len(search_results)
         assert second_employer.get("/api/v1/employer/searches").json() == []
         assert second_employer.get(f"/api/v1/employer/searches/{snapshot_id}").status_code == 404
         assert second_employer.get(f"/api/v1/employer/searches?need_id={need_id}").status_code == 404
