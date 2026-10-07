@@ -268,5 +268,7 @@ def test_reverse_hiring_and_contact_boundary():
                              headers=csrf(candidate)).status_code == 200
         hidden_snapshot = employer.get(f"/api/v1/employer/searches/{snapshot_id}")
         assert hidden_snapshot.status_code == 200
-        assert hidden_snapshot.json()["results"] == []
+        assert {item["id"] for item in hidden_snapshot.json()["results"]} == {
+            item["id"] for item in search_results if item["id"] != person["id"]
+        }
         assert hidden_snapshot.json()["unavailable_count"] == 1

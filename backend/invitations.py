@@ -371,10 +371,11 @@ def transition_invitation(db: Session, actor_id: str | None, invitation_id: str,
     if not initial:
         raise InvitationError("NOT_FOUND", 404)
     profile = _current_candidate_profile(db, initial.candidate_id) if command == "accept" else None
-    # Role lifecycle operations lock HiringNeed before touching invitations. Keep
-    # the same order here so accept cannot deadlock against a concurrent revision.
+    # A transition can acquire a key-share lock on HiringNeed when PostgreSQL
+    # checks the invitation's FK. Lock it first for every command, so accept,
+    # reject, withdraw and expire use the same order as role lifecycle updates.
     locked_need = None
-    if command == "accept" and initial.role_version_id and initial.need_id:
+    if initial.need_id:
         locked_need = db.scalar(select(HiringNeed).where(
             HiringNeed.id == initial.need_id
         ).with_for_update())
@@ -453,12 +454,15 @@ def transition_invitation(db: Session, actor_id: str | None, invitation_id: str,
 
 
 def expire_due_invitations(db: Session, at: datetime) -> int:
-    pending = db.scalars(select(Invitation).where(
+    pending_ids = db.scalars(select(Invitation.id).where(
         Invitation.state.in_(("sent", "viewed")), Invitation.expires_at <= at
-    ).order_by(Invitation.expires_at, Invitation.id).with_for_update(skip_locked=True)).all()
+    ).order_by(Invitation.expires_at, Invitation.id)).all()
     expired = 0
-    for invitation in pending:
-        if _transition_update(db, invitation, new_state="expired", at=at, require_unexpired=False):
-            _event(db, invitation, "invitation_expired", None, at)
+    for invitation_id in pending_ids:
+        try:
+            transition_invitation(db, None, invitation_id, "expire", None, None, at)
             expired += 1
+        except InvitationError as exc:
+            if exc.code != "INVITATION_STATE_CONFLICT":
+                raise
     return expired

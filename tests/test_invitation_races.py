@@ -11,7 +11,7 @@ from sqlalchemy.engine import make_url
 
 from backend.db import SessionLocal
 from backend.domain_errors import DomainError
-from backend.invitations import create_invitation, transition_invitation
+from backend.invitations import create_invitation, expire_due_invitations, transition_invitation
 from backend.main import app
 from backend.models import ContactGrant, Invitation, MailOutbox, ProductEvent, now
 from backend.schemas import AcceptInvitationIn, InvitationV2In
@@ -170,6 +170,56 @@ def test_accept_race_has_exactly_one_terminal_state_grant_and_event(competing_co
         grants = db.scalars(select(ContactGrant).where(ContactGrant.invitation_id == invitation_id)).all()
         assert saved.state in {"accepted", "rejected", "withdrawn", "expired"}
         assert len(terminal_events) == 1
+        assert len(grants) == (1 if saved.state == "accepted" else 0)
+
+
+def test_worker_expiry_racing_with_accept_keeps_one_terminal_event():
+    _, candidate, _, invitation = _prepared_invitation()
+    invitation_id = invitation["id"]
+    with SessionLocal() as db:
+        expires_at = db.get(Invitation, invitation_id).expires_at
+
+    barrier = Barrier(2)
+
+    def accept():
+        with SessionLocal() as db:
+            barrier.wait(timeout=10)
+            try:
+                transition_invitation(
+                    db, candidate["id"], invitation_id, "accept", 1,
+                    AcceptInvitationIn(
+                        expected_terms_hash=invitation["terms_hash"],
+                        expected_preferences_version=1,
+                    ), now(),
+                )
+                db.commit()
+                return "accepted"
+            except DomainError as exc:
+                db.rollback()
+                return exc.code
+
+    def expire():
+        with SessionLocal() as db:
+            barrier.wait(timeout=10)
+            expire_due_invitations(db, expires_at + timedelta(microseconds=1))
+            db.commit()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        accept_future = executor.submit(accept)
+        expire_future = executor.submit(expire)
+        outcome = accept_future.result(timeout=30)
+        expire_future.result(timeout=30)
+
+    assert outcome in {"accepted", "INVITATION_STATE_CONFLICT"}
+    with SessionLocal() as db:
+        saved = db.get(Invitation, invitation_id)
+        events = db.scalars(select(ProductEvent).where(
+            ProductEvent.entity_id == invitation_id,
+            ProductEvent.type.in_(("invitation_accepted", "invitation_expired")),
+        )).all()
+        grants = db.scalars(select(ContactGrant).where(ContactGrant.invitation_id == invitation_id)).all()
+        assert saved.state in {"accepted", "expired"}
+        assert len(events) == 1
         assert len(grants) == (1 if saved.state == "accepted" else 0)
 
 
