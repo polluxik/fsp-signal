@@ -131,6 +131,97 @@ def test_send_pins_role_terms_and_evidence_without_disclosing_private_compatibil
         assert employer.get(f"/api/v1/employer/candidates/{candidate_user['id']}/contact").status_code == 403
 
 
+def test_viewed_invitation_retains_candidate_compatibility():
+    with TestClient(app) as employer, TestClient(app) as candidate:
+        _, candidate_user, need_id, _ = make_search_context(employer, candidate)
+        role_version_id = _publish_role(employer, need_id)
+        evidence_id = _candidate_evidence_id(candidate)
+        sent = employer.post(
+            "/api/v1/employer/invitations",
+            json=_invitation_payload(candidate_user["id"], need_id, role_version_id, evidence_id),
+            headers=csrf(employer) | {"Idempotency-Key": "invite-view-compat-1"},
+        )
+        assert sent.status_code == 201, sent.text
+
+        listed = candidate.get("/api/v1/candidate/invitations")
+        assert listed.status_code == 200, listed.text
+        listed_invitation = listed.json()[0]
+        listed_report = listed_invitation["compatibility"]
+        assert listed_report["status"] in {"compatible", "needs_clarification", "incompatible"}
+        assert listed_report["checks"]
+
+        viewed = candidate.post(
+            f"/api/v1/invitations/{sent.json()['id']}/view",
+            json={"expected_state_version": sent.json()["state_version"]},
+            headers=csrf(candidate),
+        )
+        assert viewed.status_code == 200, viewed.text
+        viewed_report = viewed.json().get("compatibility")
+        assert viewed_report is not None, viewed.text
+        assert viewed_report["status"] == listed_report["status"]
+        assert viewed_report["checks"] == listed_report["checks"]
+
+
+def test_interview_is_counted_only_after_both_parties_confirm():
+    with (TestClient(app) as employer, TestClient(app) as candidate,
+          TestClient(app) as outsider_candidate, TestClient(app) as outsider_employer):
+        _, candidate_user, need_id, _ = make_search_context(employer, candidate)
+        register_verified(outsider_candidate, "held-outsider-candidate@example.test", "candidate")
+        register_verified(outsider_employer, "held-outsider-employer@example.test", "employer")
+        role_version_id = _publish_role(employer, need_id)
+        evidence_id = _candidate_evidence_id(candidate)
+        sent = employer.post(
+            "/api/v1/employer/invitations",
+            json=_invitation_payload(candidate_user["id"], need_id, role_version_id, evidence_id),
+            headers=csrf(employer) | {"Idempotency-Key": "invite-held-interview-1"},
+        )
+        assert sent.status_code == 201, sent.text
+        invitation_id = sent.json()["id"]
+        confirmation_url = f"/api/v1/invitations/{invitation_id}/interview-held-confirmation"
+
+        premature = candidate.post(confirmation_url, headers=csrf(candidate))
+        assert premature.status_code == 409, premature.text
+
+        preferences_version = candidate.get("/api/v1/candidate/preferences").json()["version"]
+        accepted = candidate.post(
+            f"/api/v1/invitations/{invitation_id}/accept",
+            json={
+                "expected_state_version": sent.json()["state_version"],
+                "expected_terms_hash": sent.json()["terms_hash"],
+                "expected_preferences_version": preferences_version,
+            },
+            headers=csrf(candidate),
+        )
+        assert accepted.status_code == 200, accepted.text
+
+        def held_event_count():
+            with SessionLocal() as db:
+                return db.scalar(select(func.count(ProductEvent.id)).where(
+                    ProductEvent.entity_id == invitation_id,
+                    ProductEvent.type == "interview_held",
+                )) or 0
+
+        assert outsider_candidate.post(confirmation_url, headers=csrf(outsider_candidate)).status_code == 404
+        assert outsider_employer.post(confirmation_url, headers=csrf(outsider_employer)).status_code == 404
+        assert held_event_count() == 0
+
+        candidate_confirmation = candidate.post(confirmation_url, headers=csrf(candidate))
+        assert candidate_confirmation.status_code == 200, candidate_confirmation.text
+        assert held_event_count() == 0
+
+        repeated_candidate_confirmation = candidate.post(confirmation_url, headers=csrf(candidate))
+        assert repeated_candidate_confirmation.status_code == 200, repeated_candidate_confirmation.text
+        assert held_event_count() == 0
+
+        employer_confirmation = employer.post(confirmation_url, headers=csrf(employer))
+        assert employer_confirmation.status_code == 200, employer_confirmation.text
+        assert held_event_count() == 1
+
+        assert employer.post(confirmation_url, headers=csrf(employer)).status_code == 200
+        assert candidate.post(confirmation_url, headers=csrf(candidate)).status_code == 200
+        assert held_event_count() == 1
+
+
 def test_accept_is_pinned_idempotent_and_creates_one_grant_event_and_sla():
     with TestClient(app) as employer, TestClient(app) as candidate:
         employer_user, candidate_user, need_id, _ = make_search_context(employer, candidate)

@@ -78,6 +78,94 @@ def test_preferences_are_versioned_private_and_legacy_fields_stay_in_sync():
             assert legacy.work_format == "any"
 
 
+def test_profile_update_cannot_overwrite_newer_preferences():
+    with TestClient(app) as candidate:
+        register_verified(candidate, "stale-profile-preferences@example.test", "candidate")
+        original_profile = {
+            "full_name": "Алексей Кандидат",
+            "contact_email": "private@example.test",
+            "contact_phone": "",
+            "city": "Москва",
+            "summary": "Профиль до обновления условий",
+            "skills": ["Python"],
+            "experience_months": 24,
+            "min_salary_rub": 120000,
+            "work_format": "remote",
+            "consent_processing": True,
+            "published": True,
+            "available": True,
+            "adult_hiring_confirmed": True,
+        }
+        created = candidate.put(
+            "/api/v1/candidate/profile", json=original_profile, headers=csrf(candidate),
+        )
+        assert created.status_code == 200, created.text
+        stale_preferences_version = created.json()["preferences_version"]
+
+        newer = candidate.put("/api/v1/candidate/preferences", json={
+            "expected_version": stale_preferences_version,
+            "salary_min_rub": 260000,
+            "allowed_work_formats": ["hybrid", "office"],
+            "allowed_cities": ["Казань"],
+            "excluded_industries": [],
+            "preferred_stack": ["Python"],
+            "preferred_tasks": [],
+            "max_take_home_minutes": 45,
+            "available": True,
+            "adult_hiring_confirmed": True,
+        }, headers=csrf(candidate))
+        assert newer.status_code == 200, newer.text
+        assert newer.json()["version"] == stale_preferences_version + 1
+
+        stale_profile = candidate.put(
+            "/api/v1/candidate/profile",
+            json=original_profile | {
+                "full_name": "Старый черновик профиля",
+                "expected_preferences_version": stale_preferences_version,
+            },
+            headers=csrf(candidate),
+        )
+        assert stale_profile.status_code == 409, stale_profile.text
+        assert stale_profile.json()["detail"] == "PREFERENCES_VERSION_CONFLICT"
+
+        current_preferences = candidate.get("/api/v1/candidate/preferences")
+        assert current_preferences.status_code == 200, current_preferences.text
+        assert current_preferences.json()["version"] == stale_preferences_version + 1
+        assert current_preferences.json()["salary_min_rub"] == 260000
+        assert current_preferences.json()["allowed_work_formats"] == ["hybrid", "office"]
+        assert current_preferences.json()["allowed_cities"] == ["Казань"]
+        assert candidate.get("/api/v1/candidate/profile").json()["full_name"] == "Алексей Кандидат"
+
+
+def test_candidate_preferences_get_returns_no_store():
+    with TestClient(app) as candidate:
+        register_verified(candidate, "preferences-cache-get@example.test", "candidate")
+        response = candidate.get("/api/v1/candidate/preferences")
+
+        assert response.status_code == 200, response.text
+        assert response.headers.get("cache-control") == "no-store"
+
+
+def test_candidate_preferences_put_returns_no_store():
+    with TestClient(app) as candidate:
+        register_verified(candidate, "preferences-cache-put@example.test", "candidate")
+        response = candidate.put("/api/v1/candidate/preferences", json={
+            "expected_version": 1,
+            "salary_min_rub": 180000,
+            "allowed_work_formats": ["remote"],
+            "allowed_cities": [],
+            "excluded_industries": [],
+            "preferred_stack": [],
+            "preferred_tasks": [],
+            "max_take_home_minutes": None,
+            "available": True,
+            "adult_hiring_confirmed": True,
+        }, headers=csrf(candidate))
+
+        assert response.status_code == 200, response.text
+        assert response.headers.get("cache-control") == "no-store"
+
+
 def test_candidate_visibility_requires_explicit_adult_attestation():
     with TestClient(app) as candidate, TestClient(app) as employer:
         register_verified(candidate, "adult-attestation@example.test", "candidate")

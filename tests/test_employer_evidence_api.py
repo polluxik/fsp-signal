@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 from backend.db import SessionLocal
 from backend.main import app
-from backend.models import CandidateProfile
+from backend.models import CandidateProfile, now
 from test_flow import csrf, register_verified
 
 
@@ -64,3 +64,44 @@ def test_employer_can_load_only_candidate_opted_in_evidence(request):
             assert other.get(f"/api/v1/employer/candidates/{person['id']}/evidence").status_code == 200
         finally:
             other.close()
+
+
+def test_legacy_aggregate_evidence_is_not_serialized_as_a_verified_action(request):
+    with TestClient(app) as candidate, TestClient(app) as employer:
+        person = register_verified(candidate, "legacy-aggregate-owner@example.test", "candidate")
+        request.addfinalizer(lambda: deactivate_candidate(person["id"]))
+        register_verified(employer, "legacy-aggregate-viewer@example.test", "employer")
+        saved = candidate.put("/api/v1/candidate/profile", json={
+            "full_name": "Кандидат со старой записью",
+            "contact_email": "private@example.test",
+            "contact_phone": "",
+            "city": "Казань",
+            "summary": "Агрегированная проверка без сохранённой попытки",
+            "skills": ["Python"],
+            "experience_months": 24,
+            "min_salary_rub": 0,
+            "work_format": "remote",
+            "consent_processing": True,
+            "published": True,
+            "available": True,
+            "adult_hiring_confirmed": True,
+        }, headers=csrf(candidate))
+        assert saved.status_code == 200, saved.text
+        with SessionLocal() as db:
+            profile = db.get(CandidateProfile, person["id"])
+            profile.verified_specialization = "backend"
+            profile.verified_grade = "middle"
+            profile.test_score = 86
+            profile.verification_source = "assessment"
+            profile.test_verified_at = now()
+            profile.verified_attempt_id = None
+            db.commit()
+
+        response = employer.get(f"/api/v1/employer/candidates/{person['id']}/evidence")
+        assert response.status_code == 200, response.text
+        legacy = next(card for card in response.json() if card["source_type"] == "legacy_aggregate")
+        assert legacy["verification_level"] == "aggregate"
+        assert legacy["scope"] == "aggregate_only"
+        assert legacy["verification_level"] != "verified_action"
+        assert any("конкретное действие не восстанавливается" in limit.lower()
+                   for limit in legacy["limitations"])

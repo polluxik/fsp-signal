@@ -211,6 +211,15 @@ test('role facts, selected evidence, explicit acceptance, and pair-scoped contac
   const selectedEvidence = employerPage.getByRole('checkbox', { name: 'Добавить: Ранее сохранённая категория' })
   await expect(selectedEvidence).toBeChecked()
   await expect(employerPage.getByRole('checkbox', { name: 'Добавить: Навык из профиля' }).first()).not.toBeChecked()
+  const legacyEvidence = employerPage.locator('.evidence-item').filter({ hasText: 'Ранее сохранённая категория' })
+  await expect(legacyEvidence).toContainText('Синтетическая демонстрация')
+  await expect(legacyEvidence).not.toContainText('Действие проверено заданием')
+  const declaredEvidence = employerPage.locator('.evidence-item').filter({ hasText: 'Навык из профиля' })
+  await expect(declaredEvidence).toHaveCount(2)
+  for (const card of await declaredEvidence.all()) {
+    await expect(card).toContainText('Заявлено кандидатом')
+    await expect(card).not.toContainText('Действие проверено заданием')
+  }
   let submittedEvidenceIds: string[] | null = null
   await employerPage.route('**/api/v1/employer/invitations', async route => {
     if (route.request().method() === 'POST') {
