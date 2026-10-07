@@ -14,6 +14,14 @@ from test_flow import csrf, register_verified
 from test_role_cards import role_payload
 
 
+def set_match_version(monkeypatch, version):
+    main_module = import_module("backend.main")
+    matching_module = import_module("backend.matching")
+    configured = replace(settings, match_algorithm_version=version)
+    monkeypatch.setattr(main_module, "settings", configured)
+    monkeypatch.setattr(matching_module, "settings", configured)
+
+
 def make_search_context(employer, candidate, *, extra_skills=None):
     suffix = uuid4().hex[:10]
     employer_user = register_verified(employer, f"snapshot-{suffix}-employer@example.test", "employer")
@@ -69,7 +77,9 @@ def make_candidate_profile(candidate, *, extra_skills=None, email=None):
     return candidate_user
 
 
-def test_snapshot_pins_search_inputs_and_reports_changed_candidate_values():
+def test_snapshot_pins_search_inputs_and_reports_changed_candidate_values(monkeypatch):
+    set_match_version(monkeypatch, "match_v1")
+
     with TestClient(app) as employer, TestClient(app) as candidate:
         _, candidate_user, need_id, role_version_id = make_search_context(employer, candidate)
         listed_need = next(item for item in employer.get("/api/v1/employer/needs").json()
@@ -101,6 +111,7 @@ def test_snapshot_pins_search_inputs_and_reports_changed_candidate_values():
             profile.preferences_version = 2
             db.commit()
 
+        set_match_version(monkeypatch, "match_v2")
         restored = employer.get(f"/api/v1/employer/searches/{snapshot['id']}")
         assert restored.status_code == 200, restored.text
         restored_row = next(item for item in restored.json()["results"]
@@ -112,7 +123,8 @@ def test_snapshot_pins_search_inputs_and_reports_changed_candidate_values():
         assert restored_row["changed_since_search"] is True
 
 
-def test_snapshot_rechecks_current_consent_availability_and_block_state():
+def test_snapshot_rechecks_current_consent_availability_and_block_state(monkeypatch):
+    set_match_version(monkeypatch, "match_v1")
     with TestClient(app) as employer, TestClient(app) as candidate:
         employer_user, candidate_user, need_id, role_version_id = make_search_context(employer, candidate)
         found = employer.post("/api/v1/employer/searches", json={
@@ -147,7 +159,8 @@ def test_snapshot_rechecks_current_consent_availability_and_block_state():
         assert_candidate_is_hidden()
 
 
-def test_role_version_is_pinned_and_stale_parent_cannot_start_a_new_search():
+def test_role_version_is_pinned_and_stale_parent_cannot_start_a_new_search(monkeypatch):
+    set_match_version(monkeypatch, "match_v1")
     with TestClient(app) as employer, TestClient(app) as candidate:
         _, _, need_id, initial_role_version_id = make_search_context(employer, candidate)
         first = employer.post("/api/v1/employer/searches", json={
@@ -179,7 +192,8 @@ def test_role_version_is_pinned_and_stale_parent_cannot_start_a_new_search():
         assert wrong_parent.json()["detail"] == "ROLE_VERSION_CONFLICT"
 
 
-def test_search_filter_stack_is_unioned_with_role_stack():
+def test_search_filter_stack_is_unioned_with_role_stack(monkeypatch):
+    set_match_version(monkeypatch, "match_v1")
     with TestClient(app) as employer, TestClient(app) as candidate:
         _, candidate_user, need_id, role_version_id = make_search_context(
             employer, candidate, extra_skills=["Rust"]
@@ -203,12 +217,16 @@ def test_search_filter_stack_is_unioned_with_role_stack():
         assert candidate_user["id"] not in {row["id"] for row in excluded.json()["results"]}
 
 
-def test_match_v2_is_selected_by_config_and_bank_score_has_no_fsp_bonus(monkeypatch):
+def test_new_searches_default_to_match_v2_and_bank_score_has_no_fsp_bonus(monkeypatch):
+    from backend.config import Settings
+
+    monkeypatch.delenv("MATCH_ALGORITHM_VERSION", raising=False)
+    default_settings = Settings()
+    assert default_settings.match_algorithm_version == "match_v2"
     main_module = import_module("backend.main")
     matching_module = import_module("backend.matching")
-    v2_settings = replace(settings, match_algorithm_version="match_v2")
-    monkeypatch.setattr(main_module, "settings", v2_settings)
-    monkeypatch.setattr(matching_module, "settings", v2_settings)
+    monkeypatch.setattr(main_module, "settings", default_settings)
+    monkeypatch.setattr(matching_module, "settings", default_settings)
 
     with TestClient(app) as employer, TestClient(app) as candidate:
         _, candidate_user, need_id, _ = make_search_context(
@@ -248,7 +266,8 @@ def test_match_v2_is_selected_by_config_and_bank_score_has_no_fsp_bonus(monkeypa
         assert candidate_card["bank_score_algorithm_version"] == "match_v2"
 
 
-def test_search_result_ties_use_test_score_then_stable_candidate_id():
+def test_search_result_ties_use_test_score_then_stable_candidate_id(monkeypatch):
+    set_match_version(monkeypatch, "match_v1")
     with TestClient(app) as employer, TestClient(app) as candidate, TestClient(app) as second_candidate:
         _, candidate_user, need_id, role_version_id = make_search_context(employer, candidate)
         second_user = make_candidate_profile(second_candidate)

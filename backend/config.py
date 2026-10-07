@@ -12,7 +12,7 @@ class Settings:
     smtp_from: str = os.getenv("SMTP_FROM", "demo@example.test")
     session_secure: bool = os.getenv("SESSION_SECURE", "false").lower() == "true"
     fsp_provider: str = os.getenv("FSP_PROVIDER", "mock")
-    match_algorithm_version: str = os.getenv("MATCH_ALGORITHM_VERSION", "match_v1")
+    match_algorithm_version: str = os.getenv("MATCH_ALGORITHM_VERSION", "match_v2")
 
     def __post_init__(self) -> None:
         if self.match_algorithm_version not in {"match_v1", "match_v2"}:

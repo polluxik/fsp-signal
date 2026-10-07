@@ -143,7 +143,7 @@
 - [x] **Step 6: Correct visible evidence badges so only `verified_action` is called verified; preserve `synthetic_fixture`, `aggregate` and unknown labels**
 - [x] **Step 7: Show the held-interview confirmation control only after acceptance; show a confirmed outcome only after both parties confirm**
 - [x] **Step 8: Extract `signIn` and `currentUserId` to `frontend/tests/test-support.ts`, set Playwright `testMatch` to `**/*.spec.ts`, then run `cd frontend && npm run build` and the focused browser cases; expected: PASS with no TypeScript errors or console exceptions**
-- [ ] **Step 9: Commit the core candidate/employer UI state repair after build and focused E2E pass**
+- [x] **Step 9: Commit the core candidate/employer UI state repair after build and focused E2E pass**
 
 Task 3 RED/GREEN evidence and remaining caveats: [Task 3 verification report](../reports/2026-10-07-signal-task-3-report.md).
 
@@ -151,21 +151,22 @@ Task 3 RED/GREEN evidence and remaining caveats: [Task 3 verification report](..
 
 **Files:**
 - Modify: `backend/config.py`
-- Modify: `backend/matching.py`
-- Modify: `backend/main.py`
 - Modify: `frontend/src/App.tsx`
-- Modify: `frontend/src/features/invitations/InvitationPanel.tsx`
-- Modify: `tests/test_invitations_v2.py`
-- Modify: `tests/test_product_events.py`
 - Modify: `frontend/tests/core-flow.spec.ts`
+- Modify: `tests/test_flow.py`
+- Modify: `tests/test_matching_v2.py`
+- Modify: `tests/test_role_discovery.py`
+- Modify: `tests/test_search_snapshots.py`
 
 **Interfaces:**
 - Consumes: the repaired user-state contracts from Tasks 2–3.
 - Produces: neutral matching default for new searches, unchanged historical snapshots, reliable invitation status/contact boundary and complete employer setup/recovery path.
 
-- [ ] **Step 1: Add score and candidate-bank regression tests proving new searches/bank ordering do not receive an unvalidated FSP ranking bonus while old snapshots remain unchanged**
-- [ ] **Step 2: Run the failing algorithm-default regression**
-- [ ] **Step 3: Set the new-search default to the reviewed non-FSP-bonus algorithm; do not rewrite stored snapshots**
-- [ ] **Step 4: Extend browser E2E for company setup, invite view/accept/reject/withdraw, refresh, contact access, and two-party held-interview confirmation**
-- [ ] **Step 5: Run `/Users/danielbubusan/Desktop/fsp-signal/.venv/bin/python -m pytest -q`, `cd frontend && npm run build`, and the complete E2E suite; expected: all SQLite/backend/browser checks pass and PostgreSQL-only skips are reported explicitly**
+- [x] **Step 1: Add score and candidate-bank regression tests proving new searches/bank ordering do not receive an unvalidated FSP ranking bonus while old snapshots remain unchanged**
+- [x] **Step 2: Run the failing algorithm-default regression**
+- [x] **Step 3: Set the new-search default to the neutral non-FSP-bonus algorithm; do not rewrite stored snapshots**
+- [x] **Step 4: Extend browser E2E for company setup, invite view/accept/reject/withdraw, refresh, contact access, and two-party held-interview confirmation**
+- [x] **Step 5: Run the complete backend suite, frontend build and E2E suite; report PostgreSQL-only skips explicitly**
 - [ ] **Step 6: Commit this independently reviewable core-journey change**
+
+Task 4 RED/GREEN evidence and verification: [Task 4 report](../reports/2026-10-07-signal-task-4-report.md).

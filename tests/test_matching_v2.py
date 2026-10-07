@@ -144,8 +144,9 @@ def test_v2_scores_only_within_the_same_verified_category(specialization, grade,
     assert score_profile_v2(profile, other).score is None
 
 
-def test_matching_algorithm_config_accepts_only_supported_versions():
-    assert Settings().match_algorithm_version == "match_v1"
+def test_matching_algorithm_config_accepts_only_supported_versions(monkeypatch):
+    monkeypatch.delenv("MATCH_ALGORITHM_VERSION", raising=False)
+    assert Settings().match_algorithm_version == "match_v2"
     assert Settings(match_algorithm_version="match_v2").match_algorithm_version == "match_v2"
     with pytest.raises(ValueError, match="MATCH_ALGORITHM_VERSION"):
         Settings(match_algorithm_version="match_v3")

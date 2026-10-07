@@ -175,6 +175,24 @@ def test_reverse_hiring_and_contact_boundary():
         created = employer.post("/api/v1/employer/needs", json=need, headers=csrf(employer))
         assert created.status_code == 201, created.text
         need_id = created.json()["id"]
+        role_card = {
+            "title": need["title"], "description": need["description"],
+            "specialization": need["specialization"], "grade": need["grade"],
+            "competencies": need["competencies"], "stack": need["stack"],
+            "salary_min_rub": need["salary_min_rub"], "salary_max_rub": need["salary_max_rub"],
+            "work_format": need["work_format"], "work_city": None, "industry": "ИТ",
+            "first_30_days": "Устранить повторную обработку платежных событий",
+            "interview_steps": [{"title": "Знакомство с командой", "duration_minutes": 45}],
+            "take_home_minutes": 0, "response_sla_hours": 48,
+            "employer_contact": "team@example.test", "active_headcount_attested": True,
+        }
+        revised_role = employer.post(f"/api/v1/employer/needs/{need_id}/versions",
+                                     json={"expected_version": 1, "card": role_card}, headers=csrf(employer))
+        assert revised_role.status_code == 201, revised_role.text
+        published_role = employer.post(f"/api/v1/employer/needs/{need_id}/publish",
+                                       json={"expected_version": 2, "active_headcount_attested": True,
+                                             "discoverable": True}, headers=csrf(employer))
+        assert published_role.status_code == 200, published_role.text
         found = employer.post("/api/v1/employer/searches", json={"need_id":need_id}, headers=csrf(employer))
         assert found.status_code == 201, found.text
         search_results = found.json()["results"]

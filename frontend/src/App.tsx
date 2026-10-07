@@ -328,6 +328,7 @@ function EmployerApp({ me }: { me: User }) {
   const [contacts, setContacts] = useState<Record<string, Record<string,string>>>({})
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
+  const [inviteActionBusyId, setInviteActionBusyId] = useState('')
   const [companySetupRequired, setCompanySetupRequired] = useState(false)
   const [returnToInvitation, setReturnToInvitation] = useState(false)
   const [returnToNeed, setReturnToNeed] = useState(false)
@@ -513,6 +514,26 @@ function EmployerApp({ me }: { me: User }) {
     }
     catch (err) { setError((err as Error).message) }
   }
+  async function withdrawInvitation(invite: Invite) {
+    setError('')
+    setFeedback('')
+    setInviteActionBusyId(invite.id)
+    try {
+      await api(`/invitations/${invite.id}/withdraw`, 'POST', {
+        expected_state_version: invite.state_version ?? 1,
+      })
+      setOffers(await api<Invite[]>('/employer/invitations'))
+      setFeedback('Приглашение отозвано. Кандидат больше не увидит его как активное.')
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'INVITATION_STATE_CONFLICT') {
+        try {
+          setOffers(await api<Invite[]>('/employer/invitations'))
+          setError('Статус приглашения уже изменился. Список обновлён — проверьте актуальное состояние перед повтором.')
+        } catch (refreshError) { setError((refreshError as Error).message) }
+      } else setError((err as Error).message)
+    }
+    finally { setInviteActionBusyId('') }
+  }
   async function onRoleSaved(card: RoleCardOut) {
     setRoleCard(card)
     try { setNeeds(await api<Need[]>('/employer/needs')) }
@@ -626,7 +647,7 @@ function EmployerApp({ me }: { me: User }) {
       </div>}
     </>}
     {tab === 'bank' && <><div className="page-heading"><p className="eyebrow">БАНК КАНДИДАТОВ</p><h1>Все открытые проверенные профили</h1><p>{bank[0]?.bank_score_algorithm_version === 'match_v2' ? 'Порядок внутри категории основан на тестовом результате; ФСП доступен как отдельный фильтр.' : bank[0]?.bank_score_algorithm_version === 'match_v1' ? 'Порядок внутри категории учитывает тест и дополнительный сигнал ФСП.' : 'Порядок внутри категории определяется выбранной версией алгоритма; ФСП можно фильтровать отдельно.'}</p></div><section className="search-bar card"><label>Специализация<select value={bankSpec} onChange={e => setBankSpec(e.target.value)}><option value="">Все</option><option value="backend">Backend</option><option value="frontend">Frontend</option></select></label><label>Грейд<select value={bankGrade} onChange={e => setBankGrade(e.target.value)}><option value="">Все</option><option value="junior">Junior</option><option value="middle">Middle</option></select></label><label>Стек (заявлен)<input value={bankStack} onChange={e => setBankStack(e.target.value)} placeholder="Python"/></label><label className="inline-check"><input type="checkbox" checked={bankFsp} onChange={e => setBankFsp(e.target.checked)}/> С историей ФСП</label><button className="primary" onClick={filterBank}>Применить фильтры</button></section>{bank.length ? <div className="candidate-grid">{bank.map(candidate => <CandidateCard key={candidate.id} candidate={candidate}/>)}</div> : <div className="empty card">Пока нет подходящих опубликованных профилей.</div>}</>}
-    {tab === 'offers' && <><div className="page-heading"><p className="eyebrow">ИСХОДЯЩИЕ ПРЕДЛОЖЕНИЯ</p><h1>Нанимайте по обещаниям, которые можно проверить</h1><p>Каждое приглашение привязано к выбранным доказательствам и конкретной версии условий.</p></div>{offers.length === 0 ? <div className="empty card">Пока нет приглашений.</div> : offers.map(invite => <article className="card offer-card" key={invite.id}><div className="section-title"><div><h2>{invite.company_name} → Кандидат #{invite.candidate_id.slice(0,8)}</h2><p className="muted">{invite.offer_text}</p></div><span className={`badge ${invite.state === 'accepted' ? 'green' : ''}`}>{statusName(invite.state)}</span></div><div className="salary">{rubles(invite.salary_min_rub)} — {rubles(invite.salary_max_rub)} <small>в месяц · до налогов</small></div><p><strong>Основание:</strong> {invite.reason}</p>{invite.state === 'accepted' && <><InterviewConfirmation invite={invite} viewer="employer" onChanged={load}/><button className="button outline" onClick={() => showContact(invite.candidate_id)}>Показать контакты кандидата #{invite.candidate_id.slice(0,8)}</button></>}{contacts[invite.candidate_id] && invite.state === 'accepted' && <Notice tone="good">{contacts[invite.candidate_id].full_name} · {contacts[invite.candidate_id].email} · {contacts[invite.candidate_id].phone}</Notice>}</article>)}</>}
+    {tab === 'offers' && <><div className="page-heading"><p className="eyebrow">ИСХОДЯЩИЕ ПРЕДЛОЖЕНИЯ</p><h1>Нанимайте по обещаниям, которые можно проверить</h1><p>Каждое приглашение привязано к выбранным доказательствам и конкретной версии условий.</p></div>{offers.length === 0 ? <div className="empty card">Пока нет приглашений.</div> : offers.map(invite => <article className="card offer-card" key={invite.id}><div className="section-title"><div><h2>{invite.company_name} → Кандидат #{invite.candidate_id.slice(0,8)}</h2><p className="muted">{invite.offer_text}</p></div><span className={`badge ${invite.state === 'accepted' ? 'green' : ''}`}>{statusName(invite.state)}</span></div><div className="salary">{rubles(invite.salary_min_rub)} — {rubles(invite.salary_max_rub)} <small>в месяц · до налогов</small></div><p><strong>Основание:</strong> {invite.reason}</p>{['sent', 'viewed'].includes(invite.state) && <button className="button subtle" type="button" disabled={inviteActionBusyId === invite.id} onClick={() => void withdrawInvitation(invite)}>{inviteActionBusyId === invite.id ? 'Отзываем…' : 'Отозвать приглашение'}</button>}{invite.state === 'accepted' && <><InterviewConfirmation invite={invite} viewer="employer" onChanged={load}/><button className="button outline" onClick={() => showContact(invite.candidate_id)}>Показать контакты кандидата #{invite.candidate_id.slice(0,8)}</button></>}{contacts[invite.candidate_id] && invite.state === 'accepted' && <Notice tone="good">{contacts[invite.candidate_id].full_name} · {contacts[invite.candidate_id].email} · {contacts[invite.candidate_id].phone}</Notice>}</article>)}</>}
   </main></div></div>
 }
 

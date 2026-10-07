@@ -341,6 +341,62 @@ test('role facts, selected evidence, explicit acceptance, and pair-scoped contac
   expect(submittedEvidenceIds?.every(id => targetEvidenceIds.has(id))).toBeTruthy()
   await expect(employerPage.getByRole('status')).toContainText('Приглашение отправлено')
 
+  await employerPage.getByRole('button', { name: 'Приглашения' }).click()
+  const firstEmployerOffer = employerPage.locator('.offer-card').filter({ hasText: candidateId.slice(0, 8) })
+  const withdrawFirstOffer = firstEmployerOffer.getByRole('button', { name: 'Отозвать приглашение' })
+  await expect(withdrawFirstOffer).toBeVisible()
+
+  await candidatePage.getByRole('button', { name: 'Приглашения' }).click()
+  const candidateFirstOffer = candidatePage.locator('.offer-card')
+    .filter({ hasText: 'Приглашаем обсудить обработку платёжных событий в команде.' })
+  await candidateFirstOffer.getByRole('button', { name: 'Проверить условия' }).click()
+  await expect(candidatePage.getByRole('dialog')).toBeVisible()
+
+  await withdrawFirstOffer.click()
+  await expect(employerPage.getByRole('alert')).toContainText('Список обновлён')
+  await expect(firstEmployerOffer).toContainText('Просмотрено')
+  await expect(withdrawFirstOffer).toBeEnabled()
+  await withdrawFirstOffer.click()
+  await expect(firstEmployerOffer).toContainText('Отозвано')
+
+  await candidatePage.reload()
+  await candidatePage.getByRole('button', { name: 'Приглашения' }).click()
+  const withdrawnCandidateOffer = candidatePage.locator('.offer-card')
+    .filter({ hasText: 'Приглашаем обсудить обработку платёжных событий в команде.' })
+  await expect(withdrawnCandidateOffer).toContainText('Отозвано')
+  await expect(withdrawnCandidateOffer.getByRole('button', { name: 'Проверить условия' })).toHaveCount(0)
+
+  await employerPage.getByRole('button', { name: 'Найти специалиста' }).click()
+  await employerPage.locator('.candidate-card').filter({ hasText: targetAlias })
+    .getByRole('button', { name: /Пригласить с условиями/ }).click()
+  await expect(employerPage.getByRole('dialog')).toBeVisible()
+  await employerPage.getByRole('button', { name: /Отправить с выбранным основанием/ }).click()
+  await expect(employerPage.getByRole('status')).toContainText('Приглашение отправлено')
+  await candidatePage.getByRole('button', { name: 'Мой профиль' }).click()
+  await candidatePage.getByRole('button', { name: 'Приглашения' }).click()
+  await expect(candidatePage.locator('.offer-card').filter({
+    hasText: 'Приглашаем обсудить роль Backend Middle: события и задачи команды.',
+  }).getByRole('button', { name: 'Проверить условия' })).toBeVisible()
+
+  const rejectedCandidateOffer = candidatePage.locator('.offer-card').filter({
+    hasText: 'Приглашаем обсудить роль Backend Middle: события и задачи команды.',
+  })
+  await rejectedCandidateOffer.getByRole('button', { name: 'Отклонить' }).click()
+  await expect(candidatePage.getByRole('status')).toContainText('Ваши контакты не раскрыты')
+  await expect(rejectedCandidateOffer).toContainText('Отклонено')
+
+  await employerPage.getByRole('button', { name: 'Найти специалиста' }).click()
+  await employerPage.locator('.candidate-card').filter({ hasText: targetAlias })
+    .getByRole('button', { name: /Пригласить с условиями/ }).click()
+  await expect(employerPage.getByRole('dialog')).toBeVisible()
+  await employerPage.getByRole('button', { name: /Отправить с выбранным основанием/ }).click()
+  await expect(employerPage.getByRole('status')).toContainText('Приглашение отправлено')
+  await candidatePage.reload()
+  await candidatePage.getByRole('button', { name: 'Приглашения' }).click()
+  await expect(candidatePage.locator('.offer-card').filter({
+    hasText: 'Приглашаем обсудить роль Backend Middle: события и задачи команды.',
+  }).getByRole('button', { name: 'Проверить условия' })).toBeVisible()
+
   await employerPage.unroute(`**/api/v1/employer/candidates/${alternate.id}/evidence`)
   await employerPage.unroute('**/api/v1/employer/invitations')
   await expect(employerPage.getByRole('dialog')).toHaveCount(0)

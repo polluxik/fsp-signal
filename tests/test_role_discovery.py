@@ -1,4 +1,5 @@
 from datetime import timedelta
+import json
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
@@ -110,7 +111,18 @@ def test_candidate_role_feed_filters_private_hard_preferences_and_omits_contact(
         assert not {low_salary_id, office_id, long_test_id, excluded_industry_id}.intersection(by_id)
         assert by_id[compatible_id]["match_state"] == "compatible"
         assert by_id[unknown_id]["match_state"] == "needs_clarification"
-        assert "230000" not in response.text
+        # Public role salary values may coincidentally equal the candidate's
+        # private minimum, so verify the response contract rather than searching
+        # the whole JSON for a number that is legitimately present in a role.
+        assert all(not {"preferences", "candidate_preferences", "min_salary_rub", "salary_min_rub"}.intersection(item)
+                   for item in feed["items"])
+        assert all("salary_min_rub" in item["role"] for item in feed["items"])
+        without_public_role_salaries = [
+            {**item, "role": {key: value for key, value in item["role"].items()
+                              if key not in {"salary_min_rub", "salary_max_rub"}}}
+            for item in feed["items"]
+        ]
+        assert "230000" not in json.dumps(without_public_role_salaries, ensure_ascii=False)
         assert "gambling" not in response.text
         assert all("employer_contact" not in item["role"] for item in feed["items"])
         assert all("role-feed-employer@example.test" not in str(item) for item in feed["items"])
