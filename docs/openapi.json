@@ -2,10 +2,2310 @@
   "openapi": "3.1.0",
   "info": {
     "title": "ФСП Сигнал",
-    "description": "Демонстрационный API обратного найма",
+    "description": "Демонстрационный API платформы обратного найма «ФСП Сигнал».\n\nАвторизация использует HttpOnly cookie `fsp_session`. Изменяющие состояние запросы\nдополнительно требуют совпадающие cookie `fsp_csrf` и заголовок `x-csrf-token`.\nБизнес-ошибки возвращаются как `{\"detail\": \"MACHINE_READABLE_CODE\"}`; ошибки\nвалидации FastAPI возвращают HTTP 422. В демо данные ФСП поступают из явно\nобозначенного mock-провайдера: организаторы хакатона не предоставили API ФСП.\n",
     "version": "0.1.0"
   },
   "paths": {
+    "/api/v1/employer/needs/{need_id}/role-card": {
+      "get": {
+        "tags": [
+          "employer-v2"
+        ],
+        "summary": "Get Role Card",
+        "operationId": "get_role_card_api_v1_employer_needs__need_id__role_card_get",
+        "parameters": [
+          {
+            "name": "need_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Need Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleCardOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
+      }
+    },
+    "/api/v1/employer/needs/{need_id}/promotion/demo": {
+      "get": {
+        "tags": [
+          "employer-v2"
+        ],
+        "summary": "Get Demo Role Promotion",
+        "operationId": "get_demo_role_promotion_api_v1_employer_needs__need_id__promotion_demo_get",
+        "parameters": [
+          {
+            "name": "need_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Need Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/DemoPromotionOut"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Demo Role Promotion Api V1 Employer Needs  Need Id  Promotion Demo Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "employer-v2"
+        ],
+        "summary": "Post Demo Role Promotion",
+        "operationId": "post_demo_role_promotion_api_v1_employer_needs__need_id__promotion_demo_post",
+        "parameters": [
+          {
+            "name": "need_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Need Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoPromotionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/employer/needs/{need_id}/versions": {
+      "post": {
+        "tags": [
+          "employer-v2"
+        ],
+        "summary": "Post Role Version",
+        "operationId": "post_role_version_api_v1_employer_needs__need_id__versions_post",
+        "parameters": [
+          {
+            "name": "need_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Need Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleVersionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleCardOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/employer/needs/{need_id}/publish": {
+      "post": {
+        "tags": [
+          "employer-v2"
+        ],
+        "summary": "Post Publish Role",
+        "operationId": "post_publish_role_api_v1_employer_needs__need_id__publish_post",
+        "parameters": [
+          {
+            "name": "need_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Need Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishRoleIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleCardOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/employer/needs/{need_id}/reconfirm": {
+      "post": {
+        "tags": [
+          "employer-v2"
+        ],
+        "summary": "Post Reconfirm Role",
+        "operationId": "post_reconfirm_role_api_v1_employer_needs__need_id__reconfirm_post",
+        "parameters": [
+          {
+            "name": "need_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Need Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconfirmRoleIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleCardOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/employer/needs/{need_id}/pause": {
+      "post": {
+        "tags": [
+          "employer-v2"
+        ],
+        "summary": "Post Pause Role",
+        "operationId": "post_pause_role_api_v1_employer_needs__need_id__pause_post",
+        "parameters": [
+          {
+            "name": "need_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Need Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleMutationIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleCardOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/employer/needs/{need_id}/close": {
+      "post": {
+        "tags": [
+          "employer-v2"
+        ],
+        "summary": "Post Close Role",
+        "operationId": "post_close_role_api_v1_employer_needs__need_id__close_post",
+        "parameters": [
+          {
+            "name": "need_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Need Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleMutationIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleCardOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/candidate/recommendations/consent": {
+      "get": {
+        "tags": [
+          "candidate-v2"
+        ],
+        "summary": "Read Recommendation Consent",
+        "operationId": "read_recommendation_consent_api_v1_candidate_recommendations_consent_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "candidate-v2"
+        ],
+        "summary": "Save Recommendation Consent",
+        "operationId": "save_recommendation_consent_api_v1_candidate_recommendations_consent_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_save_recommendation_consent_api_v1_candidate_recommendations_consent_put"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/candidate/evidence": {
+      "get": {
+        "tags": [
+          "candidate-v2"
+        ],
+        "summary": "Get Candidate Evidence",
+        "operationId": "get_candidate_evidence_api_v1_candidate_evidence_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EvidenceCard"
+                  },
+                  "type": "array",
+                  "title": "Response Get Candidate Evidence Api V1 Candidate Evidence Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
+      }
+    },
+    "/api/v1/candidate/roles": {
+      "get": {
+        "tags": [
+          "candidate-v2"
+        ],
+        "summary": "Get Candidate Roles",
+        "operationId": "get_candidate_roles_api_v1_candidate_roles_get",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 512
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 20,
+              "minimum": 1,
+              "default": 5,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "specialization",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Specialization"
+            }
+          },
+          {
+            "name": "grade",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Grade"
+            }
+          },
+          {
+            "name": "work_format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "remote",
+                    "hybrid",
+                    "office"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Work Format"
+            }
+          },
+          {
+            "name": "saved_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Saved Only"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleFeedOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
+      }
+    },
+    "/api/v1/candidate/role-decisions/{need_id}": {
+      "put": {
+        "tags": [
+          "candidate-v2"
+        ],
+        "summary": "Put Candidate Role Decision",
+        "operationId": "put_candidate_role_decision_api_v1_candidate_role_decisions__need_id__put",
+        "parameters": [
+          {
+            "name": "need_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Need Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleDecisionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleDecisionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/candidate/promotions/{campaign_id}/impression": {
+      "post": {
+        "tags": [
+          "candidate-v2"
+        ],
+        "summary": "Post Sponsored Impression",
+        "operationId": "post_sponsored_impression_api_v1_candidate_promotions__campaign_id__impression_post",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Campaign Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SponsoredImpressionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/candidate/preferences": {
+      "get": {
+        "tags": [
+          "candidate-v2"
+        ],
+        "summary": "Get Candidate Preferences",
+        "operationId": "get_candidate_preferences_api_v1_candidate_preferences_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidatePreferencesOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "candidate-v2"
+        ],
+        "summary": "Put Candidate Preferences",
+        "operationId": "put_candidate_preferences_api_v1_candidate_preferences_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CandidatePreferencesIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidatePreferencesOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/candidate/companies/{employer_id}/block": {
+      "post": {
+        "tags": [
+          "candidate-v2"
+        ],
+        "summary": "Post Block Employer",
+        "operationId": "post_block_employer_api_v1_candidate_companies__employer_id__block_post",
+        "parameters": [
+          {
+            "name": "employer_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Employer Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessChangeResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/candidate/companies/{employer_id}/revoke-contact": {
+      "post": {
+        "tags": [
+          "candidate-v2"
+        ],
+        "summary": "Post Revoke Employer Contacts",
+        "operationId": "post_revoke_employer_contacts_api_v1_candidate_companies__employer_id__revoke_contact_post",
+        "parameters": [
+          {
+            "name": "employer_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Employer Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessChangeResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/assistant/candidate/preferences": {
+      "post": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Draft Candidate Preferences",
+        "operationId": "draft_candidate_preferences_api_v1_assistant_candidate_preferences_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantDraftIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidatePreferencesDraft"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/assistant/candidate/achievement": {
+      "post": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Draft Candidate Achievement",
+        "operationId": "draft_candidate_achievement_api_v1_assistant_candidate_achievement_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantDraftIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateAchievementDraft"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/assistant/employer/role": {
+      "post": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Draft Employer Role",
+        "operationId": "draft_employer_role_api_v1_assistant_employer_role_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantDraftIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmployerRoleDraft"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/employer/calendar": {
+      "get": {
+        "tags": [
+          "interview-calendar"
+        ],
+        "summary": "Read Calendar",
+        "operationId": "read_calendar_api_v1_employer_calendar_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "interview-calendar"
+        ],
+        "summary": "Update Calendar",
+        "operationId": "update_calendar_api_v1_employer_calendar_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalendarSettingsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/employer/calendar/availability": {
+      "post": {
+        "tags": [
+          "interview-calendar"
+        ],
+        "summary": "Add Availability",
+        "operationId": "add_availability_api_v1_employer_calendar_availability_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AvailabilityIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/employer/calendar/slots/{slot_id}": {
+      "delete": {
+        "tags": [
+          "interview-calendar"
+        ],
+        "summary": "Remove Slot",
+        "operationId": "remove_slot_api_v1_employer_calendar_slots__slot_id__delete",
+        "parameters": [
+          {
+            "name": "slot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slot Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/calendars/{token}": {
+      "get": {
+        "tags": [
+          "interview-calendar"
+        ],
+        "summary": "Public Calendar",
+        "operationId": "public_calendar_api_v1_calendars__token__get",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        }
+      }
+    },
+    "/api/v1/invitations/{invitation_id}/calendar": {
+      "get": {
+        "tags": [
+          "interview-calendar"
+        ],
+        "summary": "Invitation Calendar",
+        "operationId": "invitation_calendar_api_v1_invitations__invitation_id__calendar_get",
+        "parameters": [
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Invitation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
+      }
+    },
+    "/api/v1/calendars/{token}/book": {
+      "post": {
+        "tags": [
+          "interview-calendar"
+        ],
+        "summary": "Book Slot",
+        "operationId": "book_slot_api_v1_calendars__token__book_post",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/meetings": {
+      "get": {
+        "tags": [
+          "interview-calendar"
+        ],
+        "summary": "List Meetings",
+        "operationId": "list_meetings_api_v1_meetings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
+      }
+    },
+    "/api/v1/meetings/capabilities": {
+      "get": {
+        "tags": [
+          "interview-calendar"
+        ],
+        "summary": "Meeting Capabilities",
+        "operationId": "meeting_capabilities_api_v1_meetings_capabilities_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
+      }
+    },
+    "/api/v1/meetings/{meeting_id}/cancel": {
+      "post": {
+        "tags": [
+          "interview-calendar"
+        ],
+        "summary": "Cancel Meeting",
+        "operationId": "cancel_meeting_api_v1_meetings__meeting_id__cancel_post",
+        "parameters": [
+          {
+            "name": "meeting_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Meeting Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/meetings/{meeting_id}/recording-consent": {
+      "put": {
+        "tags": [
+          "interview-calendar"
+        ],
+        "summary": "Recording Consent",
+        "operationId": "recording_consent_api_v1_meetings__meeting_id__recording_consent_put",
+        "parameters": [
+          {
+            "name": "meeting_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Meeting Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/meetings/{meeting_id}/materials": {
+      "put": {
+        "tags": [
+          "interview-calendar"
+        ],
+        "summary": "Save Materials",
+        "operationId": "save_materials_api_v1_meetings__meeting_id__materials_put",
+        "parameters": [
+          {
+            "name": "meeting_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Meeting Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MaterialsIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/meetings/{meeting_id}/recording": {
+      "post": {
+        "tags": [
+          "interview-calendar"
+        ],
+        "summary": "Upload Recording",
+        "operationId": "upload_recording_api_v1_meetings__meeting_id__recording_post",
+        "parameters": [
+          {
+            "name": "meeting_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Meeting Id"
+            }
+          },
+          {
+            "name": "expected_version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Expected Version"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_recording_api_v1_meetings__meeting_id__recording_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "interview-calendar"
+        ],
+        "summary": "Download Recording",
+        "operationId": "download_recording_api_v1_meetings__meeting_id__recording_get",
+        "parameters": [
+          {
+            "name": "meeting_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Meeting Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
+      }
+    },
+    "/api/v1/meetings/{meeting_id}/calendar.ics": {
+      "get": {
+        "tags": [
+          "interview-calendar"
+        ],
+        "summary": "Export Meeting",
+        "operationId": "export_meeting_api_v1_meetings__meeting_id__calendar_ics_get",
+        "parameters": [
+          {
+            "name": "meeting_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Meeting Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
+      }
+    },
+    "/api/v1/meetings/{meeting_id}/summary": {
+      "post": {
+        "tags": [
+          "interview-calendar"
+        ],
+        "summary": "Summarize Meeting",
+        "operationId": "summarize_meeting_api_v1_meetings__meeting_id__summary_post",
+        "parameters": [
+          {
+            "name": "meeting_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Meeting Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SummaryIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/meetings/{meeting_id}/transcribe": {
+      "post": {
+        "tags": [
+          "interview-calendar"
+        ],
+        "summary": "Transcribe Meeting",
+        "operationId": "transcribe_meeting_api_v1_meetings__meeting_id__transcribe_post",
+        "parameters": [
+          {
+            "name": "meeting_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Meeting Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SummaryIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/taxonomy/categories": {
+      "get": {
+        "summary": "Get Taxonomy Categories",
+        "operationId": "get_taxonomy_categories_api_v1_taxonomy_categories_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TaxonomyCategoryOut"
+                  },
+                  "type": "array",
+                  "title": "Response Get Taxonomy Categories Api V1 Taxonomy Categories Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/health/live": {
       "get": {
         "summary": "Live",
@@ -34,6 +2334,9 @@
                 "schema": {}
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
           }
         }
       }
@@ -70,6 +2373,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
           }
         }
       }
@@ -106,6 +2412,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
           }
         }
       }
@@ -142,6 +2451,12 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
         }
       }
@@ -158,8 +2473,24 @@
                 "schema": {}
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
       }
     },
     "/api/v1/me": {
@@ -174,8 +2505,19 @@
                 "schema": {}
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
       }
     },
     "/api/v1/candidate/profile": {
@@ -190,8 +2532,19 @@
                 "schema": {}
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
       },
       "put": {
         "summary": "Save Candidate",
@@ -224,8 +2577,24 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
       }
     },
     "/api/v1/candidate/resume/preview": {
@@ -260,8 +2629,27 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
       }
     },
     "/api/v1/candidate/fsp-link": {
@@ -296,8 +2684,24 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
       },
       "delete": {
         "summary": "Unlink Fsp",
@@ -310,8 +2714,24 @@
                 "schema": {}
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
       }
     },
     "/api/v1/candidate/assessment-attempts": {
@@ -346,8 +2766,27 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
       }
     },
     "/api/v1/candidate/assessment-attempts/{attempt_id}": {
@@ -383,8 +2822,22 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
       }
     },
     "/api/v1/candidate/assessment-attempts/{attempt_id}/answers": {
@@ -430,8 +2883,27 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
       }
     },
     "/api/v1/candidate/assessment-attempts/{attempt_id}/advance": {
@@ -467,8 +2939,27 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
       }
     },
     "/api/v1/candidate/assessment-attempts/{attempt_id}/submit": {
@@ -504,8 +2995,27 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
       }
     },
     "/api/v1/candidate/assessment-history": {
@@ -520,8 +3030,19 @@
                 "schema": {}
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
       }
     },
     "/api/v1/employer/company": {
@@ -536,8 +3057,19 @@
                 "schema": {}
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
       },
       "put": {
         "summary": "Save Employer",
@@ -570,8 +3102,24 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
       }
     },
     "/api/v1/employer/needs/parse": {
@@ -606,8 +3154,24 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
       }
     },
     "/api/v1/employer/needs": {
@@ -622,8 +3186,19 @@
                 "schema": {}
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
       },
       "post": {
         "summary": "Create Need",
@@ -656,8 +3231,24 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
       }
     },
     "/api/v1/employer/categories": {
@@ -672,8 +3263,19 @@
                 "schema": {}
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
       }
     },
     "/api/v1/employer/candidates": {
@@ -758,8 +3360,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
       }
     },
     "/api/v1/employer/searches": {
@@ -781,7 +3394,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SearchOut"
+                }
               }
             }
           },
@@ -794,8 +3409,24 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
       },
       "get": {
         "summary": "List Searches",
@@ -836,8 +3467,19 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
       }
     },
     "/api/v1/employer/searches/{snapshot_id}": {
@@ -860,7 +3502,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SearchOut"
+                }
               }
             }
           },
@@ -873,8 +3517,22 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
       }
     },
     "/api/v1/employer/candidates/{candidate_id}": {
@@ -910,8 +3568,73 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
+      }
+    },
+    "/api/v1/employer/candidates/{candidate_id}/evidence": {
+      "get": {
+        "summary": "Candidate Evidence",
+        "operationId": "candidate_evidence_api_v1_employer_candidates__candidate_id__evidence_get",
+        "parameters": [
+          {
+            "name": "candidate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Candidate Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
       }
     },
     "/api/v1/employer/candidates/{candidate_id}/contact": {
@@ -947,8 +3670,22 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
       }
     },
     "/api/v1/employer/invitations": {
@@ -973,7 +3710,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/InvitationIn"
+                "$ref": "#/components/schemas/InvitationV2In"
               }
             }
           }
@@ -983,7 +3720,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationOut"
+                }
               }
             }
           },
@@ -996,8 +3735,24 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
       },
       "get": {
         "summary": "Sent Invitations",
@@ -1007,11 +3762,28 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InvitationOut"
+                  },
+                  "title": "Response Sent Invitations Api V1 Employer Invitations Get"
+                }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
       }
     },
     "/api/v1/candidate/invitations": {
@@ -1023,11 +3795,28 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/InvitationOut"
+                  },
+                  "type": "array",
+                  "title": "Response Received Invitations Api V1 Candidate Invitations Get"
+                }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
       }
     },
     "/api/v1/invitations/{invitation_id}/view": {
@@ -1045,12 +3834,31 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/InvitationCommandIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Data"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationOut"
+                }
               }
             }
           },
@@ -1063,8 +3871,85 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/invitations/{invitation_id}/interview-held-confirmation": {
+      "post": {
+        "summary": "Confirm Held Interview",
+        "operationId": "confirm_held_interview_api_v1_invitations__invitation_id__interview_held_confirmation_post",
+        "parameters": [
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Invitation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewHeldConfirmationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
       }
     },
     "/api/v1/invitations/{invitation_id}/accept": {
@@ -1082,12 +3967,31 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AcceptInvitationIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Data"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationOut"
+                }
               }
             }
           },
@@ -1100,8 +4004,27 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
       }
     },
     "/api/v1/invitations/{invitation_id}/reject": {
@@ -1119,12 +4042,31 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/InvitationCommandIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Data"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationOut"
+                }
               }
             }
           },
@@ -1137,8 +4079,27 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
       }
     },
     "/api/v1/invitations/{invitation_id}/withdraw": {
@@ -1156,12 +4117,31 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/InvitationCommandIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Data"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationOut"
+                }
               }
             }
           },
@@ -1174,8 +4154,27 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
       }
     },
     "/api/v1/candidate/contact-grants": {
@@ -1190,8 +4189,19 @@
                 "schema": {}
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
       }
     },
     "/api/v1/candidate/contact-grants/{grant_id}/revoke": {
@@ -1227,8 +4237,27 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
       }
     },
     "/api/v1/candidate/passport.pdf": {
@@ -1243,13 +4272,162 @@
                 "schema": {}
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
           }
-        }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
       }
     }
   },
   "components": {
     "schemas": {
+      "AcceptInvitationIn": {
+        "properties": {
+          "expected_state_version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected State Version"
+          },
+          "expected_terms_hash": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Expected Terms Hash"
+          },
+          "expected_preferences_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Preferences Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_terms_hash",
+          "expected_preferences_version"
+        ],
+        "title": "AcceptInvitationIn"
+      },
+      "AccessChangeResult": {
+        "properties": {
+          "employer_id": {
+            "type": "string",
+            "title": "Employer Id"
+          },
+          "blocked": {
+            "type": "boolean",
+            "title": "Blocked"
+          },
+          "revoked_grants": {
+            "type": "integer",
+            "title": "Revoked Grants"
+          },
+          "withdrawn_invitations": {
+            "type": "integer",
+            "title": "Withdrawn Invitations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "employer_id",
+          "blocked",
+          "revoked_grants",
+          "withdrawn_invitations"
+        ],
+        "title": "AccessChangeResult"
+      },
+      "AchievementStoryIn": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Title",
+            "default": ""
+          },
+          "context": {
+            "type": "string",
+            "maxLength": 700,
+            "minLength": 8,
+            "title": "Context"
+          },
+          "personal_contribution": {
+            "type": "string",
+            "maxLength": 700,
+            "minLength": 8,
+            "title": "Personal Contribution"
+          },
+          "decision": {
+            "type": "string",
+            "maxLength": 700,
+            "title": "Decision",
+            "default": ""
+          },
+          "result": {
+            "type": "string",
+            "maxLength": 700,
+            "minLength": 8,
+            "title": "Result"
+          },
+          "result_scope": {
+            "type": "string",
+            "enum": [
+              "individual",
+              "team"
+            ],
+            "title": "Result Scope",
+            "default": "individual"
+          },
+          "basis": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Basis",
+            "default": ""
+          },
+          "share_with_employers": {
+            "type": "boolean",
+            "title": "Share With Employers",
+            "default": false
+          },
+          "formatted_narrative": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Formatted Narrative"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "context",
+          "personal_contribution",
+          "result"
+        ],
+        "title": "AchievementStoryIn"
+      },
       "AnswersIn": {
         "properties": {
           "answers": {
@@ -1260,6 +4438,19 @@
                 },
                 {
                   "type": "integer"
+                },
+                {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "integer"
+                      }
+                    ]
+                  },
+                  "type": "object"
                 }
               ]
             },
@@ -1272,6 +4463,75 @@
           "answers"
         ],
         "title": "AnswersIn"
+      },
+      "AssistantDraftIn": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Text"
+          },
+          "external_ai_consent": {
+            "type": "boolean",
+            "title": "External Ai Consent"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text",
+          "external_ai_consent"
+        ],
+        "title": "AssistantDraftIn"
+      },
+      "AssistantInterviewStepDraft": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Title"
+          },
+          "duration_minutes": {
+            "type": "integer",
+            "maximum": 240.0,
+            "minimum": 1.0,
+            "title": "Duration Minutes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "duration_minutes"
+        ],
+        "title": "AssistantInterviewStepDraft"
+      },
+      "AvailabilityIn": {
+        "properties": {
+          "starts_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Starts At"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ends At"
+          },
+          "duration_minutes": {
+            "type": "integer",
+            "title": "Duration Minutes",
+            "default": 30
+          }
+        },
+        "type": "object",
+        "required": [
+          "starts_at",
+          "ends_at"
+        ],
+        "title": "AvailabilityIn"
       },
       "Body_preview_resume_api_v1_candidate_resume_preview_post": {
         "properties": {
@@ -1286,6 +4546,150 @@
           "file"
         ],
         "title": "Body_preview_resume_api_v1_candidate_resume_preview_post"
+      },
+      "Body_save_recommendation_consent_api_v1_candidate_recommendations_consent_put": {
+        "properties": {
+          "consent": {
+            "type": "boolean",
+            "title": "Consent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "consent"
+        ],
+        "title": "Body_save_recommendation_consent_api_v1_candidate_recommendations_consent_put"
+      },
+      "Body_upload_recording_api_v1_meetings__meeting_id__recording_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_recording_api_v1_meetings__meeting_id__recording_post"
+      },
+      "BookingIn": {
+        "properties": {
+          "slot_id": {
+            "type": "string",
+            "title": "Slot Id"
+          },
+          "invitation_id": {
+            "type": "string",
+            "title": "Invitation Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slot_id",
+          "invitation_id"
+        ],
+        "title": "BookingIn"
+      },
+      "CalendarSettingsIn": {
+        "properties": {
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "default": "Europe/Moscow"
+          },
+          "call_url": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Call Url",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "CalendarSettingsIn"
+      },
+      "CandidateAchievementDraft": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Title",
+            "default": ""
+          },
+          "context": {
+            "type": "string",
+            "maxLength": 700,
+            "title": "Context",
+            "default": ""
+          },
+          "personal_contribution": {
+            "type": "string",
+            "maxLength": 700,
+            "title": "Personal Contribution",
+            "default": ""
+          },
+          "decision": {
+            "type": "string",
+            "maxLength": 700,
+            "title": "Decision",
+            "default": ""
+          },
+          "result": {
+            "type": "string",
+            "maxLength": 700,
+            "title": "Result",
+            "default": ""
+          },
+          "result_scope": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "individual",
+                  "team"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Scope"
+          },
+          "basis": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Basis",
+            "default": ""
+          },
+          "missing_fields": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "context",
+                "personal_contribution",
+                "decision",
+                "result",
+                "result_scope",
+                "basis"
+              ]
+            },
+            "type": "array",
+            "maxItems": 6,
+            "title": "Missing Fields"
+          },
+          "follow_up_questions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 5,
+            "title": "Follow Up Questions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CandidateAchievementDraft"
       },
       "CandidateIn": {
         "properties": {
@@ -1316,6 +4720,16 @@
             "maxLength": 4000,
             "title": "Summary",
             "default": ""
+          },
+          "achievement_story": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AchievementStoryIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "skills": {
             "items": {
@@ -1357,6 +4771,29 @@
             "type": "boolean",
             "title": "Available",
             "default": true
+          },
+          "adult_hiring_confirmed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adult Hiring Confirmed"
+          },
+          "expected_preferences_version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Preferences Version"
           }
         },
         "type": "object",
@@ -1365,6 +4802,682 @@
           "contact_email"
         ],
         "title": "CandidateIn"
+      },
+      "CandidatePreferencesDraft": {
+        "properties": {
+          "salary_min_rub": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Salary Min Rub"
+          },
+          "allowed_work_formats": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "remote",
+                "hybrid",
+                "office"
+              ]
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Allowed Work Formats"
+          },
+          "allowed_cities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Allowed Cities"
+          },
+          "excluded_industries": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Excluded Industries"
+          },
+          "preferred_stack": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Preferred Stack"
+          },
+          "preferred_tasks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Preferred Tasks"
+          },
+          "max_take_home_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 240.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Take Home Minutes"
+          },
+          "missing_fields": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "salary_min_rub",
+                "allowed_work_formats",
+                "allowed_cities",
+                "excluded_industries",
+                "preferred_stack",
+                "preferred_tasks",
+                "max_take_home_minutes"
+              ]
+            },
+            "type": "array",
+            "maxItems": 7,
+            "title": "Missing Fields"
+          },
+          "follow_up_questions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 5,
+            "title": "Follow Up Questions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CandidatePreferencesDraft"
+      },
+      "CandidatePreferencesIn": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Version"
+          },
+          "salary_min_rub": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Salary Min Rub"
+          },
+          "allowed_work_formats": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "remote",
+                "hybrid",
+                "office"
+              ]
+            },
+            "type": "array",
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "Allowed Work Formats"
+          },
+          "allowed_cities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Allowed Cities"
+          },
+          "excluded_industries": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Excluded Industries"
+          },
+          "preferred_stack": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Preferred Stack"
+          },
+          "preferred_tasks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Preferred Tasks"
+          },
+          "max_take_home_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 240.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Take Home Minutes"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available",
+            "default": true
+          },
+          "adult_hiring_confirmed": {
+            "type": "boolean",
+            "title": "Adult Hiring Confirmed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_version",
+          "allowed_work_formats",
+          "adult_hiring_confirmed"
+        ],
+        "title": "CandidatePreferencesIn"
+      },
+      "CandidatePreferencesOut": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "salary_min_rub": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Salary Min Rub"
+          },
+          "allowed_work_formats": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Work Formats"
+          },
+          "allowed_cities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Cities"
+          },
+          "excluded_industries": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Excluded Industries"
+          },
+          "preferred_stack": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Preferred Stack"
+          },
+          "preferred_tasks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Preferred Tasks"
+          },
+          "max_take_home_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Take Home Minutes"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "adult_hiring_confirmed": {
+            "type": "boolean",
+            "title": "Adult Hiring Confirmed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "salary_min_rub",
+          "allowed_work_formats",
+          "allowed_cities",
+          "excluded_industries",
+          "preferred_stack",
+          "preferred_tasks",
+          "max_take_home_minutes",
+          "available",
+          "adult_hiring_confirmed"
+        ],
+        "title": "CandidatePreferencesOut"
+      },
+      "CandidateRoleCard": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "specialization": {
+            "type": "string",
+            "enum": [
+              "backend",
+              "frontend",
+              "qa",
+              "data_analyst"
+            ],
+            "title": "Specialization"
+          },
+          "grade": {
+            "type": "string",
+            "enum": [
+              "junior",
+              "middle"
+            ],
+            "title": "Grade"
+          },
+          "competencies": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Competencies"
+          },
+          "stack": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Stack"
+          },
+          "salary_min_rub": {
+            "type": "integer",
+            "title": "Salary Min Rub"
+          },
+          "salary_max_rub": {
+            "type": "integer",
+            "title": "Salary Max Rub"
+          },
+          "work_format": {
+            "type": "string",
+            "enum": [
+              "remote",
+              "hybrid",
+              "office"
+            ],
+            "title": "Work Format"
+          },
+          "work_city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work City"
+          },
+          "industry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry"
+          },
+          "first_30_days": {
+            "type": "string",
+            "title": "First 30 Days"
+          },
+          "interview_steps": {
+            "items": {
+              "$ref": "#/components/schemas/InterviewStepIn"
+            },
+            "type": "array",
+            "title": "Interview Steps"
+          },
+          "take_home_minutes": {
+            "type": "integer",
+            "title": "Take Home Minutes"
+          },
+          "response_sla_hours": {
+            "type": "integer",
+            "enum": [
+              24,
+              48,
+              72
+            ],
+            "title": "Response Sla Hours"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "description",
+          "specialization",
+          "grade",
+          "competencies",
+          "stack",
+          "salary_min_rub",
+          "salary_max_rub",
+          "work_format",
+          "first_30_days",
+          "interview_steps",
+          "take_home_minutes",
+          "response_sla_hours"
+        ],
+        "title": "CandidateRoleCard"
+      },
+      "CandidateRoleFeedItem": {
+        "properties": {
+          "need_id": {
+            "type": "string",
+            "title": "Need Id"
+          },
+          "role_version_id": {
+            "type": "string",
+            "title": "Role Version Id"
+          },
+          "role_version": {
+            "type": "integer",
+            "title": "Role Version"
+          },
+          "company_name": {
+            "type": "string",
+            "title": "Company Name"
+          },
+          "role": {
+            "$ref": "#/components/schemas/CandidateRoleCard"
+          },
+          "confirmed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Confirmed At"
+          },
+          "preferences_version": {
+            "type": "integer",
+            "title": "Preferences Version"
+          },
+          "data_mode": {
+            "type": "string",
+            "enum": [
+              "real",
+              "synthetic",
+              "unknown"
+            ],
+            "title": "Data Mode"
+          },
+          "match_state": {
+            "type": "string",
+            "enum": [
+              "compatible",
+              "needs_clarification",
+              "not_assessed"
+            ],
+            "title": "Match State"
+          },
+          "compatibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CompatibilityReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "saved",
+              "hidden",
+              "none"
+            ],
+            "title": "Decision",
+            "default": "none"
+          },
+          "discovery_match": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discovery Match"
+          }
+        },
+        "type": "object",
+        "required": [
+          "need_id",
+          "role_version_id",
+          "role_version",
+          "company_name",
+          "role",
+          "confirmed_at",
+          "preferences_version",
+          "data_mode",
+          "match_state"
+        ],
+        "title": "CandidateRoleFeedItem"
+      },
+      "CompatibilityCheck": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "unknown",
+              "fail"
+            ],
+            "title": "Status"
+          },
+          "public_text": {
+            "type": "string",
+            "title": "Public Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "status",
+          "public_text"
+        ],
+        "title": "CompatibilityCheck"
+      },
+      "CompatibilityReport": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "compatible",
+              "needs_clarification",
+              "incompatible"
+            ],
+            "title": "Status"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/CompatibilityCheck"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "soft_signals": {
+            "items": {
+              "$ref": "#/components/schemas/CompatibilitySoftSignal"
+            },
+            "type": "array",
+            "title": "Soft Signals"
+          },
+          "preference_version": {
+            "type": "integer",
+            "title": "Preference Version"
+          },
+          "role_version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role Version Id"
+          },
+          "compatibility_version": {
+            "type": "string",
+            "const": "compat_v2",
+            "title": "Compatibility Version",
+            "default": "compat_v2"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "checks",
+          "preference_version"
+        ],
+        "title": "CompatibilityReport"
+      },
+      "CompatibilitySoftSignal": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "matched": {
+            "type": "boolean",
+            "title": "Matched"
+          },
+          "public_text": {
+            "type": "string",
+            "title": "Public Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "matched",
+          "public_text"
+        ],
+        "title": "CompatibilitySoftSignal"
+      },
+      "ConsentIn": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Version"
+          },
+          "consent": {
+            "type": "boolean",
+            "title": "Consent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_version",
+          "consent"
+        ],
+        "title": "ConsentIn"
+      },
+      "DemoPromotionOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "need_id": {
+            "type": "string",
+            "title": "Need Id"
+          },
+          "role_version_id": {
+            "type": "string",
+            "title": "Role Version Id"
+          },
+          "active_from": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Active From"
+          },
+          "active_until": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Active Until"
+          },
+          "demo_only": {
+            "type": "boolean",
+            "const": true,
+            "title": "Demo Only",
+            "default": true
+          },
+          "revenue_rub": {
+            "type": "integer",
+            "const": 0,
+            "title": "Revenue Rub",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "need_id",
+          "role_version_id",
+          "active_from",
+          "active_until"
+        ],
+        "title": "DemoPromotionOut"
       },
       "EmployerIn": {
         "properties": {
@@ -1400,6 +5513,362 @@
         ],
         "title": "EmployerIn"
       },
+      "EmployerRoleDraft": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 180
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "specialization": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "backend",
+                  "frontend",
+                  "qa",
+                  "data_analyst"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialization"
+          },
+          "grade": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "junior",
+                  "middle"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grade"
+          },
+          "competencies": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "Competencies"
+          },
+          "stack": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Stack"
+          },
+          "salary_min_rub": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Salary Min Rub"
+          },
+          "salary_max_rub": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Salary Max Rub"
+          },
+          "work_format": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "remote",
+                  "hybrid",
+                  "office"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Format"
+          },
+          "work_city": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work City"
+          },
+          "industry": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry"
+          },
+          "first_30_days": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First 30 Days"
+          },
+          "interview_steps": {
+            "items": {
+              "$ref": "#/components/schemas/AssistantInterviewStepDraft"
+            },
+            "type": "array",
+            "maxItems": 5,
+            "title": "Interview Steps"
+          },
+          "take_home_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 240.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Take Home Minutes"
+          },
+          "response_sla_hours": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "enum": [
+                  24,
+                  48,
+                  72
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response Sla Hours"
+          },
+          "missing_fields": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "title",
+                "description",
+                "specialization",
+                "grade",
+                "competencies",
+                "stack",
+                "salary_min_rub",
+                "salary_max_rub",
+                "work_format",
+                "work_city",
+                "industry",
+                "first_30_days",
+                "interview_steps",
+                "take_home_minutes",
+                "response_sla_hours"
+              ]
+            },
+            "type": "array",
+            "maxItems": 15,
+            "title": "Missing Fields"
+          },
+          "ambiguous_fields": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "title",
+                "description",
+                "specialization",
+                "grade",
+                "competencies",
+                "stack",
+                "salary_min_rub",
+                "salary_max_rub",
+                "work_format",
+                "work_city",
+                "industry",
+                "first_30_days",
+                "interview_steps",
+                "take_home_minutes",
+                "response_sla_hours"
+              ]
+            },
+            "type": "array",
+            "maxItems": 15,
+            "title": "Ambiguous Fields"
+          },
+          "follow_up_questions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 5,
+            "title": "Follow Up Questions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EmployerRoleDraft"
+      },
+      "EvidenceCard": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "competency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Competency"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "source_type": {
+            "type": "string",
+            "enum": [
+              "assessment_attempt",
+              "fsp_achievement",
+              "achievement_story",
+              "skill_claim",
+              "legacy_aggregate"
+            ],
+            "title": "Source Type"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "source_version": {
+            "type": "string",
+            "title": "Source Version"
+          },
+          "assessed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessed At"
+          },
+          "verification_level": {
+            "type": "string",
+            "enum": [
+              "verified_action",
+              "verified_credential",
+              "declared",
+              "aggregate",
+              "synthetic_fixture"
+            ],
+            "title": "Verification Level"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Limitations"
+          },
+          "data_mode": {
+            "type": "string",
+            "enum": [
+              "real",
+              "synthetic"
+            ],
+            "title": "Data Mode"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "competency",
+          "action",
+          "source_type",
+          "source_id",
+          "source_version",
+          "assessed_at",
+          "verification_level",
+          "scope",
+          "limitations",
+          "data_mode"
+        ],
+        "title": "EvidenceCard"
+      },
       "FspLinkIn": {
         "properties": {
           "participant_id": {
@@ -1428,7 +5897,282 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
-      "InvitationIn": {
+      "InterviewHeldConfirmationOut": {
+        "properties": {
+          "invitation_id": {
+            "type": "string",
+            "title": "Invitation Id"
+          },
+          "candidate_confirmed": {
+            "type": "boolean",
+            "title": "Candidate Confirmed"
+          },
+          "employer_confirmed": {
+            "type": "boolean",
+            "title": "Employer Confirmed"
+          },
+          "interview_held": {
+            "type": "boolean",
+            "title": "Interview Held"
+          }
+        },
+        "type": "object",
+        "required": [
+          "invitation_id",
+          "candidate_confirmed",
+          "employer_confirmed",
+          "interview_held"
+        ],
+        "title": "InterviewHeldConfirmationOut"
+      },
+      "InterviewStepIn": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Title"
+          },
+          "duration_minutes": {
+            "type": "integer",
+            "maximum": 240.0,
+            "minimum": 1.0,
+            "title": "Duration Minutes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "duration_minutes"
+        ],
+        "title": "InterviewStepIn"
+      },
+      "InvitationCommandIn": {
+        "properties": {
+          "expected_state_version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected State Version"
+          }
+        },
+        "type": "object",
+        "title": "InvitationCommandIn"
+      },
+      "InvitationOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "candidate_id": {
+            "type": "string",
+            "title": "Candidate Id"
+          },
+          "company_name": {
+            "type": "string",
+            "title": "Company Name"
+          },
+          "employer_id": {
+            "type": "string",
+            "title": "Employer Id"
+          },
+          "need_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Need Id"
+          },
+          "role_version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role Version Id"
+          },
+          "offer_text": {
+            "type": "string",
+            "title": "Offer Text"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "employer_contact": {
+            "type": "string",
+            "title": "Employer Contact"
+          },
+          "salary_min_rub": {
+            "type": "integer",
+            "title": "Salary Min Rub"
+          },
+          "salary_max_rub": {
+            "type": "integer",
+            "title": "Salary Max Rub"
+          },
+          "salary_period": {
+            "type": "string",
+            "const": "month",
+            "title": "Salary Period",
+            "default": "month"
+          },
+          "salary_basis": {
+            "type": "string",
+            "const": "gross",
+            "title": "Salary Basis",
+            "default": "gross"
+          },
+          "work_format": {
+            "type": "string",
+            "title": "Work Format"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "sent",
+              "viewed",
+              "accepted",
+              "rejected",
+              "withdrawn",
+              "expired"
+            ],
+            "title": "State"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "terms_snapshot": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terms Snapshot"
+          },
+          "terms_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terms Hash"
+          },
+          "evidence_refs": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceCard"
+            },
+            "type": "array",
+            "title": "Evidence Refs"
+          },
+          "explanation_snapshot": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explanation Snapshot"
+          },
+          "compatibility_at_send": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CompatibilityReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state_version": {
+            "type": "integer",
+            "title": "State Version",
+            "default": 1
+          },
+          "response_due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response Due At"
+          },
+          "compatibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CompatibilityReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "candidate_interview_confirmed": {
+            "type": "boolean",
+            "title": "Candidate Interview Confirmed"
+          },
+          "employer_interview_confirmed": {
+            "type": "boolean",
+            "title": "Employer Interview Confirmed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "candidate_id",
+          "company_name",
+          "employer_id",
+          "need_id",
+          "offer_text",
+          "reason",
+          "employer_contact",
+          "salary_min_rub",
+          "salary_max_rub",
+          "work_format",
+          "state",
+          "created_at",
+          "expires_at",
+          "candidate_interview_confirmed",
+          "employer_interview_confirmed"
+        ],
+        "title": "InvitationOut"
+      },
+      "InvitationV2In": {
         "properties": {
           "candidate_id": {
             "type": "string",
@@ -1476,8 +6220,40 @@
             "maxLength": 254,
             "minLength": 5,
             "title": "Employer Contact"
+          },
+          "role_version_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 36,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role Version Id"
+          },
+          "inline_role_card": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleCardIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "Evidence Ids"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "candidate_id",
@@ -1488,7 +6264,7 @@
           "work_format",
           "employer_contact"
         ],
-        "title": "InvitationIn"
+        "title": "InvitationV2In"
       },
       "LoginIn": {
         "properties": {
@@ -1507,6 +6283,32 @@
           "password"
         ],
         "title": "LoginIn"
+      },
+      "MaterialsIn": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Version"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 12000,
+            "title": "Notes",
+            "default": ""
+          },
+          "transcript": {
+            "type": "string",
+            "maxLength": 12000,
+            "title": "Transcript",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_version"
+        ],
+        "title": "MaterialsIn"
       },
       "NeedIn": {
         "properties": {
@@ -1571,6 +6373,49 @@
         ],
         "title": "NeedIn"
       },
+      "PublishRoleIn": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Version"
+          },
+          "active_headcount_attested": {
+            "type": "boolean",
+            "title": "Active Headcount Attested"
+          },
+          "discoverable": {
+            "type": "boolean",
+            "title": "Discoverable",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_version",
+          "active_headcount_attested"
+        ],
+        "title": "PublishRoleIn"
+      },
+      "ReconfirmRoleIn": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Version"
+          },
+          "active_headcount_attested": {
+            "type": "boolean",
+            "title": "Active Headcount Attested"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_version",
+          "active_headcount_attested"
+        ],
+        "title": "ReconfirmRoleIn"
+      },
       "RegisterIn": {
         "properties": {
           "email": {
@@ -1598,11 +6443,469 @@
         ],
         "title": "RegisterIn"
       },
+      "RoleCardIn": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 180,
+            "minLength": 3,
+            "title": "Title"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Description"
+          },
+          "specialization": {
+            "type": "string",
+            "title": "Specialization"
+          },
+          "grade": {
+            "type": "string",
+            "enum": [
+              "junior",
+              "middle"
+            ],
+            "title": "Grade"
+          },
+          "competencies": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "minItems": 1,
+            "title": "Competencies"
+          },
+          "stack": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Stack"
+          },
+          "salary_min_rub": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Salary Min Rub"
+          },
+          "salary_max_rub": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Salary Max Rub"
+          },
+          "work_format": {
+            "type": "string",
+            "enum": [
+              "remote",
+              "hybrid",
+              "office"
+            ],
+            "title": "Work Format"
+          },
+          "work_city": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work City"
+          },
+          "industry": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry"
+          },
+          "first_30_days": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "First 30 Days"
+          },
+          "interview_steps": {
+            "items": {
+              "$ref": "#/components/schemas/InterviewStepIn"
+            },
+            "type": "array",
+            "maxItems": 5,
+            "minItems": 1,
+            "title": "Interview Steps"
+          },
+          "take_home_minutes": {
+            "type": "integer",
+            "maximum": 240.0,
+            "minimum": 0.0,
+            "title": "Take Home Minutes"
+          },
+          "response_sla_hours": {
+            "type": "integer",
+            "enum": [
+              24,
+              48,
+              72
+            ],
+            "title": "Response Sla Hours"
+          },
+          "employer_contact": {
+            "type": "string",
+            "maxLength": 254,
+            "minLength": 5,
+            "title": "Employer Contact"
+          },
+          "active_headcount_attested": {
+            "type": "boolean",
+            "title": "Active Headcount Attested"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "description",
+          "specialization",
+          "grade",
+          "competencies",
+          "salary_min_rub",
+          "salary_max_rub",
+          "work_format",
+          "first_30_days",
+          "interview_steps",
+          "take_home_minutes",
+          "response_sla_hours",
+          "employer_contact",
+          "active_headcount_attested"
+        ],
+        "title": "RoleCardIn"
+      },
+      "RoleCardOut": {
+        "properties": {
+          "need_id": {
+            "type": "string",
+            "title": "Need Id"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "schema_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Version"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          },
+          "terms_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terms Hash"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "current_role_version": {
+            "type": "integer",
+            "title": "Current Role Version"
+          },
+          "publication_state": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "active",
+              "paused",
+              "closed"
+            ],
+            "title": "Publication State"
+          },
+          "discoverable": {
+            "type": "boolean",
+            "title": "Discoverable"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "fresh": {
+            "type": "boolean",
+            "title": "Fresh"
+          },
+          "missing_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Fields"
+          },
+          "salary_currency": {
+            "type": "string",
+            "const": "RUB",
+            "title": "Salary Currency",
+            "default": "RUB"
+          },
+          "salary_period": {
+            "type": "string",
+            "const": "month",
+            "title": "Salary Period",
+            "default": "month"
+          },
+          "salary_basis": {
+            "type": "string",
+            "const": "gross",
+            "title": "Salary Basis",
+            "default": "gross"
+          }
+        },
+        "type": "object",
+        "required": [
+          "need_id",
+          "version",
+          "schema_version",
+          "payload",
+          "terms_hash",
+          "source",
+          "current_role_version",
+          "publication_state",
+          "discoverable",
+          "confirmed_at",
+          "fresh"
+        ],
+        "title": "RoleCardOut"
+      },
+      "RoleDecisionIn": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "saved",
+              "hidden",
+              "none"
+            ],
+            "title": "Action"
+          },
+          "expected_role_version": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Expected Role Version"
+          },
+          "expected_preferences_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Preferences Version"
+          },
+          "source_campaign_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 36,
+                "minLength": 36
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Campaign Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action",
+          "expected_role_version",
+          "expected_preferences_version"
+        ],
+        "title": "RoleDecisionIn"
+      },
+      "RoleDecisionOut": {
+        "properties": {
+          "need_id": {
+            "type": "string",
+            "title": "Need Id"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "saved",
+              "hidden",
+              "none"
+            ],
+            "title": "Action"
+          },
+          "role_version_id": {
+            "type": "string",
+            "title": "Role Version Id"
+          },
+          "preferences_version": {
+            "type": "integer",
+            "title": "Preferences Version"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "need_id",
+          "action",
+          "role_version_id",
+          "preferences_version",
+          "updated_at"
+        ],
+        "title": "RoleDecisionOut"
+      },
+      "RoleFeedOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateRoleFeedItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "sponsored_items": {
+            "items": {
+              "$ref": "#/components/schemas/SponsoredCandidateRoleFeedItem"
+            },
+            "type": "array",
+            "title": "Sponsored Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "empty_state": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "no_active_roles",
+                  "no_compatible_roles",
+                  "no_saved_roles"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empty State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "limit"
+        ],
+        "title": "RoleFeedOut"
+      },
+      "RoleMutationIn": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_version"
+        ],
+        "title": "RoleMutationIn"
+      },
+      "RoleVersionIn": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Version"
+          },
+          "card": {
+            "$ref": "#/components/schemas/RoleCardIn"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_version",
+          "card"
+        ],
+        "title": "RoleVersionIn"
+      },
       "SearchIn": {
         "properties": {
           "need_id": {
             "type": "string",
             "title": "Need Id"
+          },
+          "role_version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role Version Id"
           },
           "parent_snapshot_id": {
             "anyOf": [
@@ -1634,6 +6937,200 @@
         ],
         "title": "SearchIn"
       },
+      "SearchOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "need_id": {
+            "type": "string",
+            "title": "Need Id"
+          },
+          "parent_snapshot_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Snapshot Id"
+          },
+          "role_version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role Version Id"
+          },
+          "algorithm_version": {
+            "type": "string",
+            "title": "Algorithm Version"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "filters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Filters"
+          },
+          "results": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Results"
+          },
+          "unavailable_count": {
+            "type": "integer",
+            "title": "Unavailable Count"
+          },
+          "changed_since_search": {
+            "type": "boolean",
+            "title": "Changed Since Search",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "need_id",
+          "parent_snapshot_id",
+          "algorithm_version",
+          "created_at",
+          "filters",
+          "results",
+          "unavailable_count"
+        ],
+        "title": "SearchOut"
+      },
+      "SponsoredCandidateRoleFeedItem": {
+        "properties": {
+          "need_id": {
+            "type": "string",
+            "title": "Need Id"
+          },
+          "role_version_id": {
+            "type": "string",
+            "title": "Role Version Id"
+          },
+          "role_version": {
+            "type": "integer",
+            "title": "Role Version"
+          },
+          "company_name": {
+            "type": "string",
+            "title": "Company Name"
+          },
+          "role": {
+            "$ref": "#/components/schemas/CandidateRoleCard"
+          },
+          "confirmed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Confirmed At"
+          },
+          "preferences_version": {
+            "type": "integer",
+            "title": "Preferences Version"
+          },
+          "data_mode": {
+            "type": "string",
+            "enum": [
+              "real",
+              "synthetic",
+              "unknown"
+            ],
+            "title": "Data Mode"
+          },
+          "match_state": {
+            "type": "string",
+            "enum": [
+              "compatible",
+              "needs_clarification",
+              "not_assessed"
+            ],
+            "title": "Match State"
+          },
+          "compatibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CompatibilityReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "saved",
+              "hidden",
+              "none"
+            ],
+            "title": "Decision",
+            "default": "none"
+          },
+          "discovery_match": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discovery Match"
+          },
+          "campaign_id": {
+            "type": "string",
+            "title": "Campaign Id"
+          },
+          "sponsor_label": {
+            "type": "string",
+            "const": "Продвигаемая роль",
+            "title": "Sponsor Label",
+            "default": "Продвигаемая роль"
+          }
+        },
+        "type": "object",
+        "required": [
+          "need_id",
+          "role_version_id",
+          "role_version",
+          "company_name",
+          "role",
+          "confirmed_at",
+          "preferences_version",
+          "data_mode",
+          "match_state",
+          "campaign_id"
+        ],
+        "title": "SponsoredCandidateRoleFeedItem"
+      },
+      "SponsoredImpressionOut": {
+        "properties": {
+          "recorded": {
+            "type": "boolean",
+            "title": "Recorded",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "SponsoredImpressionOut"
+      },
       "StartAssessmentIn": {
         "properties": {
           "industry": {
@@ -1656,6 +7153,95 @@
           "grade"
         ],
         "title": "StartAssessmentIn"
+      },
+      "SummaryIn": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Version"
+          },
+          "external_ai_consent": {
+            "type": "boolean",
+            "title": "External Ai Consent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_version",
+          "external_ai_consent"
+        ],
+        "title": "SummaryIn"
+      },
+      "TaxonomyCategoryOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "specialization": {
+            "type": "string",
+            "enum": [
+              "backend",
+              "frontend",
+              "qa",
+              "data_analyst"
+            ],
+            "title": "Specialization"
+          },
+          "grade": {
+            "type": "string",
+            "title": "Grade"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "blueprint_version": {
+            "type": "string",
+            "title": "Blueprint Version"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "competencies": {
+            "items": {
+              "$ref": "#/components/schemas/TaxonomyCompetencyOut"
+            },
+            "type": "array",
+            "title": "Competencies"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "specialization",
+          "grade",
+          "label",
+          "blueprint_version",
+          "available",
+          "competencies"
+        ],
+        "title": "TaxonomyCategoryOut"
+      },
+      "TaxonomyCompetencyOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "TaxonomyCompetencyOut"
       },
       "ValidationError": {
         "properties": {
@@ -1709,6 +7295,137 @@
           "token"
         ],
         "title": "VerifyIn"
+      },
+      "VersionIn": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_version"
+        ],
+        "title": "VersionIn"
+      },
+      "ApiError": {
+        "description": "Stable error envelope returned by application and security checks.",
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "required": [
+          "detail"
+        ],
+        "title": "ApiError",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "CookieSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "fsp_session",
+        "description": "HttpOnly session cookie issued by POST /api/v1/auth/login."
+      },
+      "CsrfCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "fsp_csrf",
+        "description": "Readable CSRF cookie issued together with the session."
+      },
+      "CsrfHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-csrf-token",
+        "description": "Must exactly match the fsp_csrf cookie on state-changing requests."
+      }
+    },
+    "responses": {
+      "Error401": {
+        "description": "Нет действующей cookie-сессии или учетные данные неверны.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      },
+      "Error403": {
+        "description": "Недостаточно прав, не подтвержден email или не пройдена CSRF-проверка.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      },
+      "Error404": {
+        "description": "Ресурс не найден либо недоступен текущему пользователю.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      },
+      "Error409": {
+        "description": "Конфликт состояния, версии или повторной операции.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      },
+      "Error413": {
+        "description": "Загруженный файл превышает допустимый размер.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      },
+      "Error429": {
+        "description": "Превышен лимит попыток или запросов.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      },
+      "Error503": {
+        "description": "Зависимость или настроенная внешняя возможность временно недоступна.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
       }
     }
   }

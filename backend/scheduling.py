@@ -10,6 +10,8 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, Up
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, or_, select
+from sqlalchemy.dialects.postgresql import insert as postgresql_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -99,12 +101,32 @@ def _employer_lock(db, employer_id):
 
 
 def _calendar(db, employer_id):
-    _employer_lock(db, employer_id)
     calendar = db.get(InterviewCalendar, employer_id)
-    if not calendar:
-        calendar = InterviewCalendar(employer_id=employer_id, public_token=secrets.token_urlsafe(24))
+    if calendar:
+        return calendar
+    values = {"employer_id": employer_id, "public_token": secrets.token_urlsafe(24),
+              "timezone": "Europe/Moscow", "call_url": ""}
+    dialect = db.get_bind().dialect.name
+    if dialect == "sqlite":
+        statement = sqlite_insert(InterviewCalendar).values(**values).on_conflict_do_nothing(
+            index_elements=[InterviewCalendar.employer_id])
+        db.execute(statement)
+    elif dialect == "postgresql":
+        # The user row lock also serializes calendar creation with other
+        # employer mutations; ON CONFLICT keeps the initializer idempotent.
+        _employer_lock(db, employer_id)
+        statement = postgresql_insert(InterviewCalendar).values(**values).on_conflict_do_nothing(
+            index_elements=[InterviewCalendar.employer_id])
+        db.execute(statement)
+    else:
+        _employer_lock(db, employer_id)
+        calendar = InterviewCalendar(**values)
         db.add(calendar)
         db.flush()
+        return calendar
+    calendar = db.get(InterviewCalendar, employer_id)
+    if not calendar:  # defensive: the atomic insert must leave one winner
+        raise RuntimeError("INTERVIEW_CALENDAR_INITIALIZATION_FAILED")
     return calendar
 
 

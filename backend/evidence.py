@@ -9,9 +9,10 @@ from sqlalchemy.orm import Session
 
 from .assessment import grade_attempt
 from .domain_errors import DomainError
+from .matching import fsp_bonus
 from .models import AssessmentAttempt, CandidateProfile, User
 from .preferences import is_blocked
-from .schemas import AchievementStoryIn, EvidenceCard, MatchExplanation
+from .schemas import AchievementStoryIn, EvidenceCard, FspAchievementOut, MatchExplanation
 
 
 class EvidenceError(DomainError):
@@ -99,6 +100,43 @@ def _skill_cards(profile: CandidateProfile, user: User, skills: list) -> list[Ev
             data_mode=_data_mode(user),
         ))
     return cards
+
+
+def _fsp_card(profile: CandidateProfile, user: User) -> EvidenceCard | None:
+    if fsp_bonus(profile) <= 0 or not profile.fsp_id:
+        return None
+    try:
+        achievement = FspAchievementOut.model_validate(profile.fsp_achievement or {})
+    except ValidationError:
+        return None
+    result_names = {"participant": "участник", "finalist": "финалист", "prize": "призёр"}
+    scope = "командный" if achievement.result_scope == "team" else "индивидуальный"
+    limitations = [
+        "Достижение подтверждает результат в событии ФСП, но не заменяет практическую проверку категории.",
+    ]
+    if achievement.result_scope == "team":
+        limitations.append("Результат командный; личный вклад описан отдельно и может требовать уточнения.")
+    if achievement.mapped_specializations:
+        limitations.append(
+            "Буст ранжирования применяется только к указанным релевантным специализациям."
+        )
+    synthetic = achievement.source == "synthetic_fixture"
+    return EvidenceCard(
+        id=_stable_id(profile.user_id, "fsp_achievement", profile.fsp_id,
+                      achievement.credential_version),
+        competency=None,
+        action=(f"{result_names[achievement.result].capitalize()} события «{achievement.event_name}»; "
+                f"дисциплина «{achievement.discipline}», {scope} результат. "
+                f"Личная роль: {achievement.personal_role}"),
+        source_type="fsp_achievement",
+        source_id=profile.fsp_id,
+        source_version=achievement.credential_version,
+        assessed_at=achievement.verified_at,
+        verification_level="synthetic_fixture" if synthetic else "verified_credential",
+        scope=f"{achievement.result_scope}_event_result",
+        limitations=limitations,
+        data_mode="synthetic" if synthetic else _data_mode(user),
+    )
 
 
 def _assessment_action(attempt: AssessmentAttempt, competency: str, questions: list,
@@ -205,6 +243,9 @@ def list_candidate_evidence(db: Session, candidate_id: str, *, audience: Literal
         return []
 
     cards: list[EvidenceCard] = []
+    fsp_card = _fsp_card(profile, user)
+    if fsp_card:
+        cards.append(fsp_card)
     story = profile.achievement_story or {}
     if story and (audience == "self" or story.get("share_with_employers") is True):
         try:

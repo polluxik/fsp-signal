@@ -255,7 +255,7 @@ export default function RoleFeed({ onNavigate }: Props) {
     </div>
     <section className="card discovery-filters" aria-label="Фильтры вакансий">
       <label>Направление<select value={filters.specialization} onChange={event => { setRefreshNotice(''); setFilters(current => ({ ...current, specialization: event.target.value })) }}>
-        <option value="">Любое</option><option value="backend">Backend</option><option value="frontend">Frontend</option>
+        <option value="">Любое</option><option value="backend">Backend</option><option value="frontend">Frontend</option><option value="qa">QA</option><option value="data_analyst">Аналитика данных</option>
       </select></label>
       <label>Грейд<select value={filters.grade} onChange={event => { setRefreshNotice(''); setFilters(current => ({ ...current, grade: event.target.value })) }}>
         <option value="">Любой</option><option value="junior">Junior</option><option value="middle">Middle</option>

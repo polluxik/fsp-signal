@@ -68,6 +68,28 @@ def fsp_bonus(profile: CandidateProfile) -> float:
     return {"participant": 0.2, "finalist": 0.6, "prize": 1.0}.get(profile.fsp_result, 0.0)
 
 
+def fsp_relevance(profile: CandidateProfile, specialization: str) -> float:
+    """Return a capped role-relevance signal without changing category eligibility.
+
+    Every FSP discipline receives the same result-level base value.  The only
+    specialization-dependent part is how directly the recorded discipline maps
+    to the role being ranked.  Legacy verified records without metadata retain a
+    small signal but never receive the full relevance multiplier.
+    """
+    result_signal = fsp_bonus(profile)
+    if not result_signal:
+        return 0.0
+    credential = profile.fsp_achievement or {}
+    mapped = credential.get("mapped_specializations")
+    if not isinstance(mapped, list) or not mapped:
+        relevance = 0.25
+    elif specialization in mapped:
+        relevance = 1.0
+    else:
+        relevance = 0.25
+    return round(result_signal * relevance, 3)
+
+
 def can_search(profile: CandidateProfile) -> bool:
     return bool(profile.published_at and profile.consent_processing_at and profile.available and
                 profile.adult_attested_at and profile.verified_specialization and
@@ -344,7 +366,7 @@ def explain_profile(profile: CandidateProfile, role: HiringNeed | RoleCardIn | d
 
 def score_profile_v2(profile: CandidateProfile, role: RoleCardIn) -> MatchResult:
     """Score only comparable, versioned role evidence; unknown evidence is not a zero."""
-    component_names = ("competencies", "assessment", "text")
+    component_names = ("competencies", "assessment", "text", "fsp_relevance")
     empty_components = {name: None for name in component_names}
     if (profile.verified_specialization, profile.verified_grade) != (role.specialization, role.grade):
         reason = "Категории роли и кандидата не совпадают; общий балл не рассчитывается."
@@ -359,16 +381,23 @@ def score_profile_v2(profile: CandidateProfile, role: RoleCardIn) -> MatchResult
     assessment_score = (float(profile.test_score) / 100
                         if isinstance(profile.test_score, int) and 0 <= profile.test_score <= 100 else None)
     text_score = (lexical_similarity_for_role(role, profile) if profile.verified_attempt_id else None)
+    fsp_score = fsp_relevance(profile, role.specialization)
     components = {
         "competencies": round(competency_score, 3) if competency_score is not None else None,
         "assessment": round(assessment_score, 3) if assessment_score is not None else None,
         "text": round(text_score, 3) if text_score is not None else None,
+        "fsp_relevance": fsp_score if fsp_score else None,
     }
     weights = {"competencies": 0.60, "assessment": 0.35, "text": 0.05}
-    included_weight = sum(weights[name] for name, value in components.items() if value is not None)
+    included_weight = sum(weights[name] for name, value in components.items()
+                          if name in weights and value is not None)
     score = (round(100 * sum(weights[name] * value for name, value in components.items()
-                              if value is not None) / included_weight, 1)
+                              if name in weights and value is not None) / included_weight, 1)
              if included_weight else None)
+    # FSP is a small, transparent within-category boost. It cannot make an
+    # unverified category eligible or compensate for a failed assessment.
+    if score is not None and fsp_score:
+        score = min(100.0, round(score + 5 * fsp_score, 1))
     competency_coverage = len(verified) / len(selected) if selected else 0.0
     evidence_coverage = (
         weights["competencies"] * competency_coverage
@@ -381,6 +410,13 @@ def score_profile_v2(profile: CandidateProfile, role: RoleCardIn) -> MatchResult
         explanation = explanation.model_copy(update={
             "reasons": [*explanation.reasons,
                         "Текстовый сигнал использует только подтверждённые компетенции этой роли."],
+        })
+    if fsp_score:
+        credential = profile.fsp_achievement or {}
+        discipline = credential.get("discipline") or "дисциплина не указана"
+        explanation = explanation.model_copy(update={
+            "reasons": [*explanation.reasons,
+                        f"Подтверждённое достижение ФСП: {discipline}; буст внутри категории +{round(5 * fsp_score, 1)}."],
         })
     text_gaps = [
         (f"Пока нет данных по компетенции «{SKILL_NAMES.get(gap.competency, gap.competency)}»."
@@ -406,6 +442,7 @@ def public_candidate(profile: CandidateProfile, result: dict | None = None) -> d
         "skills_declared": profile.skills or [], "experience_months_declared": profile.experience_months,
         "work_format": profile.work_format,
         "fsp_status": profile.fsp_status, "fsp_result": profile.fsp_result if fsp_bonus(profile) else None,
+        "fsp_achievement": profile.fsp_achievement if fsp_bonus(profile) else None,
     }
     if result is not None:
         card["match"] = result

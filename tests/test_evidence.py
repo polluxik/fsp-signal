@@ -209,3 +209,41 @@ def test_fixture_without_attempt_emits_only_an_aggregate_with_no_invented_action
             assert "конкретное действие не сохранено" in aggregate.action
         finally:
             db.rollback()
+
+
+def test_verified_fsp_achievement_is_selectable_evidence_with_provenance_and_limits():
+    with SessionLocal() as db:
+        try:
+            profile = _profile(db, verified=True)
+            profile.fsp_id = "fsp-credential-42"
+            profile.fsp_status = "verified_external"
+            profile.fsp_result = "prize"
+            profile.fsp_achievement = {
+                "credential_version": "fsp-achievement-v1",
+                "issuer": "ФСП России",
+                "discipline": "программирование продуктов",
+                "event_name": "Кубок ФСП",
+                "event_date": "2026-09-20",
+                "result": "prize",
+                "result_scope": "team",
+                "personal_role": "Разработал обработчик событий.",
+                "evidence_url": "https://example.test/fsp-credential-42",
+                "mapped_specializations": ["backend"],
+                "verified_at": now().isoformat(),
+                "source": "fsp_registry",
+            }
+            employer_id = uid()
+            db.add(User(id=employer_id, email=f"{employer_id}@example.test", password_hash="x",
+                        role="employer", origin="direct_signup"))
+            db.flush()
+
+            card = next(card for card in list_candidate_evidence(
+                db, profile.user_id, audience="employer") if card.source_type == "fsp_achievement")
+            assert card.source_id == "fsp-credential-42"
+            assert card.verification_level == "verified_credential"
+            assert card.data_mode == "real"
+            assert "командный результат" in card.action
+            assert any("не заменяет практическую проверку" in item for item in card.limitations)
+            assert resolve_evidence_refs(db, profile.user_id, [card.id], employer_id) == [card]
+        finally:
+            db.rollback()

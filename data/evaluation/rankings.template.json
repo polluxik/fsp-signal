@@ -1,0 +1,8 @@
+{
+  "keyword_baseline": {
+    "backend-middle-1": ["candidate-2", "candidate-1", "candidate-3"]
+  },
+  "match_v2_fsp": {
+    "backend-middle-1": ["candidate-1", "candidate-2", "candidate-3"]
+  }
+}

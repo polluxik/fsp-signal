@@ -228,6 +228,29 @@ def seed() -> None:
             "qa": "Синтетический профиль: Playwright, Postman, проверка пользовательских сценариев и API, регрессии.",
             "data_analyst": "Синтетический профиль: SQL, Python, качество данных, витрины, аналитика и проверка метрик.",
         }
+        discipline_by_specialization = {
+            "backend": "программирование продуктов",
+            "frontend": "программирование продуктов",
+            "qa": "информационная безопасность",
+            "data_analyst": "алгоритмическое программирование",
+        }
+
+        def demo_fsp_achievement(specialization: str) -> dict:
+            return {
+                "credential_version": "fsp-achievement-v1",
+                "issuer": "ФСП России (демонстрационная запись)",
+                "discipline": discipline_by_specialization[specialization],
+                "event_name": "Демонстрационный кубок ФСП",
+                "event_date": "2026-09-20",
+                "result": "finalist",
+                "result_scope": "team",
+                "personal_role": "Участник команды; личный вклад требует подтверждения на интервью.",
+                "evidence_url": None,
+                "mapped_specializations": [specialization],
+                "verified_at": now().isoformat(),
+                "source": "synthetic_fixture",
+            }
+
         synthetic_profile_count = 0
         for category, skills in COMPETENCIES.items():
             specialization, grade = category.split(":")
@@ -243,6 +266,8 @@ def seed() -> None:
                                 profile.summary = demo_summaries[specialization]
                             if profile.adult_attested_at is None:
                                 profile.adult_attested_at = now()
+                            if profile.fsp_status == "mock" and not profile.fsp_achievement:
+                                profile.fsp_achievement = demo_fsp_achievement(specialization)
                             if profile.verification_source == "synthetic_fixture":
                                 synthetic_profile_count += 1
                     continue
@@ -255,6 +280,7 @@ def seed() -> None:
                 if score < 70:
                     score = 70
                 fsp = "mock" if index in (2, 6, 10) else "unlinked"
+                fsp_achievement = demo_fsp_achievement(specialization) if fsp == "mock" else {}
                 profile = CandidateProfile(
                     user_id=user.id, full_name=f"Демо кандидат {index+1}", contact_email=email,
                     contact_phone=f"+7000000{index:04d}", city="Москва",
@@ -268,7 +294,8 @@ def seed() -> None:
                     verification_source="synthetic_fixture", competencies=competencies,
                     test_verified_at=now()-timedelta(days=index*5), grade_changed_at=now()-timedelta(days=35),
                     fsp_id=f"demo-{user.id}" if fsp == "mock" else None,
-                    fsp_status=fsp, fsp_result="finalist" if fsp == "mock" else None)
+                    fsp_status=fsp, fsp_result="finalist" if fsp == "mock" else None,
+                    fsp_achievement=fsp_achievement)
                 db.add(profile)
                 synthetic_profile_count += 1
         db.flush()

@@ -12,6 +12,21 @@ export type AchievementStory = {
   formatted_narrative?: string
 }
 
+export type FspAchievement = {
+  credential_version: 'fsp-achievement-v1'
+  issuer: string
+  discipline: string
+  event_name: string
+  event_date: string
+  result: 'participant' | 'finalist' | 'prize'
+  result_scope: 'individual' | 'team'
+  personal_role: string
+  evidence_url: string | null
+  mapped_specializations: ('backend' | 'frontend' | 'qa' | 'data_analyst')[]
+  verified_at: string
+  source: 'fsp_registry' | 'synthetic_fixture'
+}
+
 export type Profile = {
   id?: string
   preferences_version?: number
@@ -35,6 +50,7 @@ export type Profile = {
   competencies?: Record<string, number>
   fsp_status?: string
   fsp_result?: string | null
+  fsp_achievement?: FspAchievement | null
   next_grade_change_at?: string | null
 }
 
@@ -185,6 +201,7 @@ export type Candidate = {
   fsp_status: string
   bank_score_algorithm_version?: string
   fsp_result?: string | null
+  fsp_achievement?: FspAchievement | null
   bank_score?: number
   match?: Match
   verification_source?: string
@@ -209,11 +226,11 @@ export type EvidenceCard = {
   id: string
   competency: string | null
   action: string
-  source_type: 'assessment_attempt' | 'achievement_story' | 'skill_claim' | 'legacy_aggregate'
+  source_type: 'assessment_attempt' | 'fsp_achievement' | 'achievement_story' | 'skill_claim' | 'legacy_aggregate'
   source_id: string | null
   source_version: string
   assessed_at: string | null
-  verification_level: 'verified_action' | 'declared' | 'aggregate' | 'synthetic_fixture'
+  verification_level: 'verified_action' | 'verified_credential' | 'declared' | 'aggregate' | 'synthetic_fixture'
   scope: string
   limitations: string[]
   data_mode: 'real' | 'synthetic'

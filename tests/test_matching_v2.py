@@ -49,7 +49,7 @@ def make_profile(specialization="backend", grade="middle", **overrides):
     return CandidateProfile(**(values | overrides))
 
 
-def test_v2_uses_the_frozen_60_35_5_formula_without_fsp_or_freshness(monkeypatch):
+def test_v2_keeps_the_60_35_5_base_and_adds_only_a_capped_fsp_boost(monkeypatch):
     from backend import matching
 
     role = make_role()
@@ -59,10 +59,12 @@ def test_v2_uses_the_frozen_60_35_5_formula_without_fsp_or_freshness(monkeypatch
 
     result = score_profile_v2(profile, role)
 
-    assert result.score == 81.5
-    assert result.components == {"competencies": 0.8, "assessment": 0.9, "text": 0.4}
+    assert result.score == 82.8
+    assert result.components == {
+        "competencies": 0.8, "assessment": 0.9, "text": 0.4, "fsp_relevance": 0.25,
+    }
     assert result.evidence_coverage == 1.0
-    assert set(result.components) == {"competencies", "assessment", "text"}
+    assert set(result.components) == {"competencies", "assessment", "text", "fsp_relevance"}
     assert result.algorithm_version == "match_v2"
     assert any("Текстовый сигнал" in reason for reason in result.explanation.reasons)
 
@@ -90,7 +92,9 @@ def test_missing_attempt_is_unknown_not_a_zero_competency_score(monkeypatch):
 
     result = score_profile_v2(profile, role)
 
-    assert result.components == {"competencies": None, "assessment": 0.9, "text": None}
+    assert result.components == {
+        "competencies": None, "assessment": 0.9, "text": None, "fsp_relevance": None,
+    }
     assert result.score == 90.0
     assert result.evidence_coverage == 0.35
     assert any(gap.competency == competency and gap.status == "unknown"
@@ -108,7 +112,9 @@ def test_synthetic_fixture_competencies_can_score_but_are_labeled_as_synthetic()
 
     result = score_profile_v2(profile, role)
 
-    assert result.components == {"competencies": 0.8, "assessment": 0.82, "text": None}
+    assert result.components == {
+        "competencies": 0.8, "assessment": 0.82, "text": None, "fsp_relevance": None,
+    }
     assert result.evidence_coverage == 0.95
     assert any("синтетическ" in reason.lower() for reason in result.explanation.reasons)
     assert not any("подтверждена компетенция" in reason.lower() for reason in result.explanation.reasons)
@@ -121,7 +127,9 @@ def test_text_component_does_not_borrow_unrelated_competency_evidence():
 
     result = score_profile_v2(profile, role)
 
-    assert result.components == {"competencies": None, "assessment": 0.9, "text": None}
+    assert result.components == {
+        "competencies": None, "assessment": 0.9, "text": None, "fsp_relevance": None,
+    }
     assert result.evidence_coverage == 0.35
     assert result.score == 90.0
 
@@ -137,6 +145,27 @@ def test_evidence_coverage_accounts_for_unassessed_role_competencies():
     assert result.evidence_coverage == 0.7
     assert any(gap.competency == missing and gap.status == "unknown"
                for gap in result.explanation.gaps)
+
+
+def test_fsp_boost_is_role_relevant_and_never_crosses_category_gate():
+    role = make_role("backend", "middle")
+    credential = {
+        "discipline": "программирование продуктов",
+        "mapped_specializations": ["backend"],
+    }
+    relevant = make_profile(
+        "backend", "middle", fsp_status="verified_external", fsp_result="prize",
+        fsp_achievement=credential,
+    )
+    unrelated = make_profile(
+        "backend", "middle", fsp_status="verified_external", fsp_result="prize",
+        fsp_achievement={**credential, "mapped_specializations": ["frontend"]},
+    )
+
+    assert score_profile_v2(relevant, role).score > score_profile_v2(unrelated, role).score
+    assert score_profile_v2(relevant, role).components["fsp_relevance"] == 1.0
+    assert score_profile_v2(unrelated, role).components["fsp_relevance"] == 0.25
+    assert score_profile_v2(relevant, make_role("frontend", "middle")).score is None
 
 
 @pytest.mark.parametrize(

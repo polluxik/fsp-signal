@@ -12,7 +12,7 @@ from backend import meeting_ai
 from backend.config import settings
 from backend.db import SessionLocal, engine
 from backend.main import app
-from backend.models import AvailabilitySlot, InterviewMeeting
+from backend.models import AvailabilitySlot, InterviewCalendar, InterviewMeeting
 from backend.security import aware
 from backend.models import now
 from test_flow import csrf, register_verified
@@ -56,6 +56,31 @@ def book(candidate, calendar, invitation, slot):
 def put(candidate, meeting, path, **fields):
     return candidate.put(f'/api/v1/meetings/{meeting["id"]}/{path}', headers=csrf(candidate),
                          json={'expected_version': meeting['version'], **fields})
+
+
+def test_calendar_initialization_is_idempotent_under_concurrent_first_reads():
+    email = f"calendar-race-{now().timestamp()}@example.test"
+    with TestClient(app) as first, TestClient(app) as second:
+        employer = register_verified(first, email, "employer")
+        assert second.post("/api/v1/auth/login", json={
+            "email": email, "password": "CorrectHorse123!",
+        }).status_code == 200
+        barrier = Barrier(2)
+
+        def read_calendar(client):
+            barrier.wait(timeout=10)
+            response = client.get("/api/v1/employer/calendar")
+            return response.status_code, response.json()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = [future.result(timeout=30) for future in (
+                pool.submit(read_calendar, first), pool.submit(read_calendar, second)
+            )]
+        assert [status for status, _ in results] == [200, 200]
+        assert results[0][1]["public_url"] == results[1][1]["public_url"]
+        with SessionLocal() as db:
+            assert len(db.scalars(select(InterviewCalendar).where(
+                InterviewCalendar.employer_id == employer["id"])).all()) == 1
 
 
 def test_hr_range_timezone_overlap_book_cancel_and_access():

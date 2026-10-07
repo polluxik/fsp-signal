@@ -117,9 +117,12 @@ def render_passport(profile: CandidateProfile) -> BytesIO:
     origin = ("Синтетический профиль для демонстрации. Балл не является результатом человека."
               if synthetic else "Оценка получена в тесте ФСП Сигнал; результат привязан к указанной категории.")
     _line(pdf, origin, 42, 112, regular, 9, width-84, MUTED)
+    achievement = profile.fsp_achievement or {}
     fsp = ("Демо-достижение" if profile.fsp_status == "mock" else
            "Подтверждённое достижение" if profile.fsp_status == "verified_external" else
            "История ФСП не подтверждена")
+    if achievement.get("discipline"):
+        fsp += f" · {achievement['discipline']} · {achievement.get('event_name', 'событие ФСП')}"
     _line(pdf, f"ФСП: {fsp}", 42, 94, regular, 9, width-84, MUTED)
     date = datetime.now(timezone.utc).strftime("%d.%m.%Y")
     _line(pdf, f"Сформировано {date} · Личная выгрузка кандидата", 42, 55, regular, 9, width-84, MUTED)

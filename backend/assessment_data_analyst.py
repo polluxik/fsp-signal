@@ -7,10 +7,11 @@ from .assessment_parts import part
 
 def make_data_analyst_groups(grade: str, rng: random.Random) -> list:
     if grade == "junior":
-        rows = rng.randint(10, 18)
+        rows = rng.randint(100, 9999)
+        table_name = rng.choice(("orders", "payments", "shipments", "subscriptions"))
         return [
             ("sql_querying", [
-                part("daj1", f"В таблице orders {rows} строк. Нужно посчитать только оплаченные заказы. Какое условие добавить?", 10, "paid_filter",
+                part("daj1", f"В таблице {table_name} {rows} строк. Нужно посчитать только оплаченные операции. Какое условие добавить?", 10, "paid_filter",
                      options=[{"value": "paid_filter", "label": "Отфильтровать статус по точному значению paid"},
                               {"value": "count_all", "label": "Посчитать все строки без фильтра"},
                               {"value": "sum_ids", "label": "Сложить идентификаторы заказов"}]),
