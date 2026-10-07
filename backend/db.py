@@ -2,7 +2,7 @@ from collections.abc import Generator
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.pool import NullPool, StaticPool
 
 from .config import settings
 
@@ -25,6 +25,10 @@ def make_engine(url: str):
         kwargs["connect_args"] = {"check_same_thread": False}
         if url in ("sqlite://", "sqlite:///:memory:"):
             kwargs["poolclass"] = StaticPool
+        else:
+            # Close file handles between requests so ephemeral databases can be
+            # removed reliably on Windows after browser tests.
+            kwargs["poolclass"] = NullPool
     engine = create_engine(url, **kwargs)
     if url.startswith("sqlite"):
         event.listen(engine, "connect", _enable_sqlite_foreign_keys)
