@@ -72,35 +72,42 @@
 - Modify: `tests/test_invitations_v2.py`
 - Modify: `tests/test_product_events.py`
 - Modify: `tests/test_migrations.py`
+- Modify: `tests/test_access_controls.py`
+- Modify: `tests/test_flow.py`
+- Modify: `tests/test_runtime.py`
 
 **Interfaces:**
 - Consumes: Task 1 regression tests.
 - Produces: stable candidate invitation serialization, conflict-safe preference writes, private/no-store preference responses, explicit evidence provenance, and `confirm_interview_held(db, actor_id, invitation_id, at)`.
 
-- [ ] **Step 1: Set `Cache-Control: no-store` on candidate preference GET and PUT, making the failing assertions from Task 1 pass**
-- [ ] **Step 2: Fix candidate invitation view serialization to return the profile-specific compatibility report**
+- [ ] **Step 1: Add a failing migration regression before changing models or production schema**
+
+  In `tests/test_migrations.py`, upgrade a pre-change database with an existing accepted invitation to `head`; assert the invitation state is preserved and both new confirmation fields are null. Run `tests/test_migrations.py::test_interview_outcome_migration_preserves_existing_invitations` against the current code and verify it fails because the new columns/revision do not exist.
+
+- [ ] **Step 1a: Re-run the Task 1 regressions and confirm the missing API contracts still fail before implementation**
+
+  Capture only the known RED failures for compatibility serialization, stale profile version, cache headers, held-interview endpoint and event allowlist; keep unrelated existing tests green.
+
+- [ ] **Step 2: Set `Cache-Control: no-store` on candidate preference GET and PUT, making the failing assertions from Task 1 pass**
+- [ ] **Step 3: Fix candidate invitation view serialization to return the profile-specific compatibility report**
 
   Preserve the employer-facing invitation contract; use the candidate-specific serializer only for the candidate's view/action response.
 
-- [ ] **Step 3: Make preference/profile synchronization reject or preserve stale values using the current preference version**
+- [ ] **Step 4: Make preference/profile synchronization reject or preserve stale values using the current preference version**
 
-  Keep the existing first-profile creation path working; on conflict return a typed `409` and current state without committing stale preferences.
+  Existing-profile updates must include `expected_preferences_version`. If absent, return `409 PREFERENCES_VERSION_REQUIRED`; if stale, return `409 PREFERENCES_VERSION_CONFLICT`, include current state, and do not commit profile or preference changes. Keep the first-profile creation path working without a version.
 
-- [ ] **Step 4: Add two-party held-interview confirmation state and endpoint**
+- [ ] **Step 5: Add two-party held-interview confirmation state and endpoint**
 
   Add candidate/employer confirmation timestamps to `Invitation`; expose `POST /api/v1/invitations/{invitation_id}/interview-held-confirmation`. Require an accepted invitation and the authenticated participant. Lock the invitation while updating; emit the deduplicated `interview_held` event only when both parties have confirmed. Repeated clicks are idempotent; a single confirmation is never counted as held.
 
-- [ ] **Step 4a: Test upgrade/backfill behavior for the additive invitation columns and event contract**
-
-  Upgrade a pre-change SQLite schema to head and verify old invitation states remain intact with neither party spuriously confirmed.
-
-- [ ] **Step 5: Run focused tests, then the complete backend suite**
+- [ ] **Step 6: Run focused tests, then the complete backend suite**
 
   Run: `/Users/danielbubusan/Desktop/fsp-signal/.venv/bin/python -m pytest tests/test_preferences.py tests/test_invitations_v2.py tests/test_product_events.py tests/test_migrations.py tests/test_employer_evidence_api.py tests/test_role_discovery.py -q`
 
   Expected: PASS; then `/Users/danielbubusan/Desktop/fsp-signal/.venv/bin/python -m pytest -q` passes SQLite-supported tests, with only the documented PostgreSQL-only skips.
 
-- [ ] **Step 6: Commit the backend contract/consent repair after the focused and full backend suites pass**
+- [ ] **Step 7: Commit the backend contract/consent repair after the focused and full backend suites pass**
 
 ### Task 3: Keep candidate/employer UI in sync with server state
 
