@@ -228,6 +228,8 @@ class Invitation(Base):
     compatibility_snapshot: Mapped[dict | None] = mapped_column(JSON)
     state_version: Mapped[int] = mapped_column(Integer, default=1)
     response_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    candidate_interview_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    employer_interview_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     idempotency_key: Mapped[str] = mapped_column(String(100))
     request_hash: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)

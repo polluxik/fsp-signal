@@ -131,6 +131,7 @@ def test_block_revokes_every_company_grant_and_pending_invite_but_not_other_empl
             "skills": ["Python"], "experience_months": 24, "min_salary_rub": 0,
             "work_format": "remote", "consent_processing": True, "published": False,
             "available": True, "adult_hiring_confirmed": True,
+            "expected_preferences_version": 1,
         }, headers=csrf(candidate))
         assert paused.status_code == 200
         assert second.get(f"/api/v1/employer/candidates/{person['id']}/contact").status_code == 200

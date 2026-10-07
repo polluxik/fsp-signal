@@ -453,6 +453,42 @@ def transition_invitation(db: Session, actor_id: str | None, invitation_id: str,
     return invitation
 
 
+def confirm_interview_held(db: Session, actor_id: str, invitation_id: str,
+                           at: datetime) -> dict[str, object]:
+    """Record one participant's confirmation; count the outcome only after both confirm."""
+    initial = db.get(Invitation, invitation_id)
+    if not initial or actor_id not in (initial.candidate_id, initial.employer_id):
+        raise InvitationError("NOT_FOUND", 404)
+
+    invitation = db.scalar(select(Invitation).where(
+        Invitation.id == invitation_id
+    ).with_for_update())
+    if not invitation or actor_id not in (invitation.candidate_id, invitation.employer_id):
+        raise InvitationError("NOT_FOUND", 404)
+    if invitation.state != "accepted":
+        raise InvitationError("INVITATION_NOT_ACCEPTED", 409)
+
+    if actor_id == invitation.candidate_id:
+        if invitation.candidate_interview_confirmed_at is None:
+            invitation.candidate_interview_confirmed_at = at
+    elif invitation.employer_interview_confirmed_at is None:
+        invitation.employer_interview_confirmed_at = at
+
+    candidate_confirmed = invitation.candidate_interview_confirmed_at is not None
+    employer_confirmed = invitation.employer_interview_confirmed_at is not None
+    interview_held = candidate_confirmed and employer_confirmed
+    if interview_held:
+        # This is a bilateral outcome, not an event owned by the last confirmer.
+        _event(db, invitation, "interview_held", None, at)
+    db.flush()
+    return {
+        "invitation_id": invitation.id,
+        "candidate_confirmed": candidate_confirmed,
+        "employer_confirmed": employer_confirmed,
+        "interview_held": interview_held,
+    }
+
+
 def expire_due_invitations(db: Session, at: datetime) -> int:
     pending_ids = db.scalars(select(Invitation.id).where(
         Invitation.state.in_(("sent", "viewed")), Invitation.expires_at <= at

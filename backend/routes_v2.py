@@ -169,15 +169,17 @@ def post_close_role(need_id: str, data: RoleMutationIn, user: User = Depends(get
 
 
 @candidate_router.get("/preferences", response_model=CandidatePreferencesOut)
-def get_candidate_preferences(user: User = Depends(get_user), db: Session = Depends(get_db)):
+def get_candidate_preferences(response: Response, user: User = Depends(get_user), db: Session = Depends(get_db)):
+    response.headers["Cache-Control"] = "no-store"
     require(user, "candidate")
     return preferences_data(db.get(CandidateProfile, user.id))
 
 
 @candidate_router.put("/preferences", response_model=CandidatePreferencesOut,
                       dependencies=[Depends(csrf_guard)])
-def put_candidate_preferences(data: CandidatePreferencesIn, user: User = Depends(get_user),
+def put_candidate_preferences(response: Response, data: CandidatePreferencesIn, user: User = Depends(get_user),
                               db: Session = Depends(get_db)):
+    response.headers["Cache-Control"] = "no-store"
     require(user, "candidate")
     try:
         result = save_preferences(db, user.id, data, now())

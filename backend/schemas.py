@@ -53,6 +53,7 @@ class CandidateIn(BaseModel):
     published: bool = False
     available: bool = True
     adult_hiring_confirmed: bool | None = None
+    expected_preferences_version: int | None = Field(default=None, ge=1)
 
 
 class EmployerIn(BaseModel):
@@ -451,6 +452,13 @@ class InvitationOut(BaseModel):
     state_version: int = 1
     response_due_at: datetime | None = None
     compatibility: CompatibilityReport | None = None
+
+
+class InterviewHeldConfirmationOut(BaseModel):
+    invitation_id: str
+    candidate_confirmed: bool
+    employer_confirmed: bool
+    interview_held: bool
 
 
 class FspLinkIn(BaseModel):

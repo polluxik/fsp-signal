@@ -22,6 +22,7 @@ EVENT_PAYLOAD_FIELDS = {
     "invitation_rejected": {"state_version", "role_version_id"},
     "invitation_withdrawn": {"state_version", "role_version_id"},
     "invitation_expired": {"state_version", "role_version_id"},
+    "interview_held": {"state_version", "role_version_id"},
 }
 
 

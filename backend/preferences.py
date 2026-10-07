@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from .domain_errors import DomainError
 from .models import CandidateProfile, ContactGrant, Invitation, User, now
 from .product_events import write_invitation_event
-from .schemas import CandidatePreferencesIn
+from .schemas import CandidateIn, CandidatePreferencesIn
 
 
 ALL_FORMATS = ["remote", "hybrid", "office"]
@@ -60,6 +60,43 @@ def preferences_data(profile: CandidateProfile | None) -> dict:
         "available": preferences.get("available", available),
         "adult_hiring_confirmed": bool(profile and profile.adult_attested_at),
     }
+
+
+def save_profile_preferences(profile: CandidateProfile, payload: CandidateIn, at: datetime,
+                             *, is_new: bool) -> None:
+    """Synchronize legacy profile fields only through the current preference version."""
+    current = preferences_data(profile)
+    if not is_new:
+        if payload.expected_preferences_version is None:
+            raise PreferencesError("PREFERENCES_VERSION_REQUIRED")
+        if payload.expected_preferences_version != current["version"]:
+            raise PreferencesError("PREFERENCES_VERSION_CONFLICT")
+
+    changes = {
+        "salary_min_rub": payload.min_salary_rub != profile.min_salary_rub,
+        "allowed_work_formats": payload.work_format != profile.work_format,
+        "available": payload.available != profile.available,
+    }
+    if is_new or any(changes.values()):
+        preference_fields = (
+            "salary_min_rub", "allowed_work_formats", "allowed_cities", "excluded_industries",
+            "preferred_stack", "preferred_tasks", "max_take_home_minutes", "available",
+        )
+        existing = profile.preferences or {}
+        preferences = {field: existing.get(field, current[field]) for field in preference_fields}
+        if is_new or changes["salary_min_rub"]:
+            preferences["salary_min_rub"] = payload.min_salary_rub or None
+        if is_new or changes["allowed_work_formats"]:
+            preferences["allowed_work_formats"] = formats_from_legacy(payload.work_format)
+        if is_new or changes["available"]:
+            preferences["available"] = payload.available
+        profile.preferences = preferences
+        profile.preferences_version = max(1, profile.preferences_version or 1) + (0 if is_new else 1)
+        profile.preferences_confirmed_at = at
+
+    profile.min_salary_rub = payload.min_salary_rub
+    profile.work_format = payload.work_format
+    profile.available = payload.available
 
 
 def save_preferences(db: Session, candidate_id: str, payload: CandidatePreferencesIn,

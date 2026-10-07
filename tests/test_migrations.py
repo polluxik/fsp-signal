@@ -175,3 +175,45 @@ def test_invitation_migration_diagnoses_accepted_rows_without_a_grant():
         invitation_ids = {row[0] for row in connection.execute("SELECT id FROM invitations")}
         connection.close()
         assert invitation_ids == {"invite-accepted"}
+
+
+def test_interview_outcome_migration_preserves_existing_invitations():
+    with tempfile.TemporaryDirectory(prefix="signal-interview-outcome-upgrade-") as directory:
+        database = Path(directory) / "accepted.sqlite3"
+        url = _legacy_invitation_database(database, [("accepted", "sent")])
+        _alembic(url, "e8a1c4d57b20")
+
+        connection = sqlite3.connect(database)
+        connection.execute("UPDATE invitations SET state='accepted' WHERE id='invite-accepted'")
+        connection.execute(
+            "INSERT INTO contact_grants (id,invitation_id,employer_id,candidate_id,granted_at,revoked_at) "
+            "VALUES (?,?,?,?,?,?)",
+            ("grant-accepted", "invite-accepted", "employer-duplicate", "candidate-duplicate",
+             "2026-10-01T00:00:00+00:00", None),
+        )
+        connection.commit()
+        connection.close()
+
+        _alembic(url, "head")
+
+        connection = sqlite3.connect(database)
+        invitation = connection.execute(
+            "SELECT state,candidate_interview_confirmed_at,employer_interview_confirmed_at "
+            "FROM invitations WHERE id='invite-accepted'"
+        ).fetchone()
+        connection.close()
+
+        assert invitation == ("accepted", None, None)
+
+
+def test_interview_outcome_downgrade_preserves_invitation_constraints():
+    with tempfile.TemporaryDirectory(prefix="signal-interview-outcome-downgrade-") as directory:
+        database = Path(directory) / "invitation.sqlite3"
+        url = _legacy_invitation_database(database, [("pending", "sent")])
+        _alembic(url, "head")
+        _alembic(url, "e8a1c4d57b20")
+
+        connection = sqlite3.connect(database)
+        with pytest.raises(sqlite3.IntegrityError, match="invitation_state_invalid"):
+            connection.execute("UPDATE invitations SET state='invalid' WHERE id='invite-pending'")
+        connection.close()

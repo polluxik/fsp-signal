@@ -6,7 +6,7 @@ import json
 import secrets
 
 from fastapi import Body, Depends, FastAPI, File, Header, HTTPException, Request, Response, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import ValidationError
 from sqlalchemy import func, inspect, select, text, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -17,21 +17,23 @@ from .config import settings
 from .db import Base, get_db
 from .evidence import (build_achievement_narrative, build_achievement_story_record,
                        list_candidate_evidence)
-from .invitations import (InvitationError, create_invitation as create_invitation_record,
-                          transition_invitation)
+from .invitations import (InvitationError, confirm_interview_held,
+                          create_invitation as create_invitation_record, transition_invitation)
 from .matching import (can_search, eligible, evaluate_compatibility, explain_profile, fsp_bonus,
                        public_candidate, score_profile, score_profile_v2, suggest_competencies)
 from .models import (AssessmentAttempt, CandidateProfile, ContactGrant, EmailToken, EmployerProfile,
                      HiringNeed, Invitation, LoginSession, MailOutbox, RoleVersion,
                      SearchSnapshot, User, now)
 from .passport import render_passport
-from .preferences import formats_from_legacy, is_blocked, preferences_data
+from .preferences import (PreferencesError, is_blocked, preferences_data,
+                          save_profile_preferences)
 from .resume_import import MAX_PDF_BYTES, ResumeImportError, preview_pdf
 from .role_cards import create_initial_draft
 from .routes_v2 import candidate_router, router as v2_router
 from .schemas import (AcceptInvitationIn, AnswersIn, CandidateIn, EmployerIn, FspLinkIn,
-                      InvitationCommandIn, InvitationOut, InvitationV2In, LoginIn, NeedIn,
-                      RegisterIn, RoleCardIn, SearchIn, SearchOut, StartAssessmentIn, VerifyIn)
+                      InterviewHeldConfirmationOut, InvitationCommandIn, InvitationOut,
+                      InvitationV2In, LoginIn, NeedIn, RegisterIn, RoleCardIn, SearchIn,
+                      SearchOut, StartAssessmentIn, VerifyIn)
 from .security import aware, check_password, csrf_guard, digest, get_user, hasher, new_session, require, set_auth_cookies
 
 @asynccontextmanager
@@ -233,12 +235,25 @@ def save_candidate(data: CandidateIn, user: User = Depends(get_user), db: Sessio
         problem("CONSENT_REQUIRED")
     if data.work_format not in ("remote", "hybrid", "office", "any"):
         problem("INVALID_WORK_FORMAT")
-    profile = db.get(CandidateProfile, user.id)
+    profile = db.scalar(select(CandidateProfile).where(
+        CandidateProfile.user_id == user.id
+    ).with_for_update())
     created = profile is None
     profile = profile or CandidateProfile(user_id=user.id, preferences_version=1)
-    prior_preferences = preferences_data(profile)
+    at = now()
+    try:
+        save_profile_preferences(profile, data, at, is_new=created)
+    except PreferencesError as exc:
+        return JSONResponse(
+            status_code=exc.status,
+            headers={"Cache-Control": "no-store"},
+            content={"detail": exc.code, "current": {
+                "profile": candidate_private(profile),
+                "preferences": preferences_data(profile),
+            }},
+        )
     for field in ("full_name", "contact_email", "contact_phone", "city", "summary", "skills",
-                  "experience_months", "min_salary_rub", "work_format", "available"):
+                  "experience_months"):
         setattr(profile, field, getattr(data, field))
     if "achievement_story" in data.model_fields_set:
         profile.achievement_story = (build_achievement_story_record(data.achievement_story)
@@ -247,27 +262,6 @@ def save_candidate(data: CandidateIn, user: User = Depends(get_user), db: Sessio
     profile.published_at = profile.published_at or now() if data.published else None
     if data.adult_hiring_confirmed is not None:
         profile.adult_attested_at = (profile.adult_attested_at or now()) if data.adult_hiring_confirmed else None
-    formats = formats_from_legacy(data.work_format)
-    if created or (
-        prior_preferences["salary_min_rub"] != (data.min_salary_rub or None)
-        or prior_preferences["allowed_work_formats"] != formats
-        or prior_preferences["available"] != data.available
-    ):
-        preference_fields = (
-            "salary_min_rub", "allowed_work_formats", "allowed_cities", "excluded_industries",
-            "preferred_stack", "preferred_tasks", "max_take_home_minutes", "available",
-        )
-        existing_preferences = profile.preferences or {}
-        preferences = {field: existing_preferences.get(field, prior_preferences[field])
-                       for field in preference_fields}
-        preferences.update({
-            "salary_min_rub": data.min_salary_rub or None,
-            "allowed_work_formats": formats,
-            "available": data.available,
-        })
-        profile.preferences = preferences
-        profile.preferences_version = max(1, profile.preferences_version) + (0 if created else 1)
-        profile.preferences_confirmed_at = now()
     db.add(profile)
     db.commit()
     return candidate_private(profile)
@@ -820,7 +814,24 @@ def view_invitation(invitation_id: str, data: InvitationCommandIn | None = Body(
     except InvitationError as exc:
         db.rollback()
         problem(exc.code, exc.status)
-    return invitation_data(invite)
+    profile = db.get(CandidateProfile, user.id)
+    return candidate_invitation_data(db, profile, invite)
+
+
+@app.post("/api/v1/invitations/{invitation_id}/interview-held-confirmation",
+          dependencies=[Depends(csrf_guard)], response_model=InterviewHeldConfirmationOut)
+def confirm_held_interview(invitation_id: str, user: User = Depends(get_user),
+                           db: Session = Depends(get_db)):
+    try:
+        result = confirm_interview_held(db, user.id, invitation_id, now())
+        db.commit()
+    except InvitationError as exc:
+        db.rollback()
+        problem(exc.code, exc.status)
+    except IntegrityError:
+        db.rollback()
+        problem("INVITATION_STATE_CONFLICT", 409)
+    return result
 
 
 @app.post("/api/v1/invitations/{invitation_id}/accept", dependencies=[Depends(csrf_guard)],

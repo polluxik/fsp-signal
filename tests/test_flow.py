@@ -104,7 +104,9 @@ def test_reverse_hiring_and_contact_boundary():
         assert "Основание: со слов кандидата" in saved.json()["achievement_story"]["formatted_narrative"]
         readback_story = candidate.get("/api/v1/candidate/profile").json()["achievement_story"]
         roundtrip = candidate.put("/api/v1/candidate/profile",
-                                  json=profile | {"achievement_story":readback_story}, headers=csrf(candidate))
+                                  json=profile | {"achievement_story":readback_story,
+                                                  "expected_preferences_version": 1},
+                                  headers=csrf(candidate))
         assert roundtrip.status_code == 200, roundtrip.text
         assert roundtrip.json()["achievement_story"]["formatted_narrative"] == readback_story["formatted_narrative"]
 
@@ -234,7 +236,8 @@ def test_reverse_hiring_and_contact_boundary():
         assert received["salary_min_rub"] == 180000
         assert received["compatibility"]["status"] == "compatible"
         assert "min_salary_rub" not in str(received["compatibility"])
-        paused = candidate.put("/api/v1/candidate/profile", json=profile | {"published":False},
+        paused = candidate.put("/api/v1/candidate/profile",
+                               json=profile | {"published":False, "expected_preferences_version": 1},
                                headers=csrf(candidate))
         assert paused.status_code == 200
         unavailable_accept = candidate.post(f"/api/v1/invitations/{invitation_id}/accept",
@@ -242,7 +245,8 @@ def test_reverse_hiring_and_contact_boundary():
         assert unavailable_accept.status_code == 409
         assert unavailable_accept.json()["detail"] == "INVITATION_NOT_AVAILABLE"
         assert employer.get(f"/api/v1/employer/candidates/{person['id']}/contact").status_code == 403
-        resumed = candidate.put("/api/v1/candidate/profile", json=profile | {"published":True},
+        resumed = candidate.put("/api/v1/candidate/profile",
+                                json=profile | {"published":True, "expected_preferences_version": 1},
                                 headers=csrf(candidate))
         assert resumed.status_code == 200
         accepted = candidate.post(f"/api/v1/invitations/{invitation_id}/accept", headers=csrf(candidate))
@@ -264,7 +268,8 @@ def test_reverse_hiring_and_contact_boundary():
         from backend.mail_worker import expire_invitations
         assert expire_invitations() >= 1
         assert candidate.post(f"/api/v1/invitations/{again.json()['id']}/accept", headers=csrf(candidate)).status_code == 409
-        assert candidate.put("/api/v1/candidate/profile", json=profile | {"published":False},
+        assert candidate.put("/api/v1/candidate/profile",
+                             json=profile | {"published":False, "expected_preferences_version": 1},
                              headers=csrf(candidate)).status_code == 200
         hidden_snapshot = employer.get(f"/api/v1/employer/searches/{snapshot_id}")
         assert hidden_snapshot.status_code == 200
