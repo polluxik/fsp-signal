@@ -1,12 +1,15 @@
 """API contract tests for evidence-linked, versioned invitations."""
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from threading import Barrier
 
+from sqlalchemy import event
 from sqlalchemy import func, select
 from fastapi.testclient import TestClient
 
 from backend.config import settings
-from backend.db import SessionLocal
+from backend.db import SessionLocal, engine
 from backend.invitations import expire_due_invitations
 from backend.main import app
 from backend.models import (CandidateProfile, ContactGrant, EmployerProfile, Invitation,
@@ -216,10 +219,72 @@ def test_interview_is_counted_only_after_both_parties_confirm():
         employer_confirmation = employer.post(confirmation_url, headers=csrf(employer))
         assert employer_confirmation.status_code == 200, employer_confirmation.text
         assert held_event_count() == 1
-
         assert employer.post(confirmation_url, headers=csrf(employer)).status_code == 200
         assert candidate.post(confirmation_url, headers=csrf(candidate)).status_code == 200
         assert held_event_count() == 1
+
+
+def test_concurrent_participant_confirmations_succeed_and_emit_one_event():
+    with (TestClient(app, raise_server_exceptions=False) as employer,
+          TestClient(app, raise_server_exceptions=False) as candidate):
+        _, candidate_user, need_id, _ = make_search_context(employer, candidate)
+        role_version_id = _publish_role(employer, need_id)
+        evidence_id = _candidate_evidence_id(candidate)
+        sent = employer.post(
+            "/api/v1/employer/invitations",
+            json=_invitation_payload(candidate_user["id"], need_id, role_version_id, evidence_id),
+            headers=csrf(employer) | {"Idempotency-Key": "invite-held-concurrent-1"},
+        )
+        assert sent.status_code == 201, sent.text
+        invitation_id = sent.json()["id"]
+        accepted = candidate.post(
+            f"/api/v1/invitations/{invitation_id}/accept",
+            json={
+                "expected_state_version": sent.json()["state_version"],
+                "expected_terms_hash": sent.json()["terms_hash"],
+                "expected_preferences_version": 1,
+            },
+            headers=csrf(candidate),
+        )
+        assert accepted.status_code == 200, accepted.text
+
+        # In the former read/modify/write flow, both handlers reached this point
+        # only after their unlocked SELECT and decision, forcing stale reads. With
+        # the atomic flow, the same barrier starts both database writes together.
+        updates_at_write_boundary = Barrier(2)
+
+        def synchronize_confirmation_writes(conn, cursor, statement, parameters, context, executemany):
+            del conn, cursor, parameters, context, executemany
+            if not statement.lower().lstrip().startswith("update invitations"):
+                return
+            updates_at_write_boundary.wait(timeout=5)
+
+        event.listen(engine, "before_cursor_execute", synchronize_confirmation_writes)
+        confirmation_url = f"/api/v1/invitations/{invitation_id}/interview-held-confirmation"
+        try:
+            with ThreadPoolExecutor(max_workers=2) as requests:
+                candidate_request = requests.submit(
+                    candidate.post, confirmation_url, headers=csrf(candidate)
+                )
+                employer_request = requests.submit(
+                    employer.post, confirmation_url, headers=csrf(employer)
+                )
+                responses = [candidate_request.result(timeout=15), employer_request.result(timeout=15)]
+        finally:
+            event.remove(engine, "before_cursor_execute", synchronize_confirmation_writes)
+
+        assert [response.status_code for response in responses] == [200, 200], [
+            (response.status_code, response.text) for response in responses
+        ]
+        with SessionLocal() as db:
+            held_events = db.scalars(select(ProductEvent).where(
+                ProductEvent.entity_id == invitation_id,
+                ProductEvent.type == "interview_held",
+            )).all()
+        assert len(held_events) == 1, {
+            "held_event_count": len(held_events),
+            "confirmations": [response.json() for response in responses],
+        }
 
 
 def test_accept_is_pinned_idempotent_and_creates_one_grant_event_and_sla():

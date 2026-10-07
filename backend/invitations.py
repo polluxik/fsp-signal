@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 
-from sqlalchemy import select, update
+from sqlalchemy import case, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from .config import settings
@@ -456,23 +456,39 @@ def transition_invitation(db: Session, actor_id: str | None, invitation_id: str,
 def confirm_interview_held(db: Session, actor_id: str, invitation_id: str,
                            at: datetime) -> dict[str, object]:
     """Record one participant's confirmation; count the outcome only after both confirm."""
-    initial = db.get(Invitation, invitation_id)
-    if not initial or actor_id not in (initial.candidate_id, initial.employer_id):
-        raise InvitationError("NOT_FOUND", 404)
+    # Make the participant confirmation an atomic database write. Unlike the old
+    # read/modify/write flow, this serializes competing confirmations across both
+    # processes and database connections (SQLite ignores SELECT FOR UPDATE).
+    result = db.execute(update(Invitation).where(
+        Invitation.id == invitation_id,
+        Invitation.state == "accepted",
+        or_(Invitation.candidate_id == actor_id, Invitation.employer_id == actor_id),
+    ).values(
+        candidate_interview_confirmed_at=case(
+            (Invitation.candidate_id == actor_id,
+             func.coalesce(Invitation.candidate_interview_confirmed_at, at)),
+            else_=Invitation.candidate_interview_confirmed_at,
+        ),
+        employer_interview_confirmed_at=case(
+            (Invitation.employer_id == actor_id,
+             func.coalesce(Invitation.employer_interview_confirmed_at, at)),
+            else_=Invitation.employer_interview_confirmed_at,
+        ),
+    ).execution_options(synchronize_session=False))
+
+    if result.rowcount == 0:
+        current = db.get(Invitation, invitation_id)
+        if not current or actor_id not in (current.candidate_id, current.employer_id):
+            raise InvitationError("NOT_FOUND", 404)
+        if current.state != "accepted":
+            raise InvitationError("INVITATION_NOT_ACCEPTED", 409)
+        raise InvitationError("INVITATION_STATE_CONFLICT", 409)
 
     invitation = db.scalar(select(Invitation).where(
         Invitation.id == invitation_id
     ).with_for_update())
-    if not invitation or actor_id not in (invitation.candidate_id, invitation.employer_id):
+    if not invitation:
         raise InvitationError("NOT_FOUND", 404)
-    if invitation.state != "accepted":
-        raise InvitationError("INVITATION_NOT_ACCEPTED", 409)
-
-    if actor_id == invitation.candidate_id:
-        if invitation.candidate_interview_confirmed_at is None:
-            invitation.candidate_interview_confirmed_at = at
-    elif invitation.employer_interview_confirmed_at is None:
-        invitation.employer_interview_confirmed_at = at
 
     candidate_confirmed = invitation.candidate_interview_confirmed_at is not None
     employer_confirmed = invitation.employer_interview_confirmed_at is not None
