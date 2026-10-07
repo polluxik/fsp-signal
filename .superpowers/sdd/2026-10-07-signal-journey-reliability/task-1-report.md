@@ -70,3 +70,21 @@ Playwright used its randomized localhost ports and a temporary SQLite database; 
 - Edge cases covered include stale versions, unaccepted invitations, candidate/employer outsiders, repeated confirmation, no-store on both read and write, and the difference between aggregate, synthetic, and declared evidence.
 - The pre-existing stale feed-decision test was verified by the required command and left unchanged.
 - `git diff --check` passed before commit. Only the five listed test files and this report are in scope; pre-existing untracked planning documents are being left untouched.
+
+## Fix round 1 — Task 1 plan/brief file-list correction
+
+Removed the already-existing stale-decision test file from Task 1's changed-file list only; its instruction and focused pytest command remain intact.
+
+Exact document lines:
+
+- `docs/superpowers/plans/2026-10-07-signal-journey-reliability.md:40` — deleted `- Modify: tests/test_role_discovery.py`; the Task 1 changed-file list now ends at line 40 with `frontend/tests/core-flow.spec.ts`.
+- `.superpowers/sdd/2026-10-07-signal-journey-reliability/task-1-brief.md:8` — deleted the corresponding `- Modify: tests/test_role_discovery.py`; the generated brief list now ends at line 8 with `frontend/tests/core-flow.spec.ts`.
+- Retained the stale-decision instruction at source-plan line 52 and generated-brief line 20.
+- Retained the focused pytest command, including `tests/test_role_discovery.py`, at source-plan line 56 and generated-brief line 24.
+
+Checks:
+
+- Searched hidden repository files and script references for a task-brief generator; none was present, so the generated brief was updated directly to match the source plan.
+- Extracted both Task 1 `Modify` lists and compared them with `diff -u`; exit code `0`, output: `Task 1 modified-file lists match` (five entries each).
+- Confirmed by search that both stale-decision references and both focused commands still include `tests/test_role_discovery.py`.
+- Documentation-only change: no tests or production code were edited or rerun.
