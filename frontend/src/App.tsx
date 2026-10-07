@@ -10,6 +10,11 @@ import RoleFeed from './features/roles/RoleFeed'
 import RoleEditor from './features/roles/RoleEditor'
 import InterviewConfirmation from './features/invitations/InterviewConfirmation'
 import AssistantPanel from './features/assistant/AssistantPanel'
+import CalendarPanel from './features/calendar/CalendarPanel'
+import MeetingList from './features/calendar/MeetingList'
+import PublicCalendar from './features/calendar/PublicCalendar'
+import BookingLink from './features/calendar/BookingLink'
+import './features/calendar/calendar.css'
 
 const skillNames: Record<string, string> = {
   data_trace: 'Данные и трассировка', validation: 'Валидация', http_api: 'HTTP API',
@@ -243,12 +248,13 @@ function CandidateApp({ me }: { me: User }) {
   return <div className="workspace">
     <header className="topbar"><span className="logo">ФСП <strong>СИГНАЛ</strong></span><span className="top-id">{me.email}</span></header>
     <div className="shell"><aside className="sidebar"><p className="overline">КАБИНЕТ КАНДИДАТА</p>
-      {[['roles','Для меня'],['profile','Мой профиль'],['preferences','Условия поиска'],['evidence','Доказательства'],['test','Проверка навыков'],['offers','Приглашения'],['fsp','ФСП ID и доступ']].map(([id, label]) =>
+      {[['roles','Для меня'],['profile','Мой профиль'],['preferences','Условия поиска'],['evidence','Доказательства'],['test','Проверка навыков'],['offers','Приглашения'],['meetings','Встречи'],['fsp','ФСП ID и доступ']].map(([id, label]) =>
         <button key={id} className={tab === id ? 'active' : ''} onClick={() => { setTab(id); setError(''); setFeedback('') }}>{label}</button>)}
       <div className="sidebar-bottom"><CategoryBadge spec={profile.verified_specialization} grade={profile.verified_grade}/><p className="small muted">Контакты открываются только по вашему решению.</p></div>
     </aside><main className="content">
       {error && <Notice tone="bad">{error}</Notice>}{feedback && <Notice tone="good">{feedback}</Notice>}
       {tab === 'roles' && <RoleFeed onNavigate={setTab}/>}
+      {tab === 'meetings' && <><div className="page-heading"><p className="eyebrow">СЛЕДУЮЩИЙ ШАГ</p><h1>Встречи и договорённости</h1><p>Выберите время разговора и сохраните материалы вместе с работодателем.</p></div><MeetingList viewer="candidate"/></>}
       {tab === 'preferences' && <><div className="page-heading"><p className="eyebrow">ВАШИ ПРАВИЛА</p><h1>Подборка под ваши условия</h1><p>Сохранённые ограничения фильтруют выдачу. Их значения остаются закрытыми от компаний.</p></div><PreferencesPanel onSaved={preferences => setProfile(current => ({
         ...current,
         preferences_version: preferences.version,
@@ -602,7 +608,7 @@ function EmployerApp({ me }: { me: User }) {
         onClick={() => void choose(candidate)}>Пригласить с условиями →</button>
     </article>
   }
-  return <div className="workspace"><header className="topbar"><span className="logo">ФСП <strong>СИГНАЛ</strong></span><span className="top-id">{company.company_name || me.email}</span></header><div className="shell"><aside className="sidebar"><p className="overline">КАБИНЕТ РАБОТОДАТЕЛЯ</p>{[['search','Найти специалиста'],['need','Роль и условия'],['bank','Банк кандидатов'],['offers','Приглашения'],['company','Компания']].map(([id,label]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => {setTab(id);clearSelectedCandidate();setError('');setFeedback('');setReturnToInvitation(false);setReturnToNeed(false);setCompanySetupRequired(false)}}>{label}</button>)}<div className="sidebar-bottom"><p className="small muted">В этой демонстрации достижения ФСП синтетические.</p></div></aside><main className="content">
+  return <div className="workspace"><header className="topbar"><span className="logo">ФСП <strong>СИГНАЛ</strong></span><span className="top-id">{company.company_name || me.email}</span></header><div className="shell"><aside className="sidebar"><p className="overline">КАБИНЕТ РАБОТОДАТЕЛЯ</p>{[['search','Найти специалиста'],['need','Роль и условия'],['bank','Банк кандидатов'],['offers','Приглашения'],['calendar','Календарь HR'],['company','Компания']].map(([id,label]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => {setTab(id);clearSelectedCandidate();setError('');setFeedback('');setReturnToInvitation(false);setReturnToNeed(false);setCompanySetupRequired(false)}}>{label}</button>)}<div className="sidebar-bottom"><p className="small muted">В этой демонстрации достижения ФСП синтетические.</p></div></aside><main className="content">
     {error && !companySetupRequired && <Notice tone="bad">{error}</Notice>}
     {companySetupRequired && !selected && tab !== 'company' && error && <div className="notice bad" role="alert">{error}
       <button className="text-button" type="button" onClick={() => {
@@ -669,7 +675,8 @@ function EmployerApp({ me }: { me: User }) {
       </div>}
     </>}
     {tab === 'bank' && <><div className="page-heading"><p className="eyebrow">БАНК КАНДИДАТОВ</p><h1>Все открытые проверенные профили</h1><p>{bank[0]?.bank_score_algorithm_version === 'match_v2' ? 'Порядок внутри категории основан на тестовом результате; ФСП доступен как отдельный фильтр.' : bank[0]?.bank_score_algorithm_version === 'match_v1' ? 'Порядок внутри категории учитывает тест и дополнительный сигнал ФСП.' : 'Порядок внутри категории определяется выбранной версией алгоритма; ФСП можно фильтровать отдельно.'}</p></div><section className="search-bar card"><label>Специализация<select value={bankSpec} onChange={e => setBankSpec(e.target.value)}><option value="">Все</option><option value="backend">Backend</option><option value="frontend">Frontend</option></select></label><label>Грейд<select value={bankGrade} onChange={e => setBankGrade(e.target.value)}><option value="">Все</option><option value="junior">Junior</option><option value="middle">Middle</option></select></label><label>Стек (заявлен)<input value={bankStack} onChange={e => setBankStack(e.target.value)} placeholder="Python"/></label><label className="inline-check"><input type="checkbox" checked={bankFsp} onChange={e => setBankFsp(e.target.checked)}/> С историей ФСП</label><button className="primary" onClick={filterBank}>Применить фильтры</button></section>{bank.length ? <div className="candidate-grid">{bank.map(candidate => <CandidateCard key={candidate.id} candidate={candidate}/>)}</div> : <div className="empty card">Пока нет подходящих опубликованных профилей.</div>}</>}
-    {tab === 'offers' && <><div className="page-heading"><p className="eyebrow">ИСХОДЯЩИЕ ПРЕДЛОЖЕНИЯ</p><h1>Нанимайте по обещаниям, которые можно проверить</h1><p>Каждое приглашение привязано к выбранным доказательствам и конкретной версии условий.</p></div>{offers.length === 0 ? <div className="empty card">Пока нет приглашений.</div> : offers.map(invite => <article className="card offer-card" key={invite.id}><div className="section-title"><div><h2>{invite.company_name} → Кандидат #{invite.candidate_id.slice(0,8)}</h2><p className="muted">{invite.offer_text}</p></div><span className={`badge ${invite.state === 'accepted' ? 'green' : ''}`}>{statusName(invite.state)}</span></div><div className="salary">{rubles(invite.salary_min_rub)} — {rubles(invite.salary_max_rub)} <small>в месяц · до налогов</small></div><p><strong>Основание:</strong> {invite.reason}</p>{['sent', 'viewed'].includes(invite.state) && <button className="button subtle" type="button" disabled={inviteActionBusyId === invite.id} onClick={() => void withdrawInvitation(invite)}>{inviteActionBusyId === invite.id ? 'Отзываем…' : 'Отозвать приглашение'}</button>}{invite.state === 'accepted' && <><InterviewConfirmation invite={invite} viewer="employer" onChanged={load}/><button className="button outline" onClick={() => showContact(invite.candidate_id)}>Показать контакты кандидата #{invite.candidate_id.slice(0,8)}</button></>}{contacts[invite.candidate_id] && invite.state === 'accepted' && <Notice tone="good">{contacts[invite.candidate_id].full_name} · {contacts[invite.candidate_id].email} · {contacts[invite.candidate_id].phone}</Notice>}</article>)}</>}
+    {tab === 'calendar' && <CalendarPanel/>}
+    {tab === 'offers' && <><div className="page-heading"><p className="eyebrow">ИСХОДЯЩИЕ ПРЕДЛОЖЕНИЯ</p><h1>Нанимайте по обещаниям, которые можно проверить</h1><p>Каждое приглашение привязано к выбранным доказательствам и конкретной версии условий.</p></div>{offers.length === 0 ? <div className="empty card">Пока нет приглашений.</div> : offers.map(invite => <article className="card offer-card" key={invite.id}><div className="section-title"><div><h2>{invite.company_name} → Кандидат #{invite.candidate_id.slice(0,8)}</h2><p className="muted">{invite.offer_text}</p></div><span className={`badge ${invite.state === 'accepted' ? 'green' : ''}`}>{statusName(invite.state)}</span></div><div className="salary">{rubles(invite.salary_min_rub)} — {rubles(invite.salary_max_rub)} <small>в месяц · до налогов</small></div><p><strong>Основание:</strong> {invite.reason}</p>{['sent', 'viewed'].includes(invite.state) && <button className="button subtle" type="button" disabled={inviteActionBusyId === invite.id} onClick={() => void withdrawInvitation(invite)}>{inviteActionBusyId === invite.id ? 'Отзываем…' : 'Отозвать приглашение'}</button>}{invite.state === 'accepted' && <><InterviewConfirmation invite={invite} viewer="employer" onChanged={load}/><BookingLink invitationId={invite.id} employer/><button className="button outline" onClick={() => showContact(invite.candidate_id)}>Показать контакты кандидата #{invite.candidate_id.slice(0,8)}</button></>}{contacts[invite.candidate_id] && invite.state === 'accepted' && <Notice tone="good">{contacts[invite.candidate_id].full_name} · {contacts[invite.candidate_id].email} · {contacts[invite.candidate_id].phone}</Notice>}</article>)}</>}
   </main></div></div>
 }
 
@@ -680,6 +687,7 @@ export default function App() {
   useEffect(() => { api<User>('/me').then(setMe).catch(() => setMe(null)).finally(() => setLoading(false)) }, [revision])
   if (location.pathname === '/verify') return <Verify onDone={() => setRevision(revision+1)}/>
   if (loading) return <div className="centered"><div className="logo">ФСП СИГНАЛ</div><p>Загружаем кабинет…</p></div>
+  if (location.pathname.startsWith('/calendar/')) return <PublicCalendar me={me} auth={<Auth onLogin={() => setRevision(revision+1)}/>}/>
   if (!me) return <Auth onLogin={() => setRevision(revision+1)}/>
   return <><div className="logout"><button onClick={async () => { await api('/auth/logout','POST'); setRevision(revision+1) }}>Выйти</button></div>{me.role === 'candidate' ? <CandidateApp me={me}/> : <EmployerApp me={me}/>}</>
 }

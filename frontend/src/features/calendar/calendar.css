@@ -1,0 +1,37 @@
+.calendar-settings,.availability-form,.meeting-card{margin-bottom:22px}
+.calendar-settings,.meeting-card,.booking-page .card,.meetings-panel>.card{padding:26px}
+.calendar-link{display:flex;gap:10px;align-items:center;margin:16px 0}
+.calendar-link input{flex:1;min-width:0;border:1px solid #dcd4e5;border-radius:10px;padding:12px}
+.calendar-settings .form-grid{margin-bottom:16px}
+.availability-form{display:grid;grid-template-columns:1.5fr 1fr 1fr 1.3fr;gap:14px}
+.availability-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px;margin:20px 0}
+.time-cell{display:flex;flex-direction:column;gap:5px;padding:13px 8px;background:#fff;border:1px solid #dfd4e8;border-radius:12px;color:#4c3461;font-weight:750}
+.time-cell small{font-size:.7rem;font-weight:500}.time-cell.available{background:#f2eafa;border-color:#8b55b3;color:#5b1997}
+.time-cell.booked{background:#eeeef1;border-color:#d6d6da;color:#777}.time-cell:disabled{opacity:.65}
+.slot-list>div,.calendar-invitation{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 0;border-top:1px solid #eee7f3}
+.calendar-invitation{flex-wrap:wrap}.booking-link{margin:10px 0}
+.booking-page{max-width:1080px;padding:40px 28px;margin:auto}.booking-page>.logo{display:inline-block;margin-bottom:36px}
+.booking-week,.meeting-actions,.recording-tools{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:18px 0}
+.booking-week{justify-content:space-between}.booking-days{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px;margin-bottom:20px}
+.booking-slots{display:flex;gap:9px;flex-wrap:wrap}.booking-slots button{flex-direction:column;gap:4px}.booking-slots small{font-weight:500;font-size:.7rem}
+.booking-confirm{border-color:#b58ad0}.booking-confirm label{margin:16px 0}.booking-success .button{margin-right:10px;margin-top:10px}
+.calendar-login-back{text-align:center;padding-bottom:32px}.meetings-panel{margin-top:30px}.meeting-card audio{width:100%;margin:12px 0}
+.meeting-materials label{margin:18px 0}.meeting-ai{margin:22px 0;padding:20px;background:#f6f0fb;border-radius:14px}
+.recording-consent{margin-top:18px}.recording-stop{background:#a52e45;color:white}.recording-tools label.button{cursor:pointer}
+.meeting-summary{padding:23px;background:#f8f5fc;border-left:3px solid #7b3cac;border-radius:12px;margin-top:22px;line-height:1.6}
+.meeting-summary h4{margin-bottom:8px}.meeting-summary li{margin-bottom:7px}.meeting-card textarea{resize:vertical}
+.visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.feed-view-controls{display:flex;gap:20px;align-items:center;justify-content:space-between;margin:16px 0 25px}.feed-view-controls .segmented{min-width:220px;max-width:260px}
+.feed-view-controls>.inline-check{max-width:540px;font-size:.77rem;line-height:1.5;font-weight:500}
+.discovery-match{display:flex;gap:18px;align-items:center;padding:20px;background:#f8f4fc;border-radius:16px;margin:18px 0}
+.match-ring{flex:0 0 82px;width:82px;height:82px;border-radius:50%;background:conic-gradient(#7132ac var(--match),#e9def2 0);position:relative;display:grid;place-items:center}
+.match-ring:before{content:'';position:absolute;inset:7px;background:#f8f4fc;border-radius:50%}.match-ring strong{position:relative;font-size:1.25rem;color:#592188}
+.discovery-match p{margin:6px 0 9px;line-height:1.45}.discovery-match details{font-size:.8rem}.discovery-match summary,.twin-details>summary{cursor:pointer;color:#6c3297;font-weight:750}
+.match-components{padding:0;list-style:none;margin:12px 0}.match-components li{display:flex;justify-content:space-between;gap:15px;margin:8px 0}.match-components small{color:#83728f}
+.twin-deck{max-width:680px;margin:20px auto}.twin-card{padding:32px;touch-action:pan-y;transition:transform .12s;outline-offset:6px}
+.twin-company,.twin-tags{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px}.twin-company{justify-content:space-between;font-size:.83rem;font-weight:750;color:#795990}
+.twin-card h2{font-size:1.7rem;line-height:1.25}.twin-description{line-height:1.7;color:#61556c}.twin-first-days{padding:18px 20px;border:1px solid #e8dcee;border-radius:14px;margin:20px 0}
+.twin-first-days strong{font-size:.8rem;color:#713b94}.twin-first-days p{margin:9px 0 0;line-height:1.65}.twin-actions{display:grid;grid-template-columns:1fr 1.3fr;gap:12px;margin:25px 0 12px}
+.twin-details{margin-top:20px}.twin-details .role-card{margin-top:16px}
+@media(max-width:760px){.availability-form{grid-template-columns:1fr 1fr}.availability-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.booking-days{grid-template-columns:1fr 1fr}.feed-view-controls{align-items:flex-start;flex-direction:column}.twin-card{padding:22px}.calendar-link{flex-wrap:wrap}.calendar-link input{flex-basis:100%}}
+@media(max-width:480px){.booking-days{grid-template-columns:1fr}.booking-page{padding:25px 16px}.booking-week strong{order:-1;flex-basis:100%;text-align:center}.availability-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.discovery-match{padding:15px;gap:12px}.match-ring{flex-basis:64px;width:64px;height:64px}.twin-actions{grid-template-columns:1fr}.calendar-settings,.meeting-card{padding:20px}.slot-list>div{align-items:flex-start;flex-direction:column}.booking-week .button{font-size:.8rem}}

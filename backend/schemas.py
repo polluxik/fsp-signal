@@ -314,6 +314,7 @@ class CandidateRoleFeedItem(BaseModel):
     match_state: Literal["compatible", "needs_clarification", "not_assessed"]
     compatibility: CompatibilityReport | None = None
     decision: Literal["saved", "hidden", "none"] = "none"
+    discovery_match: dict | None = None
 
 
 class SponsoredCandidateRoleFeedItem(CandidateRoleFeedItem):

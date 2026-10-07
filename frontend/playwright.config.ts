@@ -15,8 +15,8 @@ if (!existsSync(python)) {
 }
 const runId = process.env.FSP_SIGNAL_E2E_RUN_ID ?? randomUUID()
 process.env.FSP_SIGNAL_E2E_RUN_ID = runId
-const apiPort = 32_768 + Number.parseInt(runId.slice(0, 4), 16) % (49_151 - 32_768)
-const frontendPort = 49_152 + Number.parseInt(runId.slice(0, 4), 16) % (65_535 - 49_152)
+const apiPort = Number(process.env.FSP_SIGNAL_E2E_API_PORT ?? (32_768 + Number.parseInt(runId.slice(0, 4), 16) % (49_151 - 32_768)))
+const frontendPort = Number(process.env.FSP_SIGNAL_E2E_WEB_PORT ?? (49_152 + Number.parseInt(runId.slice(0, 4), 16) % (65_535 - 49_152)))
 const databasePath = join(tmpdir(), `fsp-signal-playwright-${runId}.sqlite3`)
 const artifactsPath = join(tmpdir(), `fsp-signal-playwright-results-${runId}`)
 const frontendEnvironment = { ...process.env }

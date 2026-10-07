@@ -8,7 +8,7 @@ from sqlalchemy import select
 from .assessment import COMPETENCIES
 from .config import settings
 from .db import SessionLocal
-from .models import CandidateProfile, EmployerProfile, HiringNeed, RoleVersion, User, now
+from .models import CandidateProfile, EmployerProfile, HiringNeed, RoleDecision, RoleVersion, User, now
 from .role_cards import create_role_version, publish_role
 from .schemas import RoleCardIn
 from .security import hasher
@@ -222,6 +222,12 @@ def seed() -> None:
             "qa": ["Playwright", "Postman"],
             "data_analyst": ["SQL", "Python"],
         }
+        demo_summaries = {
+            "backend": "Синтетический профиль: Python, PostgreSQL, API, платёжные события, обработка повторов и восстановление после отказов.",
+            "frontend": "Синтетический профиль: TypeScript, React, формы, состояния интерфейса и надёжные запросы.",
+            "qa": "Синтетический профиль: Playwright, Postman, проверка пользовательских сценариев и API, регрессии.",
+            "data_analyst": "Синтетический профиль: SQL, Python, качество данных, витрины, аналитика и проверка метрик.",
+        }
         synthetic_profile_count = 0
         for category, skills in COMPETENCIES.items():
             specialization, grade = category.split(":")
@@ -232,6 +238,9 @@ def seed() -> None:
                     if user.origin == "synthetic_fixture":
                         profile = db.get(CandidateProfile, user.id)
                         if profile:
+                            profile.recommendation_consent = True  # synthetic cohort, never real consent
+                            if profile.summary == "Синтетический профиль для демонстрации подборки.":
+                                profile.summary = demo_summaries[specialization]
                             if profile.adult_attested_at is None:
                                 profile.adult_attested_at = now()
                             if profile.verification_source == "synthetic_fixture":
@@ -249,7 +258,7 @@ def seed() -> None:
                 profile = CandidateProfile(
                     user_id=user.id, full_name=f"Демо кандидат {index+1}", contact_email=email,
                     contact_phone=f"+7000000{index:04d}", city="Москва",
-                    summary="Синтетический профиль для демонстрации подборки.",
+                    summary=demo_summaries[specialization], recommendation_consent=True,
                     skills=demo_skills[specialization],
                     experience_months=(index+4)*5, min_salary_rub=90000 if grade == "junior" else 170000,
                     work_format="remote", consent_processing_at=now(), published_at=now(), available=True,
@@ -262,6 +271,18 @@ def seed() -> None:
                     fsp_status=fsp, fsp_result="finalist" if fsp == "mock" else None)
                 db.add(profile)
                 synthetic_profile_count += 1
+        db.flush()
+        version = db.scalar(select(RoleVersion).where(RoleVersion.need_id == need.id,
+                                                    RoleVersion.version == need.current_role_version))
+        if version and need.publication_state == "active":
+            for index in range(7, 13):
+                peer = db.scalar(select(User).where(User.email == f"backend-middle-{index}@demo.test",
+                                                   User.origin == "synthetic_fixture"))
+                if peer and not db.scalar(select(RoleDecision.id).where(RoleDecision.candidate_id == peer.id,
+                                                                        RoleDecision.need_id == need.id)):
+                    profile = db.get(CandidateProfile, peer.id)
+                    db.add(RoleDecision(candidate_id=peer.id, need_id=need.id, role_version_id=version.id,
+                                        action="saved", preferences_version=profile.preferences_version))
         db.commit()
     print(f"Seed ready: two employers, {synthetic_profile_count} synthetic assessment profiles, "
           "one profile-free candidate, nine discovery roles.")

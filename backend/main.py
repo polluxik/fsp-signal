@@ -33,6 +33,7 @@ from .preferences import (PreferencesError, is_blocked, preferences_data,
 from .resume_import import MAX_PDF_BYTES, ResumeImportError, preview_pdf
 from .role_cards import create_initial_draft
 from .routes_v2 import assistant_router, candidate_router, router as v2_router
+from .scheduling import router as scheduling_router
 from .schemas import (AcceptInvitationIn, AnswersIn, CandidateIn, EmployerIn, FspLinkIn,
                       InterviewHeldConfirmationOut, InvitationCommandIn, InvitationOut,
                       InvitationV2In, LoginIn, NeedIn, RegisterIn, RoleCardIn, SearchIn,
@@ -50,6 +51,7 @@ app = FastAPI(title="ФСП Сигнал", version="0.1.0", description="Дем�
 app.include_router(v2_router)
 app.include_router(candidate_router)
 app.include_router(assistant_router)
+app.include_router(scheduling_router)
 
 
 @app.exception_handler(RequestValidationError)

@@ -3,6 +3,7 @@ import { api } from '../../api'
 import type { CandidatePreferences, Invite, RoleCardPayload } from '../../types'
 import RoleCard from '../roles/RoleCard'
 import InterviewConfirmation from './InterviewConfirmation'
+import BookingLink from '../calendar/BookingLink'
 
 type Props = { invites: Invite[]; onChanged: () => Promise<void> }
 
@@ -130,7 +131,7 @@ export default function InvitationPanel({ invites, onChanged }: Props) {
         <p><strong>Почему пригласили:</strong> {invite.reason}</p>
         <p className="small muted">Актуально на момент отправки · {invite.created_at ? date(invite.created_at) : 'дата не сохранена'} · решить до {date(invite.expires_at)}</p>
         {invite.state === 'accepted' && invite.response_due_at && <p className="small muted">Работодатель указал срок следующего шага до {date(invite.response_due_at)}.</p>}
-        {invite.state === 'accepted' && <InterviewConfirmation invite={invite} viewer="candidate" onChanged={onChanged}/>}
+        {invite.state === 'accepted' && <><InterviewConfirmation invite={invite} viewer="candidate" onChanged={onChanged}/><BookingLink invitationId={invite.id}/></>}
         {['sent', 'viewed'].includes(invite.state) && <div className="actions">
           <button className="primary" disabled={busyId === invite.id} onClick={() => open(invite)}>{busyId === invite.id ? 'Открываем…' : 'Проверить условия'}</button>
           <button className="button subtle" disabled={busyId === invite.id} onClick={() => reject(invite)}>Отклонить</button>

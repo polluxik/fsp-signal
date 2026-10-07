@@ -3,7 +3,7 @@
 from typing import Literal
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -39,6 +39,25 @@ candidate_router = APIRouter(prefix="/api/v1/candidate", tags=["candidate-v2"])
 assistant_router = APIRouter(prefix="/api/v1/assistant", tags=["assistant"])
 _ASSISTANT_RATE_LIMIT = 10
 _ASSISTANT_RATE_WINDOW = timedelta(hours=1)
+
+
+@candidate_router.get("/recommendations/consent")
+def read_recommendation_consent(user: User = Depends(get_user), db: Session = Depends(get_db)):
+    require(user, "candidate")
+    profile = db.get(CandidateProfile, user.id)
+    return {"consent": bool(profile and profile.recommendation_consent)}
+
+
+@candidate_router.put("/recommendations/consent", dependencies=[Depends(csrf_guard)])
+def save_recommendation_consent(consent: bool = Body(embed=True), user: User = Depends(get_user),
+                                db: Session = Depends(get_db)):
+    require(user, "candidate")
+    profile = db.scalar(select(CandidateProfile).where(CandidateProfile.user_id == user.id).with_for_update())
+    if not profile:
+        raise HTTPException(409, detail="PROFILE_REQUIRED")
+    profile.recommendation_consent = consent
+    db.commit()
+    return {"consent": profile.recommendation_consent}
 
 
 def _raise_role_error(exc: DomainError) -> None:

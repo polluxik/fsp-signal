@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { api, ApiError } from '../../api'
 import type { CandidateRoleDecision, CandidateRoleFeed, CandidateRoleFeedItem } from '../../types'
 import RoleCard from './RoleCard'
+import MatchDetails from './MatchDetails'
+import TwinDeck from './TwinDeck'
 
 type Props = { onNavigate: (tab: string) => void }
 type Filters = { specialization: string; grade: string; workFormat: string; savedOnly: boolean }
@@ -52,6 +54,7 @@ function RoleGroup({ title, items, busyId, onDecision, sponsored = false }: {
           </div>
         </div>
         <RoleCard role={item.role} status="active" confirmedAt={item.confirmed_at}/>
+        <MatchDetails item={item}/>
         {item.compatibility && <div className={`compatibility-summary ${item.compatibility.status}`}>
           <strong>{item.match_state === 'needs_clarification'
             ? item.compatibility.status === 'needs_clarification'
@@ -83,6 +86,9 @@ function RoleGroup({ title, items, busyId, onDecision, sponsored = false }: {
 }
 
 export default function RoleFeed({ onNavigate }: Props) {
+  const [view, setView] = useState<'list' | 'cards'>('list')
+  const [recommendationConsent, setRecommendationConsent] = useState(false)
+  useEffect(() => { api<{ consent: boolean }>('/candidate/recommendations/consent').then(result => setRecommendationConsent(result.consent)).catch(() => {}) }, [])
   const [filters, setFilters] = useState<Filters>({ specialization: '', grade: '', workFormat: '', savedOnly: false })
   const [items, setItems] = useState<CandidateRoleFeedItem[]>([])
   const [sponsoredItems, setSponsoredItems] = useState<CandidateRoleFeedItem[]>([])
@@ -189,6 +195,7 @@ export default function RoleFeed({ onNavigate }: Props) {
         else setItems(updateItem)
         setFeedback(action === 'saved' ? 'Роль сохранена в вашем списке.' : 'Роль убрана из сохранённых.')
       }
+      return true
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setRefreshNotice('Роль или ваши условия обновились. Лента загружена заново; проверьте актуальные данные.')
@@ -196,6 +203,7 @@ export default function RoleFeed({ onNavigate }: Props) {
       } else {
         setError((err as Error).message)
       }
+      return false
     } finally { setBusyId(null) }
   }
 
@@ -259,6 +267,11 @@ export default function RoleFeed({ onNavigate }: Props) {
         onChange={event => { setRefreshNotice(''); setFilters(current => ({ ...current, savedOnly: event.target.checked })) }}/>
         Только сохранённые</label>
     </section>
+    <div className="feed-view-controls"><div className="segmented"><button className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>Список</button><button className={view === 'cards' ? 'active' : ''} onClick={() => setView('cards')}>Карточки</button></div>
+      <label className="inline-check"><input type="checkbox" checked={recommendationConsent} onChange={event => {
+        const consent = event.target.checked
+        void api<{ consent: boolean }>('/candidate/recommendations/consent', 'PUT', { consent }).then(result => setRecommendationConsent(result.consent)).catch(err => setError(err.message))
+      }}/> Разрешаю использовать моё описание и сохранения в обезличенных рекомендациях</label></div>
     {error && <div className="notice bad feed-error" role="alert"><span>{error}</span>
       <button className="text-button" onClick={() => setRefreshKey(value => value + 1)}>Обновить ленту</button>
     </div>}
@@ -280,9 +293,10 @@ export default function RoleFeed({ onNavigate }: Props) {
     {!loading && (!!items.length || !!sponsoredItems.length) && <>
       <RoleGroup title="Продвигаемые роли" items={sponsoredItems} busyId={busyId} sponsored
         onDecision={(item, action) => void decide(item, action)}/>
-      <RoleGroup title="Подтверждённая категория и условия подходят" items={compatible} busyId={busyId} onDecision={(item, action) => void decide(item, action)}/>
-      <RoleGroup title="Нужно уточнить" items={clarification} busyId={busyId} onDecision={(item, action) => void decide(item, action)}/>
-      <RoleGroup title="Пока без персональной оценки" items={notAssessed} busyId={busyId} onDecision={(item, action) => void decide(item, action)}/>
+      {view === 'cards' ? <TwinDeck key={`${filters.specialization}:${filters.grade}:${filters.workFormat}:${filters.savedOnly}`} items={items} busy={busyId !== null} decide={decide}/>
+        : <><RoleGroup title="Подтверждённая категория и условия подходят" items={compatible} busyId={busyId} onDecision={(item, action) => void decide(item, action)}/>
+          <RoleGroup title="Нужно уточнить" items={clarification} busyId={busyId} onDecision={(item, action) => void decide(item, action)}/>
+          <RoleGroup title="Пока без персональной оценки" items={notAssessed} busyId={busyId} onDecision={(item, action) => void decide(item, action)}/></>}
       {nextCursor && <div className="feed-more"><button className="button outline" disabled={loadingMore} onClick={() => void loadMore()}>
         {loadingMore ? 'Загружаем…' : 'Показать ещё 5'}
       </button></div>}

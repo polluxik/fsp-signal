@@ -133,6 +133,12 @@ export type CandidateRoleFeedItem = {
     compatibility_version: 'compat_v2'
   } | null
   decision: CandidateRoleDecision
+  discovery_match?: {
+    percent: number | null
+    components: { label: string; percent: number; weight_percent: number }[]
+    peer_signal: { percent: number; cohort_size: number; common_skills: string[]; synthetic: boolean } | null
+    algorithm_version: string
+  } | null
   campaign_id?: string
   sponsor_label?: 'Продвигаемая роль'
 }

@@ -15,6 +15,22 @@ export class ApiError extends Error {
 }
 
 const messages: Record<string, string> = {
+  AVAILABILITY_RANGE_INVALID: 'Выберите будущий диапазон от 20 минут до 12 часов в пределах 90 дней.',
+  AVAILABILITY_NOT_DIVISIBLE: 'Диапазон должен делиться на выбранную длительность 20 или 30 минут.',
+  AVAILABILITY_OVERLAP: 'Диапазон пересекается с уже открытыми слотами. Уберите прежние или выберите другое время.',
+  SLOT_ALREADY_BOOKED: 'Время уже занято или встреча по этому приглашению назначена. Обновите календарь.',
+  SLOT_NOT_AVAILABLE: 'Слот больше недоступен. Выберите другое время.',
+  MEETING_TIME_CONFLICT: 'На это время у вас уже есть встреча с другой компанией.',
+  ACCEPT_INVITATION_FIRST: 'Сначала примите приглашение этой компании.',
+  MEETING_VERSION_CONFLICT: 'Встреча обновилась. Обновите список встреч и проверьте актуальные данные.',
+  RECORDING_CONSENT_REQUIRED: 'Для записи и расшифровки нужны согласия обоих участников.',
+  MEETING_NOT_STARTED: 'Запись можно добавить после начала встречи.',
+  MEETING_NOT_FINISHED: 'Добавьте расшифровку после окончания встречи.',
+  TRANSCRIPT_REQUIRED: 'Сначала сохраните расшифровку встречи.',
+  TRANSCRIPTION_PROVIDER_DISABLED: 'Автоматическая расшифровка пока недоступна. Вставьте готовый текст беседы.',
+  AUDIO_TOO_LARGE: 'Загрузите аудио не больше 15 МБ.',
+  AUDIO_FORMAT_INVALID: 'Поддерживаются аудио WebM, Ogg, WAV, MP3 и M4A.',
+  PROFILE_REQUIRED: 'Сначала сохраните профиль кандидата.',
   LOGIN_REQUIRED: 'Войдите в аккаунт',
   EMAIL_NOT_VERIFIED: 'Сначала подтвердите email',
   INVALID_CREDENTIALS: 'Неверный email или пароль',
@@ -58,6 +74,17 @@ function messageFor(code: string, status: number): string {
 
 function csrfToken(): string {
   return document.cookie.split('; ').find(item => item.startsWith('fsp_csrf='))?.split('=')[1] ?? ''
+}
+
+export async function uploadMeetingRecording(id: string, version: number, file: File | Blob) {
+  const data = new FormData()
+  data.append('file', file, file instanceof File ? file.name : 'meeting.webm')
+  const response = await fetch(`/api/v1/meetings/${id}/recording?expected_version=${version}`, {
+    method: 'POST', credentials: 'same-origin', headers: { 'x-csrf-token': decodeURIComponent(csrfToken()) }, body: data,
+  })
+  const result = await response.json()
+  if (!response.ok) throw new ApiError(response.status, result?.detail ?? '')
+  return result
 }
 
 export async function api<T>(

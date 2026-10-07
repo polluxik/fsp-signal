@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from .config import settings
 from .domain_errors import DomainError
+from .discovery_match import discovery_match
 from .matching import evaluate_compatibility
 from .models import (CandidateProfile, EmployerProfile, HiringNeed, PromotionCampaign,
                      RoleDecision, RoleVersion, User, now)
@@ -125,7 +126,7 @@ def _company_name(company: EmployerProfile | None) -> str:
 def _candidate_feed_item(need: HiringNeed, version: RoleVersion, company: EmployerProfile | None,
                          employer: User, profile: CandidateProfile | None,
                          preferences: dict, decision_by_need: dict[str, RoleDecision],
-                         saved_only: bool, at: datetime) -> tuple[CandidateRoleFeedItem | None, bool]:
+                         saved_only: bool, at: datetime, db: Session) -> tuple[CandidateRoleFeedItem | None, bool]:
     """Apply the ordinary candidate eligibility rules without scoring or ranking changes."""
     if not need.confirmed_at or not is_role_fresh(need.confirmed_at, at):
         return None, False
@@ -179,6 +180,7 @@ def _candidate_feed_item(need: HiringNeed, version: RoleVersion, company: Employ
         match_state=match_state,
         compatibility=report,
         decision=action,
+        discovery_match=discovery_match(db, profile, need, version),
     ), has_preference_match
 
 
@@ -253,7 +255,7 @@ def discover_roles(db: Session, candidate_id: str, cursor: str | None = None, li
                     continue
                 item, _ = _candidate_feed_item(
                     need, version, company, employer, profile, preferences, decisions_by_need,
-                    saved_only=False, at=at,
+                    saved_only=False, at=at, db=db,
                 )
                 if item is None:
                     continue
@@ -297,7 +299,7 @@ def discover_roles(db: Session, candidate_id: str, cursor: str | None = None, li
             last_scanned = (need.confirmed_at, need.id)
             item, matched_preferences = _candidate_feed_item(
                 need, version, company, employer, profile, preferences, decision_by_need,
-                saved_only=saved_only, at=at,
+                saved_only=saved_only, at=at, db=db,
             )
             saw_preference_match = saw_preference_match or matched_preferences
             if item is None:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import (Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, JSON, String, Text,
+from sqlalchemy import (Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, JSON, LargeBinary, String, Text,
                         UniqueConstraint, text)
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -42,7 +42,7 @@ class AssistantUsage(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
     __table_args__ = (
         CheckConstraint(
-            "intent IN ('candidate_preferences','candidate_achievement','employer_role')",
+            "intent IN ('candidate_preferences','candidate_achievement','employer_role','meeting_summary','meeting_transcription')",
             name="assistant_usage_intent",
         ),
         Index("ix_assistant_usage_user_created", "user_id", "created_at"),
@@ -75,6 +75,7 @@ class CandidateProfile(Base):
     contact_phone: Mapped[str] = mapped_column(String(80), default="")
     city: Mapped[str] = mapped_column(String(120), default="")
     summary: Mapped[str] = mapped_column(Text, default="")
+    recommendation_consent: Mapped[bool] = mapped_column(Boolean, default=False)
     achievement_story: Mapped[dict] = mapped_column(JSON, default=dict)
     skills: Mapped[list] = mapped_column(JSON, default=list)
     experience_months: Mapped[int] = mapped_column(Integer, default=0)
@@ -303,3 +304,47 @@ class MailOutbox(Base):
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     last_error: Mapped[str | None] = mapped_column(String(200))
+
+
+class InterviewCalendar(Base):
+    __tablename__ = "interview_calendars"
+    employer_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    public_token: Mapped[str] = mapped_column(String(64), unique=True)
+    timezone: Mapped[str] = mapped_column(String(80), default="Europe/Moscow")
+    call_url: Mapped[str] = mapped_column(String(500), default="")
+
+
+class AvailabilitySlot(Base):
+    __tablename__ = "availability_slots"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    employer_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    __table_args__ = (CheckConstraint("ends_at > starts_at", name="slot_positive_duration"),)
+
+
+class InterviewMeeting(Base):
+    __tablename__ = "interview_meetings"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    slot_id: Mapped[str] = mapped_column(ForeignKey("availability_slots.id"), index=True)
+    invitation_id: Mapped[str] = mapped_column(ForeignKey("invitations.id"), index=True)
+    employer_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    candidate_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    state: Mapped[str] = mapped_column(String(20), default="scheduled")
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    call_url: Mapped[str] = mapped_column(String(500), default="")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    transcript: Mapped[str] = mapped_column(Text, default="")
+    summary: Mapped[dict | None] = mapped_column(JSON)
+    candidate_recording_consent: Mapped[bool] = mapped_column(Boolean, default=False)
+    employer_recording_consent: Mapped[bool] = mapped_column(Boolean, default=False)
+    recording_data: Mapped[bytes | None] = mapped_column(LargeBinary, deferred=True)
+    recording_type: Mapped[str | None] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    __table_args__ = (
+        CheckConstraint("state IN ('scheduled','cancelled')", name="meeting_state"),
+        CheckConstraint("version >= 1", name="meeting_version"),
+        Index("uq_meeting_active_slot", "slot_id", unique=True,
+              sqlite_where=text("state = 'scheduled'"), postgresql_where=text("state = 'scheduled'")),
+    )
