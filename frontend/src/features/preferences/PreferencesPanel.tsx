@@ -23,7 +23,7 @@ function joinList(values: string[]): string {
   return values.join(', ')
 }
 
-export default function PreferencesPanel() {
+export default function PreferencesPanel({ onSaved }: { onSaved?: (value: CandidatePreferences) => void }) {
   const [preferences, setPreferences] = useState<CandidatePreferences>(emptyPreferences)
   const [cities, setCities] = useState('')
   const [industries, setIndustries] = useState('')
@@ -65,7 +65,9 @@ export default function PreferencesPanel() {
   async function reloadSaved() {
     setError('')
     try {
-      apply(await api<CandidatePreferences>('/candidate/preferences'))
+      const saved = await api<CandidatePreferences>('/candidate/preferences')
+      apply(saved)
+      onSaved?.(saved)
       setConflict(false)
       setFeedback('Загружена последняя сохранённая версия. Черновик заменён.')
     } catch (err) { setError((err as Error).message) }
@@ -87,6 +89,7 @@ export default function PreferencesPanel() {
     try {
       const saved = await api<CandidatePreferences>('/candidate/preferences', 'PUT', payload)
       apply(saved)
+      onSaved?.(saved)
       setConflict(false)
       setFeedback('Условия обновлены. Они фильтруют подходящие предложения и не показываются работодателям.')
     } catch (err) {

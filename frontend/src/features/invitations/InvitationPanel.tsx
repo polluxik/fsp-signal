@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { api } from '../../api'
 import type { CandidatePreferences, Invite, RoleCardPayload } from '../../types'
 import RoleCard from '../roles/RoleCard'
+import InterviewConfirmation from './InterviewConfirmation'
 
 type Props = { invites: Invite[]; onChanged: () => Promise<void> }
 
@@ -39,6 +40,12 @@ const reopenAfterAcceptanceConflict = new Set([
   'INVITATION_STATE_CONFLICT', 'TERMS_VERSION_CONFLICT', 'PREFERENCES_VERSION_CONFLICT',
   'ROLE_VERSION_CONFLICT', 'ROLE_STALE', 'CONDITIONS_INCOMPATIBLE',
 ])
+const verificationNames: Record<string, string> = {
+  verified_action: 'Проверенное действие',
+  declared: 'Заявлено кандидатом',
+  aggregate: 'Агрегированный результат оценки',
+  synthetic_fixture: 'Синтетический пример',
+}
 
 export default function InvitationPanel({ invites, onChanged }: Props) {
   const [active, setActive] = useState<Invite | null>(null)
@@ -57,7 +64,9 @@ export default function InvitationPanel({ invites, onChanged }: Props) {
       setBusyId(invite.id)
       try {
         const viewed = await api<Partial<Invite>>(`/invitations/${invite.id}/view`, 'POST', { expected_state_version: invite.state_version ?? 1 })
-        reviewedInvite = { ...invite, ...viewed }
+        reviewedInvite = { ...invite, ...viewed,
+          compatibility: viewed.compatibility ?? invite.compatibility,
+          evidence_refs: viewed.evidence_refs ?? invite.evidence_refs }
         await onChanged()
       }
       catch (err) { setError((err as Error).message) }
@@ -121,6 +130,7 @@ export default function InvitationPanel({ invites, onChanged }: Props) {
         <p><strong>Почему пригласили:</strong> {invite.reason}</p>
         <p className="small muted">Актуально на момент отправки · {invite.created_at ? date(invite.created_at) : 'дата не сохранена'} · решить до {date(invite.expires_at)}</p>
         {invite.state === 'accepted' && invite.response_due_at && <p className="small muted">Работодатель указал срок следующего шага до {date(invite.response_due_at)}.</p>}
+        {invite.state === 'accepted' && <InterviewConfirmation invite={invite} viewer="candidate" onChanged={onChanged}/>}
         {['sent', 'viewed'].includes(invite.state) && <div className="actions">
           <button className="primary" disabled={busyId === invite.id} onClick={() => open(invite)}>{busyId === invite.id ? 'Открываем…' : 'Проверить условия'}</button>
           <button className="button subtle" disabled={busyId === invite.id} onClick={() => reject(invite)}>Отклонить</button>
@@ -142,7 +152,7 @@ export default function InvitationPanel({ invites, onChanged }: Props) {
         </section>}
         {active.evidence_refs?.length ? <section className="invitation-evidence"><h3>На каких фактах основано приглашение</h3>
           {active.evidence_refs.map(card => <div className="invitation-evidence-item" key={card.id}>
-            <span className={`badge ${card.verification_level === 'verified_action' ? 'green' : ''}`}>{card.verification_level === 'verified_action' ? 'Проверенное действие' : card.verification_level === 'synthetic_fixture' ? 'Синтетический пример' : 'Заявлено кандидатом'}</span>
+            <span className={`badge ${card.verification_level === 'verified_action' ? 'green' : ''}`}>{verificationNames[card.verification_level] ?? 'Уровень подтверждения неизвестен'}</span>
             <p>{card.action}</p><ul className="evidence-limitations">{card.limitations.map(item => <li key={item}>{item}</li>)}</ul>
           </div>)}
         </section> : <p className="small muted">Для этой старой версии приглашения источники доказательств не сохранялись.</p>}

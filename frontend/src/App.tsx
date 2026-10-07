@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { api, uploadResume } from './api'
+import { api, ApiError, uploadResume } from './api'
 import type { AchievementStory, AnswerValue, Attempt, Candidate, EvidenceCard, Invite, Need,
   Profile, RoleCardOut, Search, SearchSummary, User } from './types'
 import EvidencePanel from './features/evidence/EvidencePanel'
@@ -8,6 +8,7 @@ import PreferencesPanel from './features/preferences/PreferencesPanel'
 import RoleCard from './features/roles/RoleCard'
 import RoleFeed from './features/roles/RoleFeed'
 import RoleEditor from './features/roles/RoleEditor'
+import InterviewConfirmation from './features/invitations/InterviewConfirmation'
 
 const skillNames: Record<string, string> = {
   data_trace: 'Данные и трассировка', validation: 'Валидация', http_api: 'HTTP API',
@@ -21,6 +22,9 @@ const skillsByCategory: Record<string, string[]> = {
   'backend:middle': ['event_idempotency', 'data_integrity', 'failure_recovery'],
   'frontend:junior': ['javascript_trace', 'ui_state', 'forms'],
   'frontend:middle': ['request_races', 'derived_state', 'error_recovery'],
+}
+const matchSignalNames: Record<string, string> = {
+  competencies: 'компетенциям', assessment: 'результату теста', text: 'содержанию роли',
 }
 const emptyProfile: Profile = {
   full_name: '', contact_email: '', contact_phone: '', city: '', summary: '', skills: [],
@@ -44,7 +48,7 @@ function CategoryBadge({ spec, grade }: { spec?: string | null; grade?: string |
   return <span className="badge purple">{spec && grade ? `${spec.toUpperCase()} · ${grade.toUpperCase()}` : 'Категория не подтверждена'}</span>
 }
 function Notice({ children, tone = 'info' }: { children: ReactNode; tone?: 'info' | 'bad' | 'good' }) {
-  return <div className={`notice ${tone}`} role="status">{children}</div>
+  return <div className={`notice ${tone}`} role={tone === 'bad' ? 'alert' : 'status'}>{children}</div>
 }
 
 function Auth({ onLogin }: { onLogin: () => void }) {
@@ -128,7 +132,13 @@ function CandidateApp({ me }: { me: User }) {
       api<typeof grants>('/candidate/contact-grants'), api<typeof history>('/candidate/assessment-history'),
     ])
     if (p) {
-      setProfile(p); setSkillsText((p.skills || []).join(', '))
+      setProfile(current => current.preferences_version != null && p.preferences_version != null
+        && current.preferences_version > p.preferences_version
+        ? { ...p, preferences_version: current.preferences_version,
+            min_salary_rub: current.min_salary_rub, work_format: current.work_format,
+            available: current.available, adult_hiring_confirmed: current.adult_hiring_confirmed }
+        : p)
+      setSkillsText((p.skills || []).join(', '))
       setStory({ ...emptyAchievementStory, ...(p.achievement_story ?? {}) })
     }
     setInvites(i); setGrants(g); setHistory(h)
@@ -158,9 +168,12 @@ function CandidateApp({ me }: { me: User }) {
       return
     }
     const { formatted_narrative: _preview, ...storyInput } = story
-    await action(() => api('/candidate/profile', 'PUT', { ...profile,
-      achievement_story: hasStory ? storyInput : null,
-      skills: skillsText.split(',').map(item => item.trim()).filter(Boolean) }), 'Профиль сохранён')
+    await action(async () => {
+      return api('/candidate/profile', 'PUT', { ...profile,
+        expected_preferences_version: profile.preferences_version,
+        achievement_story: hasStory ? storyInput : null,
+        skills: skillsText.split(',').map(item => item.trim()).filter(Boolean) })
+    }, 'Профиль сохранён')
   }
   async function importResume(file?: File) {
     if (!file) return
@@ -217,7 +230,14 @@ function CandidateApp({ me }: { me: User }) {
     </aside><main className="content">
       {error && <Notice tone="bad">{error}</Notice>}{feedback && <Notice tone="good">{feedback}</Notice>}
       {tab === 'roles' && <RoleFeed onNavigate={setTab}/>}
-      {tab === 'preferences' && <><div className="page-heading"><p className="eyebrow">ВАШИ ПРАВИЛА</p><h1>Подборка под ваши условия</h1><p>Сохранённые ограничения фильтруют выдачу. Их значения остаются закрытыми от компаний.</p></div><PreferencesPanel/></>}
+      {tab === 'preferences' && <><div className="page-heading"><p className="eyebrow">ВАШИ ПРАВИЛА</p><h1>Подборка под ваши условия</h1><p>Сохранённые ограничения фильтруют выдачу. Их значения остаются закрытыми от компаний.</p></div><PreferencesPanel onSaved={preferences => setProfile(current => ({
+        ...current,
+        preferences_version: preferences.version,
+        min_salary_rub: preferences.salary_min_rub ?? 0,
+        work_format: preferences.allowed_work_formats.length === 1 ? preferences.allowed_work_formats[0] : 'any',
+        available: preferences.available,
+        adult_hiring_confirmed: preferences.adult_hiring_confirmed,
+      }))}/></>}
       {tab === 'evidence' && <><div className="page-heading"><p className="eyebrow">ФАКТЫ О ВАШЕЙ РАБОТЕ</p><h1>Проверенное отдельно от заявленного</h1><p>Короткий ввод помогает быстро начать; в истории достижений можно сохранить контекст, личный вклад, решение, результат и его основание.</p></div><EvidencePanel/></>}
       {tab === 'profile' && <><div className="page-heading"><p className="eyebrow">ПАСПОРТ НАВЫКОВ</p><h1>Пусть навыки говорят за вас</h1><p>Работодатель увидит категорию после теста. Контакты остаются закрытыми до принятия приглашения.</p></div>
         <div className="summary-grid"><div className="metric"><span>Категория</span><CategoryBadge spec={profile.verified_specialization} grade={profile.verified_grade}/></div><div className="metric"><span>Результат теста</span><strong>{profile.test_score ?? '—'}<small>{profile.test_score != null ? ' / 100' : ''}</small></strong></div><div className="metric"><span>ФСП</span><strong>{profile.fsp_status === 'mock' ? 'Демо' : 'Нет истории'}</strong></div></div>
@@ -308,6 +328,9 @@ function EmployerApp({ me }: { me: User }) {
   const [contacts, setContacts] = useState<Record<string, Record<string,string>>>({})
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
+  const [companySetupRequired, setCompanySetupRequired] = useState(false)
+  const [returnToInvitation, setReturnToInvitation] = useState(false)
+  const [returnToNeed, setReturnToNeed] = useState(false)
   const inviteRequest = useRef<{ fingerprint: string; key: string } | null>(null)
   const bankRequest = useRef<AbortController | null>(null)
   const evidenceRequest = useRef<AbortController | null>(null)
@@ -341,20 +364,32 @@ function EmployerApp({ me }: { me: User }) {
       .catch((err: Error) => { if (err.name !== 'AbortError') setRoleCard(null) })
     return () => controller.abort()
   }, [needId])
-  async function action(job: () => Promise<unknown>, success: string) {
-    setError(''); setFeedback('')
-    try { await job(); await load(); setFeedback(success) } catch (err) { setError((err as Error).message) }
-  }
-  async function saveCompany(event: FormEvent) { event.preventDefault(); await action(() => api('/employer/company','PUT',company), 'Профиль компании сохранён') }
-  async function saveNeed(event: FormEvent) {
+  async function saveCompany(event: FormEvent) {
     event.preventDefault(); setError(''); setFeedback('')
+    try {
+      await api('/employer/company','PUT',company)
+      await load()
+      setCompanySetupRequired(false)
+      setFeedback('Профиль компании сохранён')
+    } catch (err) {
+      setCompanySetupRequired(false)
+      setError((err as Error).message)
+    }
+  }
+  async function saveNeed(event: FormEvent) {
+    event.preventDefault(); setError(''); setFeedback(''); setCompanySetupRequired(false)
     if (needForm.competencies.length === 0) { setError('Выберите хотя бы одну компетенцию.'); return }
     try {
       const result = await api<Need>('/employer/needs','POST',{...needForm, stack:needForm.stack.split(',').map(x => x.trim()).filter(Boolean)})
       setNeedForm({ title:'', description:'', specialization:'backend', grade:'middle', competencies:[], stack:'',
         salary_min_rub:180000, salary_max_rub:230000, work_format:'remote' })
       setNeedId(result.id); setShowNeedForm(false); await load(); setFeedback('Короткая потребность создана. Теперь добавьте условия роли, которые увидит кандидат.'); setTab('need')
-    } catch (err) { setError((err as Error).message) }
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'COMPANY_PROFILE_REQUIRED') {
+        setCompanySetupRequired(true)
+        setError('Перед созданием роли заполните профиль компании.')
+      } else setError((err as Error).message)
+    }
   }
   async function runSearch() {
     if (!needId) { setError('Сначала создайте потребность'); return }
@@ -449,7 +484,7 @@ function EmployerApp({ me }: { me: User }) {
   }
   async function sendInvite(event: FormEvent) {
     event.preventDefault(); if (!selected) return
-    setError(''); setFeedback(''); setInviteBusy(true)
+    setError(''); setFeedback(''); setCompanySetupRequired(false); setInviteBusy(true)
     try {
       const need = needs.find(item => item.id === needId)
       if (!roleCard || !need?.role_version_id || !roleCard.fresh) throw new Error('Версия роли устарела. Подтвердите её актуальность и попробуйте снова.')
@@ -463,7 +498,12 @@ function EmployerApp({ me }: { me: User }) {
       await api('/employer/invitations','POST',body,{ idempotencyKey:inviteRequest.current.key })
       inviteRequest.current = null
       clearSelectedCandidate(); await load(); setFeedback('Приглашение отправлено с зафиксированными условиями и выбранным основанием.')
-    } catch (err) { setError((err as Error).message) } finally { setInviteBusy(false) }
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'COMPANY_PROFILE_REQUIRED') {
+        setCompanySetupRequired(true)
+        setError('Перед отправкой приглашения заполните профиль компании.')
+      } else setError((err as Error).message)
+    } finally { setInviteBusy(false) }
   }
   async function showContact(candidateId: string) {
     setError('')
@@ -483,19 +523,33 @@ function EmployerApp({ me }: { me: User }) {
   const staleSearch = tab === 'search' && !!search
     && (search.changed_since_search || search.role_version_id !== activeNeed?.role_version_id)
   function CandidateCard({ candidate }: { candidate: Candidate }) {
+    const unknownSignals = Object.entries(candidate.match?.components ?? {})
+      .filter(([, value]) => value == null)
+      .map(([name]) => matchSignalNames[name] ?? name)
     return <article className="candidate-card card">
       <div className="section-title">
         <div>
-          <p className="eyebrow">{candidate.verification_source === 'synthetic_fixture' ? 'СИНТЕТИЧЕСКИЙ ПРОФИЛЬ' : 'ПРОВЕРЕННЫЙ ПРОФИЛЬ'}</p>
+          <p className="eyebrow">{candidate.verification_source === 'synthetic_fixture' ? 'СИНТЕТИЧЕСКИЙ ПРОФИЛЬ'
+            : candidate.verification_source === 'assessment' ? 'КАТЕГОРИЯ ПОДТВЕРЖДЕНА ТЕСТОМ' : 'КАТЕГОРИЯ НЕ ПОДТВЕРЖДЕНА'}</p>
           <h3>{candidate.alias}</h3>
         </div>
-        <span className="match-score">{candidate.match ? `${candidate.match.score ?? '—'}/100` : `${candidate.bank_score}/100`}</span>
+      </div>
+      <div className="candidate-signals">
+        <div><span>{candidate.match ? 'Соответствие роли' : 'Оценка в банке'}</span>
+          <strong>{candidate.match ? candidate.match.score == null ? 'Недостаточно данных' : `${candidate.match.score}/100`
+            : candidate.bank_score == null ? 'Нет данных' : `${candidate.bank_score}/100`}</strong></div>
+        <div><span>{candidate.verification_source === 'synthetic_fixture' ? 'Результат теста · учебные данные' : 'Результат теста'}</span>
+          <strong>{candidate.test_score}/100</strong></div>
+        {candidate.match && <div><span>Охват доказательствами</span>
+          <strong>{candidate.match.evidence_coverage == null ? 'Недостаточно данных' : `${Math.round(candidate.match.evidence_coverage * 100)}%`}</strong></div>}
       </div>
       <CategoryBadge spec={candidate.specialization} grade={candidate.grade}/>
       <div className="evidence-row">
-        <span>{candidate.verification_source === 'synthetic_fixture' ? 'Учебный балл' : 'Тест'}: <strong>{candidate.test_score}/100</strong></span>
         <span>ФСП: {candidate.fsp_status === 'mock' ? 'демо-достижение' : 'нет подтверждения'}</span>
       </div>
+      {unknownSignals.length > 0 && <p className="small muted unknown-match-data">
+        Нет данных по {unknownSignals.join(', ')}. Их отсутствие не означает отсутствие навыка и не считалось нулём.
+      </p>}
       <p className="small muted">Заявленные навыки: {candidate.skills_declared?.join(', ') || '—'} · не считаются результатом проверки</p>
       {candidate.match && <>
         <ul className="reasons">{candidate.match.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>
@@ -505,9 +559,15 @@ function EmployerApp({ me }: { me: User }) {
         onClick={() => void choose(candidate)}>Пригласить с условиями →</button>
     </article>
   }
-  return <div className="workspace"><header className="topbar"><span className="logo">ФСП <strong>СИГНАЛ</strong></span><span className="top-id">{company.company_name || me.email}</span></header><div className="shell"><aside className="sidebar"><p className="overline">КАБИНЕТ РАБОТОДАТЕЛЯ</p>{[['search','Найти специалиста'],['need','Роль и условия'],['bank','Банк кандидатов'],['offers','Приглашения'],['company','Компания']].map(([id,label]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => {setTab(id);clearSelectedCandidate();setError('');setFeedback('')}}>{label}</button>)}<div className="sidebar-bottom"><p className="small muted">В этой демонстрации достижения ФСП синтетические.</p></div></aside><main className="content">
-    {error && <Notice tone="bad">{error}</Notice>}{feedback && <Notice tone="good">{feedback}</Notice>}
-    {tab === 'company' && <><div className="page-heading"><p className="eyebrow">КОМПАНИЯ</p><h1>Кто приглашает кандидата?</h1><p>Название и способ связи будут указаны в каждом предложении.</p></div><section className="card"><form className="form-grid" onSubmit={saveCompany}><label>Название компании<input value={company.company_name} onChange={e => setCompany({...company,company_name:e.target.value})} required/></label><label>Направление деятельности<input value={company.industry} onChange={e => setCompany({...company,industry:e.target.value})}/></label><label className="full">О команде<textarea rows={4} value={company.description} onChange={e => setCompany({...company,description:e.target.value})}/></label><label>Контактный email<input type="email" value={company.contact_email} onChange={e => setCompany({...company,contact_email:e.target.value})} required/></label><div className="full"><button className="primary">Сохранить компанию</button></div></form></section></>}
+  return <div className="workspace"><header className="topbar"><span className="logo">ФСП <strong>СИГНАЛ</strong></span><span className="top-id">{company.company_name || me.email}</span></header><div className="shell"><aside className="sidebar"><p className="overline">КАБИНЕТ РАБОТОДАТЕЛЯ</p>{[['search','Найти специалиста'],['need','Роль и условия'],['bank','Банк кандидатов'],['offers','Приглашения'],['company','Компания']].map(([id,label]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => {setTab(id);clearSelectedCandidate();setError('');setFeedback('');setReturnToInvitation(false);setReturnToNeed(false);setCompanySetupRequired(false)}}>{label}</button>)}<div className="sidebar-bottom"><p className="small muted">В этой демонстрации достижения ФСП синтетические.</p></div></aside><main className="content">
+    {error && !companySetupRequired && <Notice tone="bad">{error}</Notice>}
+    {companySetupRequired && !selected && tab !== 'company' && error && <div className="notice bad" role="alert">{error}
+      <button className="text-button" type="button" onClick={() => {
+        setError(''); setReturnToInvitation(false); setReturnToNeed(tab === 'need'); setTab('company')
+      }}>Перейти к профилю компании</button>
+    </div>}
+    {feedback && <Notice tone="good">{feedback}</Notice>}
+    {tab === 'company' && <><div className="page-heading"><p className="eyebrow">КОМПАНИЯ</p><h1>Кто приглашает кандидата?</h1><p>Название и способ связи будут указаны в каждом предложении.</p></div>{((selected && returnToInvitation) || returnToNeed) && <div className="notice info" role="status">{returnToNeed ? 'Черновик роли сохранён в этой вкладке.' : 'Черновик приглашения сохранён в этой вкладке.'} <button className="text-button" type="button" onClick={() => { setTab(returnToNeed ? 'need' : 'search'); setReturnToInvitation(false); setReturnToNeed(false); setCompanySetupRequired(false); setError('') }}>{returnToNeed ? 'Вернуться к роли' : 'Вернуться к приглашению'}</button></div>}<section className="card"><form className="form-grid" onSubmit={saveCompany}><label>Название компании<input value={company.company_name} onChange={e => setCompany({...company,company_name:e.target.value})} required/></label><label>Направление деятельности<input value={company.industry} onChange={e => setCompany({...company,industry:e.target.value})}/></label><label className="full">О команде<textarea rows={4} value={company.description} onChange={e => setCompany({...company,description:e.target.value})}/></label><label>Контактный email<input type="email" value={company.contact_email} onChange={e => setCompany({...company,contact_email:e.target.value})} required/></label><div className="full"><button className="primary">Сохранить компанию</button></div></form></section></>}
     {tab === 'need' && needs.length > 0 && <><div className="page-heading"><p className="eyebrow">РОЛЬ И УСЛОВИЯ</p><h1>Сделайте вакансию понятной до отклика</h1><p>Сначала короткая потребность, затем задача первых 30 дней, зарплата, нагрузка и прозрачные этапы отбора.</p></div>
       <section className="search-bar card role-selector"><label>Потребность команды<select value={needId} onChange={event => { setNeedId(event.target.value); setSearch(null); clearSelectedCandidate() }}>{needs.map(item => <option key={item.id} value={item.id}>{item.title} · {item.grade}</option>)}</select></label>
         {!showNeedForm && <button className="button outline" onClick={() => setShowNeedForm(true)}>Новая потребность</button>}
@@ -543,6 +603,7 @@ function EmployerApp({ me }: { me: User }) {
           <button className="close" type="button" disabled={inviteBusy} onClick={clearSelectedCandidate} aria-label="Закрыть">×</button>
           <p className="eyebrow">ПЕРСОНАЛЬНОЕ ПРИГЛАШЕНИЕ · УСЛОВИЯ ЗАФИКСИРОВАНЫ</p><h2 id="invite-title">{selected.alias}</h2>
           <p className="muted">Кандидат увидит эту версию до решения. Контакты откроются вашей компании только после явного согласия.</p>
+          {companySetupRequired && error && <div className="notice bad" role="alert">{error}<button className="text-button" type="button" onClick={() => { setError(''); setReturnToInvitation(true); setTab('company') }}>Перейти к профилю компании</button></div>}
           {activeRoleCard && <RoleCard role={activeRoleCard.payload} status={activeRoleCard.publication_state}
             confirmedAt={activeRoleCard.confirmed_at} source={activeRoleCard.source}/>}
           <EvidencePanel mode="select" candidateId={selected.id} externalCards={candidateEvidence} externalLoading={evidenceBusy}
@@ -565,7 +626,7 @@ function EmployerApp({ me }: { me: User }) {
       </div>}
     </>}
     {tab === 'bank' && <><div className="page-heading"><p className="eyebrow">БАНК КАНДИДАТОВ</p><h1>Все открытые проверенные профили</h1><p>{bank[0]?.bank_score_algorithm_version === 'match_v2' ? 'Порядок внутри категории основан на тестовом результате; ФСП доступен как отдельный фильтр.' : bank[0]?.bank_score_algorithm_version === 'match_v1' ? 'Порядок внутри категории учитывает тест и дополнительный сигнал ФСП.' : 'Порядок внутри категории определяется выбранной версией алгоритма; ФСП можно фильтровать отдельно.'}</p></div><section className="search-bar card"><label>Специализация<select value={bankSpec} onChange={e => setBankSpec(e.target.value)}><option value="">Все</option><option value="backend">Backend</option><option value="frontend">Frontend</option></select></label><label>Грейд<select value={bankGrade} onChange={e => setBankGrade(e.target.value)}><option value="">Все</option><option value="junior">Junior</option><option value="middle">Middle</option></select></label><label>Стек (заявлен)<input value={bankStack} onChange={e => setBankStack(e.target.value)} placeholder="Python"/></label><label className="inline-check"><input type="checkbox" checked={bankFsp} onChange={e => setBankFsp(e.target.checked)}/> С историей ФСП</label><button className="primary" onClick={filterBank}>Применить фильтры</button></section>{bank.length ? <div className="candidate-grid">{bank.map(candidate => <CandidateCard key={candidate.id} candidate={candidate}/>)}</div> : <div className="empty card">Пока нет подходящих опубликованных профилей.</div>}</>}
-    {tab === 'offers' && <><div className="page-heading"><p className="eyebrow">ИСХОДЯЩИЕ ПРЕДЛОЖЕНИЯ</p><h1>Нанимайте по обещаниям, которые можно проверить</h1><p>Каждое приглашение привязано к выбранным доказательствам и конкретной версии условий.</p></div>{offers.length === 0 ? <div className="empty card">Пока нет приглашений.</div> : offers.map(invite => <article className="card offer-card" key={invite.id}><div className="section-title"><div><h2>{invite.company_name} → Кандидат #{invite.candidate_id.slice(0,8)}</h2><p className="muted">{invite.offer_text}</p></div><span className={`badge ${invite.state === 'accepted' ? 'green' : ''}`}>{statusName(invite.state)}</span></div><div className="salary">{rubles(invite.salary_min_rub)} — {rubles(invite.salary_max_rub)} <small>в месяц · до налогов</small></div><p><strong>Основание:</strong> {invite.reason}</p>{invite.state === 'accepted' && <button className="button outline" onClick={() => showContact(invite.candidate_id)}>Показать контакты кандидата #{invite.candidate_id.slice(0,8)}</button>}{contacts[invite.candidate_id] && invite.state === 'accepted' && <Notice tone="good">{contacts[invite.candidate_id].full_name} · {contacts[invite.candidate_id].email} · {contacts[invite.candidate_id].phone}</Notice>}</article>)}</>}
+    {tab === 'offers' && <><div className="page-heading"><p className="eyebrow">ИСХОДЯЩИЕ ПРЕДЛОЖЕНИЯ</p><h1>Нанимайте по обещаниям, которые можно проверить</h1><p>Каждое приглашение привязано к выбранным доказательствам и конкретной версии условий.</p></div>{offers.length === 0 ? <div className="empty card">Пока нет приглашений.</div> : offers.map(invite => <article className="card offer-card" key={invite.id}><div className="section-title"><div><h2>{invite.company_name} → Кандидат #{invite.candidate_id.slice(0,8)}</h2><p className="muted">{invite.offer_text}</p></div><span className={`badge ${invite.state === 'accepted' ? 'green' : ''}`}>{statusName(invite.state)}</span></div><div className="salary">{rubles(invite.salary_min_rub)} — {rubles(invite.salary_max_rub)} <small>в месяц · до налогов</small></div><p><strong>Основание:</strong> {invite.reason}</p>{invite.state === 'accepted' && <><InterviewConfirmation invite={invite} viewer="employer" onChanged={load}/><button className="button outline" onClick={() => showContact(invite.candidate_id)}>Показать контакты кандидата #{invite.candidate_id.slice(0,8)}</button></>}{contacts[invite.candidate_id] && invite.state === 'accepted' && <Notice tone="good">{contacts[invite.candidate_id].full_name} · {contacts[invite.candidate_id].email} · {contacts[invite.candidate_id].phone}</Notice>}</article>)}</>}
   </main></div></div>
 }
 

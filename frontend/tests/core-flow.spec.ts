@@ -1,21 +1,5 @@
 import { expect, test } from '@playwright/test'
-
-async function signIn(page: import('@playwright/test').Page, email: string) {
-  await page.goto('/')
-  await page.getByRole('button', { name: 'Вход' }).click()
-  await page.getByLabel('Email').fill(email)
-  await page.getByLabel('Пароль').fill('DemoPass123!')
-  await page.getByRole('button', { name: 'Войти' }).click()
-  await expect(page.getByRole('button', { name: 'Выйти' })).toBeVisible()
-}
-
-async function currentUserId(page: import('@playwright/test').Page): Promise<string> {
-  return page.evaluate(async () => {
-    const response = await fetch('/api/v1/me')
-    const user = await response.json()
-    return user.id as string
-  })
-}
+import { currentUserId, signIn } from './test-support'
 
 test('candidate discovers roles, saves and hides them, then restores with undo', async ({ browser }) => {
   const newCandidate = await browser.newPage()
@@ -98,7 +82,22 @@ test('candidate discovers roles, saves and hides them, then restores with undo',
 
 test('candidate preferences persist without publishing and stay private from employers', async ({ browser }) => {
   const candidate = await browser.newPage()
+  let releaseInitialProfileRead = () => {}
+  let markInitialProfileReadReady = () => {}
+  const initialProfileReadGate = new Promise<void>(resolve => { releaseInitialProfileRead = resolve })
+  const initialProfileReadReady = new Promise<void>(resolve => { markInitialProfileReadReady = resolve })
+  let delayedInitialProfileRead = false
+  await candidate.route('**/api/v1/candidate/profile', async route => {
+    if (route.request().method() === 'GET' && !delayedInitialProfileRead) {
+      delayedInitialProfileRead = true
+      const response = await route.fetch()
+      markInitialProfileReadReady()
+      await initialProfileReadGate
+      await route.fulfill({ response })
+    } else await route.continue()
+  })
   await signIn(candidate, 'backend-middle-1@demo.test')
+  await initialProfileReadReady
   await candidate.getByRole('button', { name: 'Условия поиска' }).click()
   await candidate.getByLabel(/Минимум, ₽ в месяц/).fill('175000')
   await candidate.getByLabel(/Города для гибрида и офиса/).fill('Москва')
@@ -106,11 +105,9 @@ test('candidate preferences persist without publishing and stay private from emp
   await candidate.getByRole('button', { name: 'Сохранить условия' }).click()
   await expect(candidate.locator('.notice')).toContainText('Условия обновлены')
 
-  await candidate.reload()
+  releaseInitialProfileRead()
   await candidate.getByRole('button', { name: 'Мой профиль' }).click()
-  await candidate.getByRole('button', { name: 'Условия поиска' }).click()
-  await expect(candidate.getByLabel(/Минимум, ₽ в месяц/)).toHaveValue('175000')
-  await candidate.getByRole('button', { name: 'Мой профиль' }).click()
+  await expect(candidate.getByLabel('Имя и фамилия')).not.toHaveValue('')
   await expect(candidate.getByLabel(/Публиковать проверенный профиль работодателям/)).toBeChecked()
   await candidate.getByLabel('Контекст: какую задачу или проблему решали').fill('Повторная доставка события могла создать двойную запись в расчётах.')
   await candidate.getByLabel('Ваш личный вклад: что сделали вы').fill('Добавил идемпотентную обработку по идентификатору события.')
@@ -126,12 +123,76 @@ test('candidate preferences persist without publishing and stay private from emp
     .toHaveValue('Повторная доставка события могла создать двойную запись в расчётах.')
   await expect(candidate.getByLabel(/Отдельно разрешаю показать этот рассказ/)).not.toBeChecked()
   await expect(candidate.getByLabel(/Публиковать проверенный профиль работодателям/)).toBeChecked()
+  await candidate.getByRole('button', { name: 'Условия поиска' }).click()
+  await expect(candidate.getByLabel(/Минимум, ₽ в месяц/)).toHaveValue('175000')
 
   const employer = await browser.newPage()
   await signIn(employer, 'employer@demo.test')
   const forbidden = await employer.evaluate(async () => (await fetch('/api/v1/candidate/preferences')).status)
   expect(forbidden).toBe(403)
   await candidate.close()
+  await employer.close()
+})
+
+test('a stale profile form cannot overwrite preferences changed in another session', async ({ browser }) => {
+  const staleProfileTab = await browser.newPage()
+  await signIn(staleProfileTab, 'backend-middle-1@demo.test')
+  await staleProfileTab.getByRole('button', { name: 'Мой профиль' }).click()
+  const summary = staleProfileTab.getByLabel('Опыт и задачи')
+  await expect(summary).toBeVisible()
+
+  const preferencesTab = await browser.newPage()
+  await signIn(preferencesTab, 'backend-middle-1@demo.test')
+  await preferencesTab.getByRole('button', { name: 'Условия поиска' }).click()
+  await preferencesTab.getByLabel(/Минимум, ₽ в месяц/).fill('205000')
+  await preferencesTab.getByLabel(/Города для гибрида и офиса/).fill('Казань')
+  await preferencesTab.getByRole('button', { name: 'Сохранить условия' }).click()
+  await expect(preferencesTab.getByRole('status')).toContainText('Условия обновлены')
+
+  await summary.fill('Черновик, открытый до обновления условий в другой вкладке.')
+  await staleProfileTab.getByRole('button', { name: 'Сохранить профиль' }).click()
+  await expect(staleProfileTab.getByRole('alert')).toContainText(/изменились в другой вкладке/i)
+
+  const currentPreferences = await staleProfileTab.evaluate(async () => {
+    const response = await fetch('/api/v1/candidate/preferences')
+    return await response.json()
+  })
+  expect(currentPreferences.salary_min_rub).toBe(205000)
+  expect(currentPreferences.allowed_cities).toEqual(['Казань'])
+
+  await staleProfileTab.getByRole('button', { name: 'Условия поиска' }).click()
+  await expect(staleProfileTab.getByLabel(/Минимум, ₽ в месяц/)).toHaveValue('205000')
+  await staleProfileTab.getByLabel(/Минимум, ₽ в месяц/).fill('175000')
+  await staleProfileTab.getByLabel(/Города для гибрида и офиса/).fill('Москва')
+  await staleProfileTab.getByRole('button', { name: 'Сохранить условия' }).click()
+  await expect(staleProfileTab.getByRole('status')).toContainText('Условия обновлены')
+
+  await staleProfileTab.close()
+  await preferencesTab.close()
+})
+
+test('company setup is reachable after company-profile-required on role creation', async ({ browser }) => {
+  const employer = await browser.newPage()
+  await signIn(employer, 'employer@demo.test')
+  await employer.getByRole('button', { name: 'Роль и условия' }).click()
+  await employer.getByRole('button', { name: 'Новая потребность' }).click()
+  await employer.getByLabel('Название роли').fill('QA Middle для биллинга')
+  await employer.getByLabel('Чем будет заниматься специалист').fill('Проверять надёжность платёжных сценариев и интеграций.')
+  await employer.getByLabel('Повторные события').check()
+  await employer.route('**/api/v1/employer/needs', async route => {
+    if (route.request().method() === 'POST') {
+      await route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ detail: 'COMPANY_PROFILE_REQUIRED' }) })
+    } else await route.continue()
+  })
+  await employer.getByRole('button', { name: 'Создать черновик роли' }).click()
+  await expect(employer.getByRole('alert')).toContainText(/заполните профиль компании/i)
+  const setupCompany = employer.getByRole('button', { name: 'Перейти к профилю компании' })
+  await expect(setupCompany).toBeVisible({ timeout: 500 })
+  await setupCompany.click()
+  await expect(employer.getByRole('heading', { name: 'Кто приглашает кандидата?' })).toBeVisible()
+  await expect(employer.getByRole('button', { name: 'Вернуться к роли' })).toBeVisible()
+  await employer.getByRole('button', { name: 'Вернуться к роли' }).click()
+  await expect(employer.getByLabel('Название роли')).toHaveValue('QA Middle для биллинга')
   await employer.close()
 })
 
@@ -174,6 +235,14 @@ test('role facts, selected evidence, explicit acceptance, and pair-scoped contac
   const target = snapshot.results.find((item: { id: string }) => item.id === candidateId)
   expect(target, `candidate ${candidateId} not found in ${JSON.stringify(snapshot.results.map((item: { id: string }) => item.id))}`).toBeTruthy()
   const targetAlias = target.alias as string
+  const targetCard = employerPage.locator('.candidate-card').filter({ hasText: targetAlias })
+  await expect.soft(targetCard.getByText(/Соответствие роли/)).toBeVisible({ timeout: 500 })
+  await expect.soft(targetCard.getByText(/Результат теста/)).toBeVisible({ timeout: 500 })
+  await expect.soft(targetCard.getByText(/Охват доказательствами/)).toBeVisible({ timeout: 500 })
+  const unknownMatchComponents = Object.values(target.match?.components ?? {}).filter(value => value == null)
+  if (unknownMatchComponents.length > 0) {
+    await expect.soft(targetCard.getByText(/Нет данных по компетенциям/)).toBeVisible({ timeout: 500 })
+  }
   const alternate = snapshot.results.find((item: { id: string }) => item.id !== candidateId)
   if (!alternate) throw new Error('Expected another candidate in the search results to exercise the evidence request race')
   const alternateAlias = alternate.alias as string
@@ -220,6 +289,42 @@ test('role facts, selected evidence, explicit acceptance, and pair-scoped contac
     await expect(card).toContainText('Заявлено кандидатом')
     await expect(card).not.toContainText('Действие проверено заданием')
   }
+  const draftOffer = employerPage.getByLabel('Текст приглашения')
+  const draftReason = employerPage.getByLabel(/Почему выбрали кандидата/)
+  await draftOffer.fill('Приглашаем обсудить обработку платёжных событий в команде.')
+  await draftReason.fill('Опыт с идемпотентной обработкой подтверждён в истории кандидата.')
+  await employerPage.route('**/api/v1/employer/invitations', async route => {
+    if (route.request().method() === 'POST') {
+      await route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ detail: 'COMPANY_PROFILE_REQUIRED' }) })
+    } else await route.continue()
+  })
+  await employerPage.getByRole('button', { name: /Отправить с выбранным основанием/ }).click()
+  await expect.soft(employerPage.getByRole('alert')).toContainText(/заполните профиль компании/i, { timeout: 500 })
+  const companySetupButton = employerPage.getByRole('button', { name: 'Перейти к профилю компании' })
+  await expect.soft(companySetupButton).toBeVisible({ timeout: 500 })
+  await expect(draftOffer).toHaveValue('Приглашаем обсудить обработку платёжных событий в команде.')
+  await expect(draftReason).toHaveValue('Опыт с идемпотентной обработкой подтверждён в истории кандидата.')
+  if (await companySetupButton.isVisible()) {
+    await companySetupButton.click()
+    await expect(employerPage.getByRole('heading', { name: 'Кто приглашает кандидата?' })).toBeVisible()
+    const companyName = employerPage.getByLabel('Название компании')
+    const savedCompanyName = await companyName.inputValue()
+    await employerPage.route('**/api/v1/employer/company', async route => {
+      if (route.request().method() === 'PUT') {
+        await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ detail: 'COMPANY_SAVE_FAILED' }) })
+      } else await route.continue()
+    })
+    await employerPage.getByRole('button', { name: 'Сохранить компанию' }).click()
+    await expect.soft(employerPage.getByRole('alert')).toContainText('COMPANY_SAVE_FAILED', { timeout: 500 })
+    await expect(companyName).toHaveValue(savedCompanyName)
+    await expect(employerPage.getByRole('button', { name: 'Вернуться к приглашению' })).toBeVisible()
+    await employerPage.unroute('**/api/v1/employer/company')
+    await employerPage.getByRole('button', { name: 'Вернуться к приглашению' }).click()
+    await expect(employerPage.getByRole('dialog')).toBeVisible()
+    await expect(draftOffer).toHaveValue('Приглашаем обсудить обработку платёжных событий в команде.')
+    await expect(draftReason).toHaveValue('Опыт с идемпотентной обработкой подтверждён в истории кандидата.')
+  }
+  await employerPage.unroute('**/api/v1/employer/invitations')
   let submittedEvidenceIds: string[] | null = null
   await employerPage.route('**/api/v1/employer/invitations', async route => {
     if (route.request().method() === 'POST') {
@@ -293,18 +398,42 @@ test('role facts, selected evidence, explicit acceptance, and pair-scoped contac
 
   await secondCandidatePage.getByRole('button', { name: 'Приглашения' }).click()
   await secondCandidatePage.getByRole('button', { name: 'Проверить условия' }).click()
+  await expect(secondCandidatePage.locator('.compatibility-summary'))
+    .toContainText(/Условия соответствуют сохранённым ограничениям|Часть условий не указана/)
   await secondCandidatePage.getByRole('checkbox', { name: /проверил.*принимаю именно эту версию/ }).check()
   await secondCandidatePage.getByRole('button', { name: 'Принять условия' }).click()
   await expect(secondCandidatePage.getByRole('status')).toContainText('Контакты доступны только этой компании')
 
+  const acceptedCandidateOffer = secondCandidatePage.locator('.offer-card')
+    .filter({ hasText: 'Приглашаем обсудить роль' })
+  const candidateConfirmation = acceptedCandidateOffer.getByRole('button', { name: 'Подтвердить встречу' })
+  await expect.soft(candidateConfirmation).toBeVisible({ timeout: 500 })
+  if (await candidateConfirmation.isVisible()) {
+    await candidateConfirmation.click()
+    await expect(acceptedCandidateOffer).toContainText('Ждём подтверждения работодателя')
+    await expect(acceptedCandidateOffer).not.toContainText('Встреча подтверждена обеими сторонами')
+  }
+
   await employerPage.getByRole('button', { name: 'Приглашения' }).click()
+  const acceptedEmployerOffer = employerPage.locator('.offer-card')
+    .filter({ hasText: secondCandidateId.slice(0, 8) })
+  const employerConfirmation = acceptedEmployerOffer.getByRole('button', { name: 'Подтвердить встречу' })
+  await expect.soft(employerConfirmation).toBeVisible({ timeout: 500 })
+  if (await employerConfirmation.isVisible()) {
+    await employerConfirmation.click()
+    await expect(acceptedEmployerOffer).toContainText('Встреча подтверждена обеими сторонами')
+    await secondCandidatePage.reload()
+    await secondCandidatePage.getByRole('button', { name: 'Приглашения' }).click()
+    await expect(secondCandidatePage.locator('.offer-card').filter({ hasText: 'Приглашаем обсудить роль' }))
+      .toContainText('Встреча подтверждена обеими сторонами')
+  }
   await employerPage.getByRole('button', { name: new RegExp(`Показать контакты кандидата #${secondCandidateId.slice(0, 8)}`) }).click()
   const secondContactCard = employerPage.locator('.offer-card').filter({ hasText: secondCandidateId.slice(0, 8) })
-  await expect(secondContactCard.getByRole('status')).toContainText('backend-middle-2@demo.test')
+  await expect(secondContactCard.getByText('backend-middle-2@demo.test')).toBeVisible()
   const firstContactCard = employerPage.locator('.offer-card').filter({ hasText: candidateId.slice(0, 8) })
   await firstContactCard.getByRole('button', { name: /Показать контакты кандидата/ }).click()
-  await expect(firstContactCard.getByRole('status')).toContainText('backend-middle-1@demo.test')
-  await expect(secondContactCard.getByRole('status')).toContainText('backend-middle-2@demo.test')
+  await expect(firstContactCard.getByText('backend-middle-1@demo.test')).toBeVisible()
+  await expect(secondContactCard.getByText('backend-middle-2@demo.test')).toBeVisible()
 
   const otherEmployer = await browser.newPage()
   await signIn(otherEmployer, 'other@demo.test')

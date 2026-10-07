@@ -111,12 +111,16 @@
 ### Task 3: Keep candidate/employer UI in sync with server state
 
 **Files:**
+- Modify: `backend/main.py` (serialize participant interview-confirmation booleans)
+- Modify: `backend/schemas.py` (require participant confirmation state in invitation output)
+- Modify: `tests/test_invitations_v2.py` (assert confirmation state for each participant after one and both confirmations)
 - Modify: `frontend/src/App.tsx`
 - Modify: `frontend/src/api.ts`
-- Modify: `frontend/src/features/preferences/PreferencesPanel.tsx`
 - Modify: `frontend/src/features/invitations/InvitationPanel.tsx`
-- Modify: `frontend/src/features/roles/RoleFeed.tsx`
-- Modify: `frontend/src/features/evidence/EvidencePanel.tsx`
+- Modify: `frontend/src/features/preferences/PreferencesPanel.tsx`
+- Create: `frontend/src/features/invitations/InterviewConfirmation.tsx`
+- Modify: `frontend/src/types.ts`
+- Modify: `frontend/src/styles.css`
 - Modify: `frontend/playwright.config.ts`
 - Create: `frontend/tests/test-support.ts`
 - Modify: `frontend/tests/core-flow.spec.ts`
@@ -125,21 +129,23 @@
 - Consumes: Task 2 response contracts.
 - Produces: synchronized profile/preference client state; preserved compatibility after viewing an invitation; clear conflict/setup/error states; honest source and match/evidence labels; optional two-sided meeting confirmation after acceptance.
 
-- [ ] **Step 1: Add Playwright regressions for preference-save → profile-save → reload, invitation-view → compatibility display, and two-party held confirmation**
-- [ ] **Step 1a: Restore the frontend test environment from the committed lockfile if dependencies are absent**
+- [x] **Step 1: Add Playwright regressions for preference-save → profile-save → reload, invitation-view → compatibility display, and two-party held confirmation**
+- [x] **Step 1a: Restore the frontend test environment from the committed lockfile if dependencies are absent**
 
   Run `npm ci` inside `frontend/` in this isolated worktree only; do not alter `package.json` or the lockfile just to satisfy the environment. Keep the existing app on port 5173 untouched; all live checks for this worktree use dedicated ports (frontend 5174, API 8001) and a synthetic temporary database.
-- [ ] **Step 2: Run the new browser cases and capture their failing state**
+- [x] **Step 2: Run the new browser cases and capture their failing state**
 
   Run: `cd frontend && FSP_SIGNAL_E2E_PYTHON=/Users/danielbubusan/Desktop/fsp-signal/.venv/bin/python npm run test:e2e -- --grep "preference state|invitation compatibility"`
 
-- [ ] **Step 3: Update parent profile state from the confirmed preferences response and keep invitation response merging null-safe**
-- [ ] **Step 4: Map `COMPANY_PROFILE_REQUIRED` to a message and direct setup action; preserve input on recoverable errors**
-- [ ] **Step 5: Render fit, assessment score, evidence coverage and unknown competencies as separate labeled values**
-- [ ] **Step 6: Correct visible evidence badges so only `verified_action` is called verified; preserve `synthetic_fixture`, aggregate and unknown labels**
-- [ ] **Step 7: Show the held-interview confirmation control only after acceptance; show a confirmed outcome only after both parties confirm**
-- [ ] **Step 8: Extract `signIn` and `currentUserId` to `frontend/tests/test-support.ts`, set Playwright `testMatch` to `**/*.spec.ts`, then run `cd frontend && npm run build` and the focused browser cases; expected: PASS with no TypeScript errors or console exceptions**
+- [x] **Step 3: Update parent profile state from the confirmed preferences response and keep invitation response merging null-safe**
+- [x] **Step 4: Map `COMPANY_PROFILE_REQUIRED` to a message and direct setup action; preserve input on recoverable errors**
+- [x] **Step 5: Render fit, assessment score, evidence coverage and unknown competencies as separate labeled values**
+- [x] **Step 6: Correct visible evidence badges so only `verified_action` is called verified; preserve `synthetic_fixture`, `aggregate` and unknown labels**
+- [x] **Step 7: Show the held-interview confirmation control only after acceptance; show a confirmed outcome only after both parties confirm**
+- [x] **Step 8: Extract `signIn` and `currentUserId` to `frontend/tests/test-support.ts`, set Playwright `testMatch` to `**/*.spec.ts`, then run `cd frontend && npm run build` and the focused browser cases; expected: PASS with no TypeScript errors or console exceptions**
 - [ ] **Step 9: Commit the core candidate/employer UI state repair after build and focused E2E pass**
+
+Task 3 RED/GREEN evidence and remaining caveats: [Task 3 verification report](../reports/2026-10-07-signal-task-3-report.md).
 
 ### Task 4: Close and verify the core flow
 

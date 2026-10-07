@@ -211,6 +211,12 @@ def test_interview_is_counted_only_after_both_parties_confirm():
         candidate_confirmation = candidate.post(confirmation_url, headers=csrf(candidate))
         assert candidate_confirmation.status_code == 200, candidate_confirmation.text
         assert held_event_count() == 0
+        candidate_status = candidate.get("/api/v1/candidate/invitations").json()[0]
+        employer_status = employer.get("/api/v1/employer/invitations").json()[0]
+        assert candidate_status["candidate_interview_confirmed"] is True
+        assert candidate_status["employer_interview_confirmed"] is False
+        assert employer_status["candidate_interview_confirmed"] is True
+        assert employer_status["employer_interview_confirmed"] is False
 
         repeated_candidate_confirmation = candidate.post(confirmation_url, headers=csrf(candidate))
         assert repeated_candidate_confirmation.status_code == 200, repeated_candidate_confirmation.text
@@ -219,6 +225,12 @@ def test_interview_is_counted_only_after_both_parties_confirm():
         employer_confirmation = employer.post(confirmation_url, headers=csrf(employer))
         assert employer_confirmation.status_code == 200, employer_confirmation.text
         assert held_event_count() == 1
+        candidate_status = candidate.get("/api/v1/candidate/invitations").json()[0]
+        employer_status = employer.get("/api/v1/employer/invitations").json()[0]
+        assert candidate_status["candidate_interview_confirmed"] is True
+        assert candidate_status["employer_interview_confirmed"] is True
+        assert employer_status["candidate_interview_confirmed"] is True
+        assert employer_status["employer_interview_confirmed"] is True
         assert employer.post(confirmation_url, headers=csrf(employer)).status_code == 200
         assert candidate.post(confirmation_url, headers=csrf(candidate)).status_code == 200
         assert held_event_count() == 1

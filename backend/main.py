@@ -104,7 +104,9 @@ def invitation_data(invite: Invitation) -> dict:
             "evidence_refs": invite.evidence_refs or [],
             "explanation_snapshot": invite.explanation_snapshot,
             "state_version": invite.state_version,
-            "response_due_at": invite.response_due_at.isoformat() if invite.response_due_at else None}
+            "response_due_at": invite.response_due_at.isoformat() if invite.response_due_at else None,
+            "candidate_interview_confirmed": invite.candidate_interview_confirmed_at is not None,
+            "employer_interview_confirmed": invite.employer_interview_confirmed_at is not None}
 
 
 def invitation_compatibility(db: Session, profile: CandidateProfile | None, invite: Invitation):

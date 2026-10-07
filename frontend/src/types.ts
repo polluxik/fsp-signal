@@ -14,6 +14,7 @@ export type AchievementStory = {
 
 export type Profile = {
   id?: string
+  preferences_version?: number
   full_name: string
   contact_email: string
   contact_phone: string
@@ -27,6 +28,7 @@ export type Profile = {
   consent_processing: boolean
   published: boolean
   available: boolean
+  adult_hiring_confirmed?: boolean
   verified_specialization?: string | null
   verified_grade?: string | null
   test_score?: number | null
@@ -245,4 +247,6 @@ export type Invite = {
   compatibility?: CompatibilityReport | null
   state_version?: number
   response_due_at?: string | null
+  candidate_interview_confirmed: boolean
+  employer_interview_confirmed: boolean
 }

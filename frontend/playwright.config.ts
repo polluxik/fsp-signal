@@ -25,7 +25,7 @@ process.env.FSP_SIGNAL_E2E_ARTIFACTS = artifactsPath
 
 export default defineConfig({
   testDir: './tests',
-  testMatch: '**/core-flow.spec.ts',
+  testMatch: '**/*.spec.ts',
   fullyParallel: false,
   workers: 1,
   retries: 0,

@@ -452,6 +452,8 @@ class InvitationOut(BaseModel):
     state_version: int = 1
     response_due_at: datetime | None = None
     compatibility: CompatibilityReport | None = None
+    candidate_interview_confirmed: bool
+    employer_interview_confirmed: bool
 
 
 class InterviewHeldConfirmationOut(BaseModel):

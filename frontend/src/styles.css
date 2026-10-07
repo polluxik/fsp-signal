@@ -129,3 +129,11 @@ button:disabled{cursor:not-allowed}
 @media(max-width:1050px){.role-editor-grid{grid-template-columns:minmax(0,1fr)}.role-preview{position:static}.role-preview .role-card{max-width:none}}
 @media(max-width:620px){.preferences-panel,.role-editor,.invitation-review{padding:19px}.role-details-grid{grid-template-columns:1fr;gap:0}.interview-step-row{grid-template-columns:minmax(0,1fr) 82px}.remove-step{grid-column:1/-1;justify-self:start}.preference-submit{align-items:flex-start;flex-direction:column}.role-card{padding:17px}.role-facts{grid-template-columns:1fr 1fr}.invitation-review{max-height:96dvh}.selectable-evidence .section-title{align-items:flex-start}}
 @media(prefers-reduced-motion:reduce){.skeleton-line{animation:none}.primary,.button{transition:none}}
+.candidate-signals{display:grid;grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:8px;margin:10px 0 13px}
+.candidate-signals>div{display:flex;flex-direction:column;justify-content:space-between;gap:4px;min-width:0;border:1px solid #ebe5f0;border-radius:10px;background:#fcfbfd;padding:9px 10px}
+.candidate-signals span{font-size:.68rem;line-height:1.35;color:#766b80}
+.candidate-signals strong{font-size:.88rem;line-height:1.35;color:#41324d}
+.unknown-match-data{padding:9px 11px;border-left:3px solid #b9a4c8;background:#f8f5fa;border-radius:0 8px 8px 0;line-height:1.5}
+.interview-confirmation{border-top:1px solid #eee7f3;margin:12px 0;padding-top:12px}
+.interview-confirmation>div>p{margin-top:0;line-height:1.5}
+.interview-confirmation .notice{margin:0}
