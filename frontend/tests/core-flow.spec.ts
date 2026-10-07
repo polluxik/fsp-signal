@@ -34,9 +34,12 @@ test('candidate discovers roles, saves and hides them, then restores with undo',
   await expect(candidate.locator('[data-testid="discovery-role"]')).toHaveCount(5)
   await expect(candidate.getByText('Нужно уточнить условия').first()).toBeVisible()
   await candidate.getByRole('button', { name: 'Показать ещё 5' }).click()
-  await expect(candidate.locator('[data-testid="discovery-role"]')).toHaveCount(6)
+  const discoveryRoles = candidate.locator('[data-testid="discovery-role"]')
+  await expect(discoveryRoles).toHaveCount(10)
+  await expect(discoveryRoles.filter({ hasText: 'QA Junior: качество пользовательских сценариев' })).toBeVisible()
+  await expect(discoveryRoles.filter({ hasText: 'Аналитик данных Junior: SQL и качество витрин' })).toBeVisible()
 
-  const savedRole = candidate.locator('[data-testid="discovery-role"]')
+  const savedRole = discoveryRoles
     .filter({ hasText: 'Frontend Middle: надёжные сценарии' })
   const bumpedPreferences = await candidate.evaluate(async () => {
     const current = await fetch('/api/v1/candidate/preferences').then(response => response.json())
@@ -239,9 +242,18 @@ test('role facts, selected evidence, explicit acceptance, and pair-scoped contac
   await expect.soft(targetCard.getByText(/Соответствие роли/)).toBeVisible({ timeout: 500 })
   await expect.soft(targetCard.getByText(/Результат теста/)).toBeVisible({ timeout: 500 })
   await expect.soft(targetCard.getByText(/Охват доказательствами/)).toBeVisible({ timeout: 500 })
-  const unknownMatchComponents = Object.values(target.match?.components ?? {}).filter(value => value == null)
+  const unknownMatchComponents = Object.entries(target.match?.components ?? {})
+    .filter(([, value]) => value == null)
+    .map(([name]) => name)
   if (unknownMatchComponents.length > 0) {
-    await expect.soft(targetCard.getByText(/Нет данных по компетенциям/)).toBeVisible({ timeout: 500 })
+    const unknownData = targetCard.locator('.unknown-match-data')
+    await expect.soft(unknownData).toBeVisible({ timeout: 500 })
+    const labels: Record<string, string> = {
+      competencies: 'компетенциям', assessment: 'результату теста', text: 'содержанию роли',
+    }
+    for (const component of unknownMatchComponents) {
+      await expect.soft(unknownData).toContainText(labels[component] ?? component, { timeout: 500 })
+    }
   }
   const alternate = snapshot.results.find((item: { id: string }) => item.id !== candidateId)
   if (!alternate) throw new Error('Expected another candidate in the search results to exercise the evidence request race')
@@ -315,7 +327,8 @@ test('role facts, selected evidence, explicit acceptance, and pair-scoped contac
       } else await route.continue()
     })
     await employerPage.getByRole('button', { name: 'Сохранить компанию' }).click()
-    await expect.soft(employerPage.getByRole('alert')).toContainText('COMPANY_SAVE_FAILED', { timeout: 500 })
+    await expect.soft(employerPage.getByRole('alert')).toContainText('Сервис временно недоступен', { timeout: 500 })
+    await expect.soft(employerPage.getByRole('alert')).not.toContainText('COMPANY_SAVE_FAILED', { timeout: 500 })
     await expect(companyName).toHaveValue(savedCompanyName)
     await expect(employerPage.getByRole('button', { name: 'Вернуться к приглашению' })).toBeVisible()
     await employerPage.unroute('**/api/v1/employer/company')

@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
+from .taxonomy import get_category
 
 
 class RegisterIn(BaseModel):
@@ -63,6 +64,21 @@ class EmployerIn(BaseModel):
     contact_email: str = Field(min_length=5, max_length=254)
 
 
+class TaxonomyCompetencyOut(BaseModel):
+    id: str
+    label: str
+
+
+class TaxonomyCategoryOut(BaseModel):
+    id: str
+    specialization: Literal["backend", "frontend", "qa", "data_analyst"]
+    grade: str
+    label: str
+    blueprint_version: str
+    available: bool
+    competencies: list[TaxonomyCompetencyOut]
+
+
 class NeedIn(BaseModel):
     title: str = Field(min_length=3, max_length=180)
     description: str = Field(min_length=10, max_length=5000)
@@ -91,7 +107,7 @@ class InterviewStepIn(BaseModel):
 class RoleCardIn(BaseModel):
     title: str = Field(min_length=3, max_length=180)
     description: str = Field(min_length=10, max_length=2000)
-    specialization: Literal["backend", "frontend"]
+    specialization: str
     grade: Literal["junior", "middle"]
     competencies: list[str] = Field(min_length=1, max_length=12)
     stack: list[str] = Field(default_factory=list, max_length=20)
@@ -135,6 +151,12 @@ class RoleCardIn(BaseModel):
 
     @model_validator(mode="after")
     def check_role_terms(self):
+        category = get_category(self.specialization, self.grade)
+        if category is None:
+            raise ValueError("unsupported role category")
+        allowed_competencies = {item.id for item in category.competencies}
+        if not set(self.competencies).issubset(allowed_competencies):
+            raise ValueError("competencies must belong to the selected role category")
         if self.salary_max_rub < self.salary_min_rub:
             raise ValueError("salary_max_rub must be >= salary_min_rub")
         if not self.competencies:
@@ -187,7 +209,7 @@ class RoleCardOut(BaseModel):
 class CandidateRoleCard(BaseModel):
     title: str
     description: str
-    specialization: Literal["backend", "frontend"]
+    specialization: Literal["backend", "frontend", "qa", "data_analyst"]
     grade: Literal["junior", "middle"]
     competencies: list[str]
     stack: list[str]
@@ -206,6 +228,7 @@ class RoleDecisionIn(BaseModel):
     action: Literal["saved", "hidden", "none"]
     expected_role_version: str = Field(min_length=36, max_length=36)
     expected_preferences_version: int = Field(ge=1)
+    source_campaign_id: str | None = Field(default=None, min_length=36, max_length=36)
 
 
 class RoleDecisionOut(BaseModel):
@@ -293,11 +316,31 @@ class CandidateRoleFeedItem(BaseModel):
     decision: Literal["saved", "hidden", "none"] = "none"
 
 
+class SponsoredCandidateRoleFeedItem(CandidateRoleFeedItem):
+    campaign_id: str
+    sponsor_label: Literal["Продвигаемая роль"] = "Продвигаемая роль"
+
+
 class RoleFeedOut(BaseModel):
     items: list[CandidateRoleFeedItem]
+    sponsored_items: list[SponsoredCandidateRoleFeedItem] = Field(default_factory=list)
     next_cursor: str | None = None
     limit: int
     empty_state: Literal["no_active_roles", "no_compatible_roles", "no_saved_roles"] | None = None
+
+
+class DemoPromotionOut(BaseModel):
+    id: str
+    need_id: str
+    role_version_id: str
+    active_from: datetime
+    active_until: datetime
+    demo_only: Literal[True] = True
+    revenue_rub: Literal[0] = 0
+
+
+class SponsoredImpressionOut(BaseModel):
+    recorded: bool = True
 
 
 class AccessChangeResult(BaseModel):
@@ -465,3 +508,97 @@ class InterviewHeldConfirmationOut(BaseModel):
 
 class FspLinkIn(BaseModel):
     participant_id: str = Field(min_length=5, max_length=80)
+
+
+class AssistantDraftIn(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    text: str = Field(min_length=1, max_length=2000)
+    external_ai_consent: bool
+
+    @field_validator("text", mode="before")
+    @classmethod
+    def trim_assistant_input(cls, value: str):
+        return value.strip() if isinstance(value, str) else value
+
+
+class CandidatePreferencesDraft(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    salary_min_rub: int | None = Field(default=None, ge=1)
+    allowed_work_formats: list[Literal["remote", "hybrid", "office"]] = Field(default_factory=list, max_length=3)
+    allowed_cities: list[str] = Field(default_factory=list, max_length=20)
+    excluded_industries: list[str] = Field(default_factory=list, max_length=20)
+    preferred_stack: list[str] = Field(default_factory=list, max_length=30)
+    preferred_tasks: list[str] = Field(default_factory=list, max_length=30)
+    max_take_home_minutes: int | None = Field(default=None, ge=0, le=240)
+    missing_fields: list[Literal[
+        "salary_min_rub", "allowed_work_formats", "allowed_cities", "excluded_industries",
+        "preferred_stack", "preferred_tasks", "max_take_home_minutes",
+    ]] = Field(default_factory=list, max_length=7)
+    follow_up_questions: list[str] = Field(default_factory=list, max_length=5)
+
+
+class CandidateAchievementDraft(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    title: str = Field(default="", max_length=120)
+    context: str = Field(default="", max_length=700)
+    personal_contribution: str = Field(default="", max_length=700)
+    decision: str = Field(default="", max_length=700)
+    result: str = Field(default="", max_length=700)
+    result_scope: Literal["individual", "team"] | None = None
+    basis: str = Field(default="", max_length=500)
+    missing_fields: list[Literal[
+        "context", "personal_contribution", "decision", "result", "result_scope", "basis",
+    ]] = Field(default_factory=list, max_length=6)
+    follow_up_questions: list[str] = Field(default_factory=list, max_length=5)
+
+
+class AssistantInterviewStepDraft(InterviewStepIn):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+
+class EmployerRoleDraft(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    title: str | None = Field(default=None, max_length=180)
+    description: str | None = Field(default=None, max_length=2000)
+    specialization: Literal["backend", "frontend", "qa", "data_analyst"] | None = None
+    grade: Literal["junior", "middle"] | None = None
+    competencies: list[str] = Field(default_factory=list, max_length=12)
+    stack: list[str] = Field(default_factory=list, max_length=20)
+    salary_min_rub: int | None = Field(default=None, gt=0)
+    salary_max_rub: int | None = Field(default=None, gt=0)
+    work_format: Literal["remote", "hybrid", "office"] | None = None
+    work_city: str | None = Field(default=None, max_length=120)
+    industry: str | None = Field(default=None, max_length=120)
+    first_30_days: str | None = Field(default=None, max_length=2000)
+    interview_steps: list[AssistantInterviewStepDraft] = Field(default_factory=list, max_length=5)
+    take_home_minutes: int | None = Field(default=None, ge=0, le=240)
+    response_sla_hours: Literal[24, 48, 72] | None = None
+    missing_fields: list[Literal[
+        "title", "description", "specialization", "grade", "competencies", "stack",
+        "salary_min_rub", "salary_max_rub", "work_format", "work_city", "industry",
+        "first_30_days", "interview_steps", "take_home_minutes", "response_sla_hours",
+    ]] = Field(default_factory=list, max_length=15)
+    ambiguous_fields: list[Literal[
+        "title", "description", "specialization", "grade", "competencies", "stack",
+        "salary_min_rub", "salary_max_rub", "work_format", "work_city", "industry",
+        "first_30_days", "interview_steps", "take_home_minutes", "response_sla_hours",
+    ]] = Field(default_factory=list, max_length=15)
+    follow_up_questions: list[str] = Field(default_factory=list, max_length=5)
+
+    @model_validator(mode="after")
+    def validate_competency_category(self):
+        if not self.competencies:
+            return self
+        if self.specialization is None or self.grade is None:
+            raise ValueError("role category is required when competencies are proposed")
+        category = get_category(self.specialization, self.grade)
+        if category is None:
+            raise ValueError("unsupported role category")
+        allowed_competencies = {item.id for item in category.competencies}
+        if not set(self.competencies).issubset(allowed_competencies):
+            raise ValueError("competencies must belong to the selected role category")
+        return self

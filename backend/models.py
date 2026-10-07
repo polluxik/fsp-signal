@@ -32,6 +32,23 @@ class User(Base):
     )
 
 
+class AssistantUsage(Base):
+    """Privacy-minimal request accounting; drafts and prompts are never persisted."""
+
+    __tablename__ = "assistant_usage"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    intent: Mapped[str] = mapped_column(String(40), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, nullable=False)
+    __table_args__ = (
+        CheckConstraint(
+            "intent IN ('candidate_preferences','candidate_achievement','employer_role')",
+            name="assistant_usage_intent",
+        ),
+        Index("ix_assistant_usage_user_created", "user_id", "created_at"),
+    )
+
+
 class EmailToken(Base):
     __tablename__ = "email_tokens"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
@@ -138,6 +155,24 @@ class RoleVersion(Base):
         UniqueConstraint("need_id", "version", name="role_version_need_version"),
         CheckConstraint("version > 0", name="role_version_positive"),
         CheckConstraint("source IN ('employer_declared','legacy_import','synthetic_demo')", name="role_version_source"),
+    )
+
+
+class PromotionCampaign(Base):
+    """Time-bounded demo promotion, deliberately separate from matching and billing."""
+
+    __tablename__ = "promotion_campaigns"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    need_id: Mapped[str] = mapped_column(ForeignKey("hiring_needs.id"), nullable=False, index=True)
+    employer_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    role_version_id: Mapped[str] = mapped_column(ForeignKey("role_versions.id"), nullable=False, index=True)
+    active_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    active_until: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    demo_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=now)
+    __table_args__ = (
+        CheckConstraint("active_until > active_from", name="promotion_campaign_positive_duration"),
+        CheckConstraint("demo_only IS TRUE", name="promotion_campaign_demo_only"),
     )
 
 

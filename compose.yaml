@@ -1,3 +1,13 @@
+x-app-env: &app_env
+  APP_MODE: demo
+  DATABASE_URL: postgresql+psycopg://fsp:demo_change_before_real_deploy@db:5432/fsp_signal
+  PUBLIC_BASE_URL: http://127.0.0.1:${FSP_WEB_PORT:-8080}
+  SMTP_HOST: mailpit
+  SMTP_PORT: 1025
+  SMTP_FROM: demo@example.test
+  FSP_PROVIDER: mock
+  SESSION_SECURE: "false"
+
 services:
   db:
     image: postgres:17.11
@@ -16,15 +26,14 @@ services:
     build:
       context: .
       dockerfile: infra/Dockerfile.api
-    environment: &app_env
-      APP_MODE: demo
-      DATABASE_URL: postgresql+psycopg://fsp:demo_change_before_real_deploy@db:5432/fsp_signal
-      PUBLIC_BASE_URL: http://127.0.0.1:${FSP_WEB_PORT:-8080}
-      SMTP_HOST: mailpit
-      SMTP_PORT: 1025
-      SMTP_FROM: demo@example.test
-      FSP_PROVIDER: mock
-      SESSION_SECURE: "false"
+    environment:
+      <<: *app_env
+      FRONTIERAI_BASE_URL: ${FRONTIERAI_BASE_URL:-https://gateway.frontierai.ru/v1/chat/completions}
+      FRONTIERAI_MODEL: ${FRONTIERAI_MODEL:-qwen3.8-27b-4a100}
+      FRONTIERAI_API_KEY: ${FRONTIERAI_API_KEY:-}
+      AI_ASSISTANT_MAX_INPUT_CHARS: ${AI_ASSISTANT_MAX_INPUT_CHARS:-2000}
+      AI_ASSISTANT_MAX_OUTPUT_TOKENS: ${AI_ASSISTANT_MAX_OUTPUT_TOKENS:-800}
+      AI_ASSISTANT_TIMEOUT_SECONDS: ${AI_ASSISTANT_TIMEOUT_SECONDS:-30}
     depends_on:
       migrate:
         condition: service_completed_successfully

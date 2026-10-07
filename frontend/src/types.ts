@@ -78,7 +78,7 @@ export type InterviewStep = { title: string; duration_minutes: number }
 export type RoleCardPayload = {
   title: string
   description: string
-  specialization: 'backend' | 'frontend'
+  specialization: 'backend' | 'frontend' | 'qa' | 'data_analyst'
   grade: 'junior' | 'middle'
   competencies: string[]
   stack: string[]
@@ -133,12 +133,24 @@ export type CandidateRoleFeedItem = {
     compatibility_version: 'compat_v2'
   } | null
   decision: CandidateRoleDecision
+  campaign_id?: string
+  sponsor_label?: 'Продвигаемая роль'
 }
 export type CandidateRoleFeed = {
   items: CandidateRoleFeedItem[]
+  sponsored_items: (CandidateRoleFeedItem & { campaign_id: string; sponsor_label: 'Продвигаемая роль' })[]
   next_cursor: string | null
   limit: number
   empty_state: 'no_active_roles' | 'no_compatible_roles' | 'no_saved_roles' | null
+}
+export type DemoPromotion = {
+  id: string
+  need_id: string
+  role_version_id: string
+  active_from: string
+  active_until: string
+  demo_only: true
+  revenue_rub: 0
 }
 export type CandidateRoleDecisionResult = {
   need_id: string
@@ -219,6 +231,41 @@ export type CandidatePreferences = {
   max_take_home_minutes: number | null
   available: boolean
   adult_hiring_confirmed: boolean
+}
+
+export type AssistantPreferencesDraft = Pick<CandidatePreferences,
+  'salary_min_rub' | 'allowed_work_formats' | 'allowed_cities' | 'excluded_industries'
+  | 'preferred_stack' | 'preferred_tasks' | 'max_take_home_minutes'> & {
+  missing_fields: string[]
+  follow_up_questions: string[]
+}
+
+export type AssistantAchievementDraft = Pick<AchievementStory,
+  'title' | 'context' | 'personal_contribution' | 'decision' | 'result' | 'basis'> & {
+  result_scope: AchievementStory['result_scope'] | null
+  missing_fields: string[]
+  follow_up_questions: string[]
+}
+
+export type AssistantRoleDraft = {
+  title: string | null
+  description: string | null
+  specialization: 'backend' | 'frontend' | 'qa' | 'data_analyst' | null
+  grade: 'junior' | 'middle' | null
+  competencies: string[]
+  stack: string[]
+  salary_min_rub: number | null
+  salary_max_rub: number | null
+  work_format: 'remote' | 'hybrid' | 'office' | null
+  work_city: string | null
+  industry: string | null
+  first_30_days: string | null
+  interview_steps: InterviewStep[]
+  take_home_minutes: number | null
+  response_sla_hours: 24 | 48 | 72 | null
+  missing_fields: string[]
+  ambiguous_fields: string[]
+  follow_up_questions: string[]
 }
 
 export type Invite = {

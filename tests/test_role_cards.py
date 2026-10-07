@@ -48,6 +48,15 @@ def test_role_card_requires_city_for_onsite_and_concrete_publication_terms():
         RoleCardIn.model_validate(role_payload(employer_contact="not-an-email"))
 
 
+def test_role_card_rejects_unknown_specialization_and_cross_category_competencies():
+    with pytest.raises(ValidationError):
+        RoleCardIn.model_validate(role_payload(specialization="devops"))
+    with pytest.raises(ValidationError):
+        RoleCardIn.model_validate(role_payload(
+            specialization="qa", grade="junior", competencies=["event_idempotency"],
+        ))
+
+
 def test_terms_hash_is_stable_and_ignores_non_terms_metadata():
     card = RoleCardIn.model_validate(role_payload())
     changed_metadata = card.model_dump(mode="json") | {
@@ -58,6 +67,62 @@ def test_terms_hash_is_stable_and_ignores_non_terms_metadata():
     assert terms_hash(card.model_dump(mode="json") | {"salary_max_rub": 240000}) != terms_hash(
         card.model_dump(mode="json")
     )
+
+
+def test_role_api_accepts_each_new_catalog_category_and_rejects_unknown_category():
+    from backend.main import app
+
+    with TestClient(app) as employer:
+        register_verified(employer, "new-category-role-owner@example.test", "employer")
+        company = employer.put("/api/v1/employer/company", json={
+            "company_name": "Команда каталога", "description": "", "industry": "ИТ",
+            "contact_email": "team@example.test",
+        }, headers=csrf(employer))
+        assert company.status_code == 200, company.text
+
+        for specialization, grade, competency in (
+            ("qa", "junior", "test_design"),
+            ("qa", "middle", "risk_based_testing"),
+            ("data_analyst", "junior", "sql_querying"),
+            ("data_analyst", "middle", "experiment_analysis"),
+        ):
+            need = employer.post("/api/v1/employer/needs", json={
+                "title": f"{specialization} {grade} роль", "description": "Проверяем роль новой категории",
+                "specialization": specialization, "grade": grade, "competencies": [competency],
+                "stack": [], "salary_min_rub": 100000, "salary_max_rub": 250000,
+                "work_format": "remote",
+            }, headers=csrf(employer))
+            assert need.status_code == 201, need.text
+            version = employer.post(f"/api/v1/employer/needs/{need.json()['id']}/versions", json={
+                "expected_version": 1, "card": role_payload(
+                    title=f"{specialization} {grade} роль", specialization=specialization,
+                    grade=grade, competencies=[competency],
+                ),
+            }, headers=csrf(employer))
+            assert version.status_code == 201, version.text
+            assert version.json()["payload"]["specialization"] == specialization
+            assert version.json()["payload"]["competencies"] == [competency]
+
+        unsupported = employer.post("/api/v1/employer/needs", json={
+            "title": "DevOps роль", "description": "Категория пока не поддерживается",
+            "specialization": "devops", "grade": "middle", "competencies": ["linux"],
+            "stack": [], "salary_min_rub": 100000, "salary_max_rub": 250000,
+            "work_format": "remote",
+        }, headers=csrf(employer))
+        assert unsupported.status_code == 422
+        assert unsupported.json()["detail"] == "UNSUPPORTED_CATEGORY"
+
+        for specialization, grade in (("devops", "middle"), ("qa", "senior")):
+            parsed = employer.post("/api/v1/employer/needs/parse", json={
+                "title": "Роль неподдерживаемой категории",
+                "description": "Проверка границ каталога для разбора вакансии",
+                "specialization": specialization, "grade": grade,
+                "competencies": [], "stack": [],
+                "salary_min_rub": 100000, "salary_max_rub": 250000,
+                "work_format": "remote",
+            }, headers=csrf(employer))
+            assert parsed.status_code == 422
+            assert parsed.json()["detail"] == "UNSUPPORTED_CATEGORY"
 
 
 def test_role_versions_are_immutable_and_stale_cas_has_no_side_effect():

@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../../api'
-import type { CandidatePreferences } from '../../types'
+import type { AssistantPreferencesDraft, CandidatePreferences } from '../../types'
+import AssistantPanel from '../assistant/AssistantPanel'
 
 const emptyPreferences: CandidatePreferences = {
   version: 1,
@@ -62,6 +63,19 @@ export default function PreferencesPanel({ onSaved }: { onSaved?: (value: Candid
     })
   }
 
+  function applyAssistantDraft(draft: AssistantPreferencesDraft) {
+    setPreferences(current => ({
+      ...current,
+      salary_min_rub: draft.salary_min_rub ?? current.salary_min_rub,
+      allowed_work_formats: draft.allowed_work_formats.length ? draft.allowed_work_formats : current.allowed_work_formats,
+      max_take_home_minutes: draft.max_take_home_minutes ?? current.max_take_home_minutes,
+    }))
+    if (draft.allowed_cities.length) setCities(joinList(draft.allowed_cities))
+    if (draft.excluded_industries.length) setIndustries(joinList(draft.excluded_industries))
+    if (draft.preferred_stack.length) setStack(joinList(draft.preferred_stack))
+    if (draft.preferred_tasks.length) setTasks(joinList(draft.preferred_tasks))
+  }
+
   async function reloadSaved() {
     setError('')
     try {
@@ -106,6 +120,8 @@ export default function PreferencesPanel({ onSaved }: { onSaved?: (value: Candid
       <span className="badge">Не видно работодателю</span>
     </div>
     <p className="muted preference-intro">Жёсткие условия исключают неподходящие роли. Работодатель не увидит вашу минимальную зарплату, причины отказа или список ограничений.</p>
+    <AssistantPanel intent="candidate_preferences" testId="assistant-candidate-preferences"
+      promptLabel="Что важно в работе?" onApply={applyAssistantDraft}/>
     {error && <div className="notice bad" role="alert">{error}{conflict && <button className="text-button" type="button" onClick={reloadSaved}>Загрузить сохранённую версию</button>}</div>}
     {feedback && <div className="notice good" role="status">{feedback}</div>}
     <form className="form-grid" onSubmit={save}>

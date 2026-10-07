@@ -13,16 +13,10 @@ from .schemas import (
     CompatibilityCheck, CompatibilityReport, CompatibilitySoftSignal, EvidenceGap,
     MatchExplanation, MatchResult, RoleCardIn,
 )
+from .taxonomy import competency_labels
 
 
-SKILL_NAMES = {
-    "data_trace": "Трассировка данных", "validation": "Валидация входа", "http_api": "HTTP API",
-    "event_idempotency": "Повторные события", "data_integrity": "Целостность данных",
-    "failure_recovery": "Обработка отказов", "javascript_trace": "JavaScript: выполнение",
-    "ui_state": "Состояние интерфейса", "forms": "Формы и доступность",
-    "request_races": "Гонки запросов", "derived_state": "Производное состояние",
-    "error_recovery": "Ошибки интерфейса",
-}
+SKILL_NAMES = competency_labels()
 
 ALIASES = {
     "повтор": "event_idempotency", "идемпотент": "event_idempotency",
@@ -31,12 +25,25 @@ ALIASES = {
     "javascript": "javascript_trace", "форм": "forms", "поиск": "request_races",
     "запрос": "request_races", "кеш": "derived_state", "ошиб": "error_recovery",
 }
+SPECIALIZATION_ALIASES = {
+    "qa": {
+        "тест": "test_design", "провер": "test_design", "баг": "bug_reporting",
+        "api": "api_testing", "риск": "risk_based_testing", "автотест": "automation_design",
+        "надёж": "reliability_testing", "надеж": "reliability_testing",
+    },
+    "data_analyst": {
+        "sql": "sql_querying", "запрос": "sql_querying", "качеств": "data_quality",
+        "метрик": "metric_definition", "эксперимент": "experiment_analysis",
+        "целост": "metric_integrity", "валид": "data_validation",
+    },
+}
 
 
 def suggest_competencies(description: str, specialization: str, grade: str) -> list[str]:
     allowed = set(COMPETENCIES.get(f"{specialization}:{grade}", []))
     lowered = description.lower()
-    found = {skill for stem, skill in ALIASES.items() if stem in lowered and skill in allowed}
+    aliases = ALIASES | SPECIALIZATION_ALIASES.get(specialization, {})
+    found = {skill for stem, skill in aliases.items() if stem in lowered and skill in allowed}
     return sorted(found)
 
 
@@ -280,7 +287,8 @@ def lexical_similarity_for_role(role: RoleCardIn, profile: CandidateProfile) -> 
 
 
 def _verified_competencies(profile: CandidateProfile, selected: list[str]) -> dict[str, float]:
-    if not profile.verified_attempt_id:
+    synthetic_fixture = profile.verification_source == "synthetic_fixture"
+    if not profile.verified_attempt_id and not synthetic_fixture:
         return {}
     values = profile.competencies or {}
     verified: dict[str, float] = {}
@@ -305,6 +313,9 @@ def explain_profile(profile: CandidateProfile, role: HiringNeed | RoleCardIn | d
     reasons: list[str] = []
     if (profile.verified_specialization, profile.verified_grade) == (specialization, grade):
         reasons.append(f"Подтверждена категория {specialization} {grade}.")
+    synthetic_fixture = profile.verification_source == "synthetic_fixture"
+    if synthetic_fixture:
+        reasons.append("Демо-оценки синтетические и не подтверждают навыки реального кандидата.")
     if isinstance(profile.test_score, int) and 0 <= profile.test_score <= 100:
         reasons.append(f"Результат профильного assessment: {profile.test_score}/100.")
     gaps: list[EvidenceGap] = []
@@ -322,8 +333,11 @@ def explain_profile(profile: CandidateProfile, role: HiringNeed | RoleCardIn | d
                 question="Обсудить ход решения и возможный способ проверки навыка.",
             ))
         else:
-            reasons.append(f"В assessment подтверждена компетенция «{label}» ({round(value * 100)}%).")
-    if not profile.verified_attempt_id and selected:
+            if synthetic_fixture:
+                reasons.append(f"В синтетическом демо-профиле указана компетенция «{label}» ({round(value * 100)}%).")
+            else:
+                reasons.append(f"В assessment подтверждена компетенция «{label}» ({round(value * 100)}%).")
+    if not profile.verified_attempt_id and not synthetic_fixture and selected:
         reasons.append("Нет данных по отдельным заданиям; компетенции остаются неизвестными, а не нулевыми.")
     return MatchExplanation(reasons=reasons, gaps=gaps)
 
@@ -371,6 +385,8 @@ def score_profile_v2(profile: CandidateProfile, role: RoleCardIn) -> MatchResult
     text_gaps = [
         (f"Пока нет данных по компетенции «{SKILL_NAMES.get(gap.competency, gap.competency)}»."
          if gap.status == "unknown" else
+         f"В синтетическом демо-профиле отмечено значение ниже порога по компетенции «{SKILL_NAMES.get(gap.competency, gap.competency)}»."
+         if profile.verification_source == "synthetic_fixture" else
          f"В подтверждённом assessment есть пробел по компетенции «{SKILL_NAMES.get(gap.competency, gap.competency)}».")
         for gap in explanation.gaps
     ]

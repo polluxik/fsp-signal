@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../../api'
-import type { Need, RoleCardOut, RoleCardPayload } from '../../types'
+import type { AssistantRoleDraft, DemoPromotion, Need, RoleCardOut, RoleCardPayload } from '../../types'
+import AssistantPanel from '../assistant/AssistantPanel'
 import RoleCard from './RoleCard'
 
 type StepDraft = { title: string; duration_minutes: string }
 type RoleDraft = {
   title: string
   description: string
-  specialization: 'backend' | 'frontend'
+  specialization: 'backend' | 'frontend' | 'qa' | 'data_analyst'
   grade: 'junior' | 'middle'
   competencies: string[]
   stack: string
@@ -36,6 +37,18 @@ const competencyOptions: Record<string, { id: string; label: string }[]> = {
   ],
   'frontend:middle': [
     { id: 'request_races', label: 'Гонки запросов' }, { id: 'derived_state', label: 'Производное состояние' }, { id: 'error_recovery', label: 'Восстановление после ошибок' },
+  ],
+  'qa:junior': [
+    { id: 'test_design', label: 'Проектирование проверок' }, { id: 'bug_reporting', label: 'Воспроизводимый баг-репорт' }, { id: 'api_testing', label: 'Проверка API' },
+  ],
+  'qa:middle': [
+    { id: 'risk_based_testing', label: 'Приоритизация рисков' }, { id: 'automation_design', label: 'Проектирование автотестов' }, { id: 'reliability_testing', label: 'Надёжность и отказоустойчивость' },
+  ],
+  'data_analyst:junior': [
+    { id: 'sql_querying', label: 'SQL-запросы' }, { id: 'data_quality', label: 'Качество данных' }, { id: 'metric_definition', label: 'Определение метрик' },
+  ],
+  'data_analyst:middle': [
+    { id: 'experiment_analysis', label: 'Анализ эксперимента' }, { id: 'metric_integrity', label: 'Целостность метрик' }, { id: 'data_validation', label: 'Валидация данных' },
   ],
 }
 
@@ -114,11 +127,14 @@ type Props = { need: Need; companyContact: string; onSaved: (card: RoleCardOut) 
 
 export default function RoleEditor({ need, companyContact, onSaved }: Props) {
   const [role, setRole] = useState<RoleCardOut | null>(null)
+  const [promotion, setPromotion] = useState<DemoPromotion | null>(null)
   const [draft, setDraft] = useState<RoleDraft>(() => newDraft(need, companyContact))
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
+  const [promotionError, setPromotionError] = useState('')
+  const [promotionBusy, setPromotionBusy] = useState(false)
   const [conflict, setConflict] = useState(false)
   const [loadRevision, setLoadRevision] = useState(0)
   const formRef = useRef<HTMLFormElement>(null)
@@ -128,6 +144,8 @@ export default function RoleEditor({ need, companyContact, onSaved }: Props) {
     setLoading(true)
     setError('')
     setConflict(false)
+    setPromotion(null)
+    setPromotionError('')
     api<RoleCardOut>(`/employer/needs/${need.id}/role-card`, 'GET', undefined, { signal: controller.signal })
       .then(card => {
         setRole(card)
@@ -135,6 +153,9 @@ export default function RoleEditor({ need, companyContact, onSaved }: Props) {
       })
       .catch((err: Error) => { if (err.name !== 'AbortError') setError(err.message) })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
+    api<DemoPromotion | null>(`/employer/needs/${need.id}/promotion/demo`, 'GET', undefined, { signal: controller.signal })
+      .then(setPromotion)
+      .catch((err: Error) => { if (err.name !== 'AbortError') setPromotionError(err.message) })
     return () => controller.abort()
   }, [need.id, companyContact, loadRevision])
 
@@ -160,6 +181,30 @@ export default function RoleEditor({ need, companyContact, onSaved }: Props) {
     setFeedback('')
   }
 
+  function applyAssistantDraft(value: AssistantRoleDraft) {
+    const classificationChanged = (value.specialization != null && value.specialization !== draft.specialization)
+      || (value.grade != null && value.grade !== draft.grade)
+    patch({
+      title: value.title ?? draft.title,
+      description: value.description ?? draft.description,
+      specialization: value.specialization ?? draft.specialization,
+      grade: value.grade ?? draft.grade,
+      competencies: value.competencies.length ? value.competencies : classificationChanged ? [] : draft.competencies,
+      stack: value.stack.length ? value.stack.join(', ') : draft.stack,
+      salary_min_rub: value.salary_min_rub == null ? draft.salary_min_rub : String(value.salary_min_rub),
+      salary_max_rub: value.salary_max_rub == null ? draft.salary_max_rub : String(value.salary_max_rub),
+      work_format: value.work_format ?? draft.work_format,
+      work_city: value.work_city ?? draft.work_city,
+      industry: value.industry ?? draft.industry,
+      first_30_days: value.first_30_days ?? draft.first_30_days,
+      interview_steps: value.interview_steps.length
+        ? value.interview_steps.map(step => ({ title: step.title, duration_minutes: String(step.duration_minutes) }))
+        : draft.interview_steps,
+      take_home_minutes: value.take_home_minutes == null ? draft.take_home_minutes : String(value.take_home_minutes),
+      response_sla_hours: value.response_sla_hours == null ? draft.response_sla_hours : String(value.response_sla_hours) as RoleDraft['response_sla_hours'],
+    })
+  }
+
   async function persist(): Promise<RoleCardOut> {
     if (!role || role.current_role_version < 1) throw new Error('Не найдена версия черновика роли.')
     if (draft.competencies.length === 0 || draft.interview_steps.length === 0) {
@@ -171,6 +216,7 @@ export default function RoleEditor({ need, companyContact, onSaved }: Props) {
     })
     setRole(saved)
     setDraft(draftFrom(saved.payload, need, companyContact))
+    setPromotion(null)
     onSaved(saved)
     return saved
   }
@@ -222,6 +268,7 @@ export default function RoleEditor({ need, companyContact, onSaved }: Props) {
       })
       setRole(result)
       onSaved(result)
+      void refreshPromotion()
       setFeedback(result.fresh ? 'Роль опубликована и подтверждена на ближайшие 14 дней.' : 'Статус роли обновлён.')
     } catch (err) {
       if (err instanceof ApiError && err.code === 'ROLE_VERSION_CONFLICT') {
@@ -243,6 +290,7 @@ export default function RoleEditor({ need, companyContact, onSaved }: Props) {
         expected_version: role.current_role_version,
       })
       setRole(result)
+      setPromotion(null)
       onSaved(result)
       setFeedback(action === 'pause' ? 'Роль поставлена на паузу.' : 'Роль закрыта.')
     } catch (err) {
@@ -252,6 +300,33 @@ export default function RoleEditor({ need, companyContact, onSaved }: Props) {
       }
       setError((err as Error).message)
     } finally { setBusy(false) }
+  }
+
+  async function refreshPromotion() {
+    try {
+      setPromotion(await api<DemoPromotion | null>(`/employer/needs/${need.id}/promotion/demo`))
+      setPromotionError('')
+    } catch (err) {
+      setPromotionError((err as Error).message)
+    }
+  }
+
+  async function activatePromotion() {
+    setPromotionBusy(true)
+    setPromotionError('')
+    setFeedback('')
+    try {
+      const active = await api<DemoPromotion>(`/employer/needs/${need.id}/promotion/demo`, 'POST')
+      setPromotion(active)
+      setFeedback('')
+    } catch (err) {
+      setPromotionError((err as Error).message)
+    } finally { setPromotionBusy(false) }
+  }
+
+  function promotionEndDate(value: string): string {
+    return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' })
+      .format(new Date(value))
   }
 
   if (loading) return <section className="card loading-panel" aria-busy="true"><div className="skeleton-line"/><div className="skeleton-line short"/><p className="muted">Загружаем сохранённые условия…</p></section>
@@ -264,9 +339,11 @@ export default function RoleEditor({ need, companyContact, onSaved }: Props) {
       {error && <div className="notice bad" role="alert">{error}{conflict && <button className="text-button" type="button" onClick={() => setLoadRevision(value => value + 1)}>Я понимаю: заменить черновик данными сервера</button>}</div>}
       {feedback && <div className="notice good" role="status">{feedback}</div>}
       {role?.missing_fields?.length ? <p className="field-error">Не заполнено: {role.missing_fields.join(', ')}</p> : null}
+      <AssistantPanel intent="employer_role" testId="assistant-employer-role"
+        promptLabel="Опишите роль своими словами" onApply={applyAssistantDraft}/>
       <form className="form-grid" ref={formRef} onSubmit={saveDraft}>
         <label>Название роли<input required minLength={3} maxLength={180} value={draft.title} onChange={event => patch({ title: event.target.value })}/></label>
-        <label>Направление<select value={draft.specialization} onChange={event => patch({ specialization: event.target.value as RoleDraft['specialization'], competencies: [] })}><option value="backend">Backend</option><option value="frontend">Frontend</option></select></label>
+        <label>Направление<select value={draft.specialization} onChange={event => patch({ specialization: event.target.value as RoleDraft['specialization'], competencies: [] })}><option value="backend">Backend</option><option value="frontend">Frontend</option><option value="qa">QA</option><option value="data_analyst">Аналитика данных</option></select></label>
         <label>Грейд<select value={draft.grade} onChange={event => patch({ grade: event.target.value as RoleDraft['grade'], competencies: [] })}><option value="junior">Junior</option><option value="middle">Middle</option></select></label>
         <label>Формат<select required value={draft.work_format} onChange={event => patch({ work_format: event.target.value as RoleDraft['work_format'] })}><option value="">Выберите формат</option><option value="remote">Удалённо</option><option value="hybrid">Гибрид</option><option value="office">Офис</option></select></label>
         {(draft.work_format === 'hybrid' || draft.work_format === 'office') && <label>Город<input required maxLength={120} value={draft.work_city} onChange={event => patch({ work_city: event.target.value })} placeholder="Город работы"/></label>}
@@ -303,6 +380,20 @@ export default function RoleEditor({ need, companyContact, onSaved }: Props) {
           {role?.publication_state === 'active' && <button className="button subtle" type="button" disabled={busy} onClick={() => changeState('pause')}>Пауза</button>}
           {role?.publication_state !== 'closed' && <button className="text-button" type="button" disabled={busy} onClick={() => changeState('close')}>Закрыть роль</button>}
         </div>
+        {role?.publication_state === 'active' && role.discoverable && role.fresh && <section className="full role-promotion-control" aria-label="Демо-продвижение вакансии">
+          <div>
+            <p className="eyebrow">ОТДЕЛЬНАЯ ПОЛКА · БЕЗ ВЛИЯНИЯ НА MATCHING</p>
+            {promotion
+              ? <p className="promotion-status" role="status">Демо-продвижение активно до {promotionEndDate(promotion.active_until)}. Оплаты нет, выручка — ₽0.</p>
+              : <p className="muted">Покажем актуальную роль в отдельном блоке подходящим кандидатам на 14 дней. На органическую выдачу и условия роли это не влияет.</p>}
+            <p className="promotion-no-charge">Демо — без оплаты</p>
+          </div>
+          {!promotion && <button className="button promotion-button" type="button" disabled={promotionBusy}
+            onClick={() => void activatePromotion()}>
+            {promotionBusy ? 'Включаем…' : 'Включить продвижение (демо)'}
+          </button>}
+          {promotionError && <p className="notice bad promotion-error" role="alert">{promotionError}</p>}
+        </section>}
       </form>
     </section>
     <aside className="role-preview"><p className="eyebrow">ТАК УСЛОВИЯ УВИДИТ КАНДИДАТ</p>

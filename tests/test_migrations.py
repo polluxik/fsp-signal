@@ -85,6 +85,12 @@ def test_upgrade_backfills_only_known_legacy_role_and_keeps_it_private():
         invitation = connection.execute("SELECT role_version_id FROM invitations WHERE id='invite-1'").fetchone()
         search = connection.execute("SELECT role_version_id FROM search_snapshots WHERE id='search-1'").fetchone()
         events = connection.execute("SELECT count(*) FROM product_events").fetchone()[0]
+        promotion_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(promotion_campaigns)").fetchall()
+        }
+        promotion_table_sql = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='promotion_campaigns'"
+        ).fetchone()[0]
         with pytest.raises(sqlite3.IntegrityError, match="role_versions_are_immutable"):
             connection.execute("UPDATE role_versions SET terms_hash=? WHERE id=?", ("0" * 64, role["id"]))
         with pytest.raises(sqlite3.IntegrityError, match="foreign key violation"):
@@ -118,6 +124,12 @@ def test_upgrade_backfills_only_known_legacy_role_and_keeps_it_private():
         assert invitation["role_version_id"] is None
         assert search["role_version_id"] is None
         assert events == 0
+        assert {
+            "id", "need_id", "employer_id", "role_version_id", "active_from", "active_until",
+            "demo_only", "created_at",
+        }.issubset(promotion_columns)
+        assert not {"price_rub", "revenue_rub", "charged_amount"}.intersection(promotion_columns)
+        assert "active_until > active_from" in promotion_table_sql
 
 
 def _legacy_invitation_database(database: Path, invitations: list[tuple[str, str]]) -> str:

@@ -51,3 +51,32 @@ def test_held_interview_event_is_allowlisted_and_deduplicated():
         assert replay.type == "interview_held"
         assert replay.payload == payload
         db.commit()
+
+
+def test_sponsored_impression_is_deduplicated_and_payload_rejects_private_data():
+    with SessionLocal() as db:
+        payload = {"role_version_id": "sponsored-role-version", "placement": "candidate_roles_shelf"}
+        event = write_product_event(
+            db, type="sponsored_role_impression", entity_type="promotion_campaign",
+            entity_id="sponsored-campaign-1", employer_id=None, actor_id=None,
+            dedupe_key="sponsored-impression-candidate-campaign-day",
+            data_mode="synthetic", payload=payload, at=now(),
+        )
+        replay = write_product_event(
+            db, type="sponsored_role_impression", entity_type="promotion_campaign",
+            entity_id="sponsored-campaign-1", employer_id=None, actor_id=None,
+            dedupe_key="sponsored-impression-candidate-campaign-day",
+            data_mode="synthetic", payload=payload, at=now(),
+        )
+        assert replay.id == event.id
+        with pytest.raises(ValueError, match="allowlisted"):
+            write_product_event(
+                db, type="sponsored_role_decision", entity_type="promotion_campaign",
+                entity_id="sponsored-campaign-1", employer_id=None, actor_id=None,
+                dedupe_key="sponsored-decision-private-data",
+                data_mode="synthetic",
+                payload={"role_version_id": "sponsored-role-version", "action": "saved",
+                         "email": "candidate@example.test"},
+                at=now(),
+            )
+        db.commit()

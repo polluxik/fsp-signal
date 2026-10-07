@@ -4,7 +4,7 @@ import pytest
 
 from backend.assessment import COMPETENCIES
 from backend.config import Settings
-from backend.matching import score_profile_v2
+from backend.matching import SKILL_NAMES, score_profile_v2, suggest_competencies
 from backend.models import CandidateProfile, now
 from backend.schemas import RoleCardIn
 
@@ -99,6 +99,21 @@ def test_missing_attempt_is_unknown_not_a_zero_competency_score(monkeypatch):
     assert any("неизвестными, а не нулевыми" in reason for reason in result.explanation.reasons)
 
 
+def test_synthetic_fixture_competencies_can_score_but_are_labeled_as_synthetic():
+    role = make_role("qa", "junior", competencies=["test_design"])
+    profile = make_profile(
+        "qa", "junior", verified_attempt_id=None, verification_source="synthetic_fixture",
+        test_score=82, competencies={"test_design": 0.8},
+    )
+
+    result = score_profile_v2(profile, role)
+
+    assert result.components == {"competencies": 0.8, "assessment": 0.82, "text": None}
+    assert result.evidence_coverage == 0.95
+    assert any("синтетическ" in reason.lower() for reason in result.explanation.reasons)
+    assert not any("подтверждена компетенция" in reason.lower() for reason in result.explanation.reasons)
+
+
 def test_text_component_does_not_borrow_unrelated_competency_evidence():
     selected, unrelated = COMPETENCIES["backend:middle"][:2]
     role = make_role(competencies=[selected])
@@ -142,6 +157,31 @@ def test_v2_scores_only_within_the_same_verified_category(specialization, grade,
     assert score_profile_v2(profile, same_specialization_other_grade).score is None
     other = make_role("frontend" if specialization == "backend" else "backend", grade)
     assert score_profile_v2(profile, other).score is None
+
+
+@pytest.mark.parametrize("specialization,grade", [
+    ("qa", "junior"), ("qa", "middle"),
+    ("data_analyst", "junior"), ("data_analyst", "middle"),
+])
+def test_new_categories_do_not_cross_match(specialization, grade):
+    profile = make_profile(specialization, grade)
+    same_category = make_role(specialization, grade)
+    other_specialization = "data_analyst" if specialization == "qa" else "qa"
+    different_category = make_role(other_specialization, grade)
+
+    assert score_profile_v2(profile, same_category).score is not None
+    assert score_profile_v2(profile, different_category).score is None
+
+
+def test_new_category_labels_and_role_competency_suggestions_are_catalog_backed():
+    assert SKILL_NAMES["test_design"] == "Проектирование проверок"
+    assert SKILL_NAMES["sql_querying"] == "SQL-запросы"
+    assert set(suggest_competencies("Нужны тест-дизайн, баг-репорт и API-проверки", "qa", "junior")) == {
+        "test_design", "bug_reporting", "api_testing",
+    }
+    assert set(suggest_competencies("SQL-запросы, качество данных и метрики", "data_analyst", "junior")) == {
+        "sql_querying", "data_quality", "metric_definition",
+    }
 
 
 def test_matching_algorithm_config_accepts_only_supported_versions(monkeypatch):

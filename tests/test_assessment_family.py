@@ -1,5 +1,6 @@
 """Behavioral tests for the deliberately narrow backend-middle assessment pilot."""
 
+from backend import assessment
 from backend.assessment import BLUEPRINT_VERSION, COMPETENCIES, grade_attempt, make_assessment
 
 
@@ -62,6 +63,7 @@ def test_saved_2026_1_attempt_remains_gradable_after_blueprint_upgrade():
     assert BLUEPRINT_VERSION == "2026.2"
     assert set(COMPETENCIES) == {
         "backend:junior", "backend:middle", "frontend:junior", "frontend:middle",
+        "qa:junior", "qa:middle", "data_analyst:junior", "data_analyst:middle",
     }
     score, passed, _, _ = _grade(legacy_questions, old_key, old_key)
     assert (score, passed) == (100, True)
@@ -106,3 +108,50 @@ def test_seeded_variants_keep_all_categories_complete_and_mutation_gated():
             incomplete_mutation = {key: value for key, value in answer_key.items()
                                    if key not in phase_two_ids}
             assert not _grade(questions, answer_key, incomplete_mutation)[1]
+
+
+def test_qa_and_data_analyst_tracks_have_versioned_complete_variants():
+    expected = {
+        "qa:junior": {"test_design", "bug_reporting", "api_testing"},
+        "qa:middle": {"risk_based_testing", "automation_design", "reliability_testing"},
+        "data_analyst:junior": {"sql_querying", "data_quality", "metric_definition"},
+        "data_analyst:middle": {"experiment_analysis", "metric_integrity", "data_validation"},
+    }
+    for category, competencies in expected.items():
+        specialization, grade = category.split(":")
+        assert set(COMPETENCIES[category]) == competencies
+        expected_version = (f"qa-{grade}-2026.1" if specialization == "qa"
+                            else f"data-analyst-{grade}-2026.1")
+        assert assessment.blueprint_version_for(specialization, grade) == expected_version
+        for seed in range(100):
+            questions, answer_key = make_assessment(specialization, grade, f"{seed:032x}")
+            if seed == 0:
+                repeated_questions, repeated_key = make_assessment(specialization, grade, f"{seed:032x}")
+                assert (questions, answer_key) == (repeated_questions, repeated_key)
+            assert sum(question["points"] for question in questions) == 100
+            assert {question["phase"] for question in questions} == {1, 2}
+            assert {question["competency"] for question in questions} == competencies
+            assert len({question["id"] for question in questions}) == len(questions)
+            assert _grade(questions, answer_key, answer_key)[:2] == (100, True)
+
+            for mutation in (question for question in questions if question["phase"] == 2):
+                wrong = dict(answer_key)
+                answer = answer_key[mutation["id"]]
+                wrong[mutation["id"]] = ({key: "__wrong__" for key in answer}
+                                          if isinstance(answer, dict) else "__wrong__")
+                assert not _grade(questions, answer_key, wrong)[1]
+
+
+def test_existing_2026_2_attempt_snapshot_remains_gradable():
+    questions, answer_key = make_assessment("backend", "middle", "a11ce")
+    assert BLUEPRINT_VERSION == "2026.2"
+    assert assessment.blueprint_version_for("backend", "middle") == "2026.2"
+    assert _grade(questions, answer_key, answer_key)[:2] == (100, True)
+
+
+def test_unsupported_category_fails_closed():
+    import pytest
+
+    for specialization, grade in (("unknown", "middle"), ("qa", "senior"), ("data_analyst", "intern")):
+        with pytest.raises(ValueError, match="unsupported category"):
+            make_assessment(specialization, grade, "a11ce")

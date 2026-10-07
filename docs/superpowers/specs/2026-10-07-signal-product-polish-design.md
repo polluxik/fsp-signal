@@ -1,6 +1,6 @@
 # Signal product polish: trustworthy matching, useful assistance, and complete UI flows
 
-Date: 7 October 2026. Branch: `codex/signal-product-polish`. Status: approved product direction; implementation has not started. This design extends [Signal v2](2026-10-05-signal-v2-design.md), the [product research](../../research/PRODUCT_RESEARCH.md), and the [FSP product requirements](../../PRODUCT_SPEC.md). The scope is intentionally broader than a visual restyle: it covers user-facing contracts, backend validation, tests, and live browser verification.
+Date: 7 October 2026. Branch: `codex/signal-product-polish`. Status: implemented and verified in the isolated worktree by the full current backend/browser suites and frontend production build. Browser coverage exercises the key candidate, employer, assistant, and sponsored-role flows; it is not an exhaustive audit of every control on every screen. This design extends [Signal v2](2026-10-05-signal-v2-design.md), the [product research](../../research/PRODUCT_RESEARCH.md), and the [FSP product requirements](../../PRODUCT_SPEC.md). The scope is intentionally broader than a visual restyle: it covers user-facing contracts, backend validation, tests, and live browser verification.
 
 ## 1. Product direction
 
@@ -36,7 +36,7 @@ Support `backend`, `frontend`, `qa`, and `data_analyst`, each at `junior` and `m
 
 QA and Data Analyst blueprints require role-specific tasks, rubrics, deterministic scoring/variants, competency thresholds and evidence generation. The system must not fall through to the Frontend Middle assessment for an unknown pair. Unsupported or not-yet-reviewed pairs are not offered as verified assessments. Tests must cover all eight pairs and preserve grading/evidence for existing blueprint versions.
 
-Expand the existing 48 synthetic candidate records to 72 by adding 12 synthetic profiles for each new category, with matching synthetic roles as needed for an end-to-end demo. Synthetic identities and evidence must be visibly and consistently marked; never imply that these are real or independently verified people. Preserve the current single active verified category and cooldown contract; do not imply simultaneous credentials across tracks.
+Expand the existing 48 synthetic candidate records to 96 by adding 12 synthetic profiles for each of the four new specialization/grade pairs (QA and Data Analyst at Junior and Middle), with matching synthetic roles. Synthetic identities and evidence must be visibly and consistently marked; never imply that these are real or independently verified people. Preserve the current single active verified category and cooldown contract; do not imply simultaneous credentials across tracks.
 
 ### 2.3. Add bounded AI-assisted drafting
 

@@ -15,12 +15,14 @@ from sqlalchemy.orm import Session
 from .config import settings
 from .domain_errors import DomainError
 from .matching import evaluate_compatibility
-from .models import (CandidateProfile, EmployerProfile, HiringNeed, RoleDecision,
-                     RoleVersion, User, now)
+from .models import (CandidateProfile, EmployerProfile, HiringNeed, PromotionCampaign,
+                     RoleDecision, RoleVersion, User, now)
 from .preferences import is_blocked, preferences_data
+from .product_events import product_event_data_mode, write_product_event
 from .role_cards import FRESHNESS, is_role_fresh, terms_hash
 from .schemas import (CandidateRoleCard, CandidateRoleFeedItem, CompatibilityReport,
-                      RoleDecisionOut, RoleFeedOut, RoleCardIn)
+                      RoleDecisionOut, RoleFeedOut, RoleCardIn,
+                      SponsoredCandidateRoleFeedItem)
 
 
 class RoleDiscoveryError(DomainError):
@@ -29,6 +31,7 @@ class RoleDiscoveryError(DomainError):
 
 RoleAction = Literal["saved", "hidden", "none"]
 _MAX_PAGE_SIZE = 20
+_MAX_SPONSORED_ITEMS = 3
 _EMAIL_PATTERN = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 _PHONE_PATTERNS = (
     re.compile(
@@ -119,6 +122,66 @@ def _company_name(company: EmployerProfile | None) -> str:
             else "Работодатель")
 
 
+def _candidate_feed_item(need: HiringNeed, version: RoleVersion, company: EmployerProfile | None,
+                         employer: User, profile: CandidateProfile | None,
+                         preferences: dict, decision_by_need: dict[str, RoleDecision],
+                         saved_only: bool, at: datetime) -> tuple[CandidateRoleFeedItem | None, bool]:
+    """Apply the ordinary candidate eligibility rules without scoring or ranking changes."""
+    if not need.confirmed_at or not is_role_fresh(need.confirmed_at, at):
+        return None, False
+    if profile and is_blocked(profile, employer.id):
+        return None, False
+    safe_role = _public_role(version.payload or {})
+    if not safe_role or version.terms_hash != terms_hash(version.payload or {}):
+        return None, False
+    company_name = _company_name(company)
+    if _contains_contact_details(safe_role, company_name):
+        return None, False
+
+    report: CompatibilityReport | None = None
+    match_state: Literal["compatible", "needs_clarification", "not_assessed"] = "not_assessed"
+    has_preference_match = False
+    if profile:
+        report = evaluate_compatibility(profile, safe_role.model_dump(mode="json"), mode="search",
+                                        role_version_id=version.id)
+        if report.status == "incompatible":
+            return None, False
+        has_preference_match = True
+        has_category = bool(profile.verified_specialization and profile.verified_grade)
+        if has_category:
+            same_category = (profile.verified_specialization, profile.verified_grade) == (
+                safe_role.specialization, safe_role.grade
+            )
+            match_state = report.status if same_category else "needs_clarification"
+        elif report.status == "needs_clarification":
+            match_state = "needs_clarification"
+        else:
+            report = None
+
+    stored_decision = decision_by_need.get(need.id)
+    action: RoleAction = "none"
+    if (stored_decision and stored_decision.role_version_id == version.id
+            and stored_decision.preferences_version == preferences["version"]
+            and stored_decision.action in ("saved", "hidden", "none")):
+        action = stored_decision.action
+    if action == "hidden" or (saved_only and action != "saved"):
+        return None, has_preference_match
+
+    return CandidateRoleFeedItem(
+        need_id=need.id,
+        role_version_id=version.id,
+        role_version=version.version,
+        company_name=company_name,
+        role=safe_role,
+        confirmed_at=need.confirmed_at,
+        preferences_version=preferences["version"],
+        data_mode=_data_mode(version, employer),
+        match_state=match_state,
+        compatibility=report,
+        decision=action,
+    ), has_preference_match
+
+
 def discover_roles(db: Session, candidate_id: str, cursor: str | None = None, limit: int = 5, *,
                    specialization: str | None = None, grade: str | None = None,
                    work_format: str | None = None, saved_only: bool = False) -> RoleFeedOut:
@@ -149,6 +212,59 @@ def discover_roles(db: Session, candidate_id: str, cursor: str | None = None, li
         base_query = base_query.where(RoleVersion.payload["work_format"].as_string() == work_format)
     profile = db.get(CandidateProfile, candidate_id)
     preferences = preferences_data(profile)
+    at = now()
+    sponsored_items: list[SponsoredCandidateRoleFeedItem] = []
+    sponsored_need_ids: set[str] = set()
+    if not saved_only:
+        sponsored_query = (
+            select(PromotionCampaign, HiringNeed, RoleVersion, EmployerProfile, User)
+            .join(HiringNeed, HiringNeed.id == PromotionCampaign.need_id)
+            .join(RoleVersion, and_(RoleVersion.id == PromotionCampaign.role_version_id,
+                                    RoleVersion.version == HiringNeed.current_role_version))
+            .join(User, User.id == HiringNeed.employer_id)
+            .outerjoin(EmployerProfile, EmployerProfile.user_id == HiringNeed.employer_id)
+            .where(PromotionCampaign.active_from <= at,
+                   PromotionCampaign.active_until > at,
+                   PromotionCampaign.demo_only.is_(True),
+                   PromotionCampaign.employer_id == HiringNeed.employer_id,
+                   HiringNeed.publication_state == "active",
+                   HiringNeed.discoverable.is_(True),
+                   HiringNeed.confirmed_at.is_not(None),
+                   HiringNeed.confirmed_at > at - FRESHNESS,
+                   User.role == "employer")
+        )
+        if specialization:
+            sponsored_query = sponsored_query.where(HiringNeed.specialization == specialization)
+        if grade:
+            sponsored_query = sponsored_query.where(HiringNeed.grade == grade)
+        if work_format:
+            sponsored_query = sponsored_query.where(RoleVersion.payload["work_format"].as_string() == work_format)
+        campaign_rows = db.execute(sponsored_query.order_by(
+            PromotionCampaign.active_from.desc(), PromotionCampaign.id.asc(),
+        )).all()
+        if campaign_rows:
+            campaign_decisions = db.scalars(select(RoleDecision).where(
+                RoleDecision.candidate_id == candidate_id,
+                RoleDecision.need_id.in_([need.id for _, need, *_ in campaign_rows]),
+            )).all()
+            decisions_by_need = {decision.need_id: decision for decision in campaign_decisions}
+            for campaign, need, version, company, employer in campaign_rows:
+                if need.id in sponsored_need_ids:
+                    continue
+                item, _ = _candidate_feed_item(
+                    need, version, company, employer, profile, preferences, decisions_by_need,
+                    saved_only=False, at=at,
+                )
+                if item is None:
+                    continue
+                sponsored_need_ids.add(need.id)
+                if not cursor:
+                    sponsored_items.append(SponsoredCandidateRoleFeedItem(
+                        **item.model_dump(), campaign_id=campaign.id,
+                    ))
+                if len(sponsored_need_ids) >= _MAX_SPONSORED_ITEMS:
+                    break
+
     page_size = max(50, limit + 1)
     scan_after = after
     evaluated: list[tuple[CandidateRoleFeedItem, datetime]] = []
@@ -179,59 +295,13 @@ def discover_roles(db: Session, candidate_id: str, cursor: str | None = None, li
             if not need.confirmed_at:
                 continue
             last_scanned = (need.confirmed_at, need.id)
-            if not is_role_fresh(need.confirmed_at, now()):
-                continue
-            if profile and is_blocked(profile, employer.id):
-                continue
-            safe_role = _public_role(version.payload or {})
-            if not safe_role or version.terms_hash != terms_hash(version.payload or {}):
-                continue
-            company_name = _company_name(company)
-            if _contains_contact_details(safe_role, company_name):
-                continue
-
-            report: CompatibilityReport | None = None
-            match_state: Literal["compatible", "needs_clarification", "not_assessed"] = "not_assessed"
-            if profile:
-                report = evaluate_compatibility(profile, safe_role.model_dump(mode="json"), mode="search",
-                                                role_version_id=version.id)
-                if report.status == "incompatible":
-                    continue
-                saw_preference_match = True
-                has_category = bool(profile.verified_specialization and profile.verified_grade)
-                if has_category:
-                    same_category = (profile.verified_specialization, profile.verified_grade) == (
-                        safe_role.specialization, safe_role.grade
-                    )
-                    match_state = report.status if same_category else "needs_clarification"
-                else:
-                    if report.status == "needs_clarification":
-                        match_state = "needs_clarification"
-                    else:
-                        report = None
-
-            stored_decision = decision_by_need.get(need.id)
-            action: RoleAction = "none"
-            if (stored_decision and stored_decision.role_version_id == version.id
-                    and stored_decision.preferences_version == preferences["version"]
-                    and stored_decision.action in ("saved", "hidden", "none")):
-                action = stored_decision.action
-            if action == "hidden" or (saved_only and action != "saved"):
-                continue
-
-            item = CandidateRoleFeedItem(
-                need_id=need.id,
-                role_version_id=version.id,
-                role_version=version.version,
-                company_name=company_name,
-                role=safe_role,
-                confirmed_at=need.confirmed_at,
-                preferences_version=preferences["version"],
-                data_mode=_data_mode(version, employer),
-                match_state=match_state,
-                compatibility=report,
-                decision=action,
+            item, matched_preferences = _candidate_feed_item(
+                need, version, company, employer, profile, preferences, decision_by_need,
+                saved_only=saved_only, at=at,
             )
+            saw_preference_match = saw_preference_match or matched_preferences
+            if item is None:
+                continue
             evaluated.append((item, need.confirmed_at))
             if len(evaluated) > limit:
                 has_more = True
@@ -241,23 +311,26 @@ def discover_roles(db: Session, candidate_id: str, cursor: str | None = None, li
             break
         scan_after = last_scanned
 
-    page = evaluated[:limit]
+    ranked_page = evaluated[:limit]
+    page = [row for row in ranked_page if row[0].need_id not in sponsored_need_ids]
     next_cursor = None
-    if has_more and page:
-        last_item, last_confirmed_at = page[-1]
+    if has_more and ranked_page:
+        # Cursor follows the unchanged organic ranking window, including any role
+        # moved into the separate sponsored shelf, so later pages do not skip jobs.
+        last_item, last_confirmed_at = ranked_page[-1]
         next_cursor = _encode_cursor(last_confirmed_at, last_item.need_id, fingerprint)
     empty_state = None
-    if not page:
+    if not page and not sponsored_items:
         empty_state = ("no_saved_roles" if saved_only else
                        "no_compatible_roles" if profile and saw_role and not saw_preference_match
                        else "no_active_roles")
-    return RoleFeedOut(items=[item for item, _ in page], next_cursor=next_cursor, limit=limit,
-                       empty_state=empty_state)
+    return RoleFeedOut(items=[item for item, _ in page], sponsored_items=sponsored_items,
+                       next_cursor=next_cursor, limit=limit, empty_state=empty_state)
 
 
 def save_role_decision(db: Session, candidate_id: str, need_id: str, action: RoleAction,
                        expected_role_version: str, expected_preferences_version: int,
-                       at: datetime) -> RoleDecisionOut:
+                       at: datetime, source_campaign_id: str | None = None) -> RoleDecisionOut:
     candidate = db.get(User, candidate_id)
     if not candidate or candidate.role != "candidate":
         raise RoleDiscoveryError("NOT_FOUND", 404)
@@ -294,6 +367,20 @@ def save_role_decision(db: Session, candidate_id: str, need_id: str, action: Rol
     ).status == "incompatible":
         raise RoleDiscoveryError("ROLE_NOT_AVAILABLE", 409)
 
+    source_campaign = None
+    if source_campaign_id:
+        source_campaign = db.scalar(select(PromotionCampaign).where(
+            PromotionCampaign.id == source_campaign_id,
+            PromotionCampaign.need_id == need_id,
+            PromotionCampaign.employer_id == employer.id,
+            PromotionCampaign.role_version_id == version.id,
+            PromotionCampaign.active_from <= at,
+            PromotionCampaign.active_until > at,
+            PromotionCampaign.demo_only.is_(True),
+        ))
+        if source_campaign is None:
+            raise RoleDiscoveryError("PROMOTION_NOT_AVAILABLE", 409)
+
     decision = db.scalar(select(RoleDecision).where(
         RoleDecision.candidate_id == candidate_id,
         RoleDecision.need_id == need_id,
@@ -314,10 +401,71 @@ def save_role_decision(db: Session, candidate_id: str, need_id: str, action: Rol
         decision.preferences_version = preferences["version"]
         decision.updated_at = at
     db.flush()
+    if source_campaign:
+        write_product_event(
+            db, type="sponsored_role_decision", entity_type="promotion_campaign",
+            entity_id=source_campaign.id, employer_id=employer.id, actor_id=candidate_id,
+            dedupe_key=f"sponsored:decision:{candidate_id}:{source_campaign.id}:{at.isoformat()}",
+            data_mode=product_event_data_mode(settings.app_mode, candidate, employer),
+            payload={"role_version_id": version.id, "action": action}, at=at,
+        )
     return RoleDecisionOut(
         need_id=need_id,
         action=action,
         role_version_id=version.id,
         preferences_version=preferences["version"],
         updated_at=at,
+    )
+
+
+def record_sponsored_impression(db: Session, candidate_id: str, campaign_id: str,
+                                at: datetime) -> None:
+    candidate = db.get(User, candidate_id)
+    if not candidate or candidate.role != "candidate":
+        raise RoleDiscoveryError("NOT_FOUND", 404)
+    campaign = db.scalar(select(PromotionCampaign).where(
+        PromotionCampaign.id == campaign_id,
+        PromotionCampaign.active_from <= at,
+        PromotionCampaign.active_until > at,
+        PromotionCampaign.demo_only.is_(True),
+    ))
+    if campaign is None:
+        raise RoleDiscoveryError("PROMOTION_NOT_AVAILABLE", 404)
+    need = db.get(HiringNeed, campaign.need_id)
+    employer = db.get(User, campaign.employer_id)
+    if (need is None or employer is None or employer.role != "employer"
+            or need.employer_id != employer.id or need.publication_state != "active"
+            or not need.discoverable or not is_role_fresh(need.confirmed_at, at)):
+        raise RoleDiscoveryError("PROMOTION_NOT_AVAILABLE", 404)
+    version = db.get(RoleVersion, campaign.role_version_id)
+    if (version is None or version.need_id != need.id
+            or version.version != need.current_role_version
+            or version.terms_hash != terms_hash(version.payload or {})):
+        raise RoleDiscoveryError("PROMOTION_NOT_AVAILABLE", 404)
+    safe_role = _public_role(version.payload or {})
+    company = db.get(EmployerProfile, employer.id)
+    if not safe_role or _contains_contact_details(safe_role, _company_name(company)):
+        raise RoleDiscoveryError("PROMOTION_NOT_AVAILABLE", 404)
+    profile = db.get(CandidateProfile, candidate_id)
+    if profile and is_blocked(profile, employer.id):
+        raise RoleDiscoveryError("PROMOTION_NOT_AVAILABLE", 404)
+    if profile and evaluate_compatibility(
+        profile, safe_role.model_dump(mode="json"), mode="search", role_version_id=version.id,
+    ).status == "incompatible":
+        raise RoleDiscoveryError("PROMOTION_NOT_AVAILABLE", 404)
+    preferences = preferences_data(profile)
+    decision = db.scalar(select(RoleDecision).where(
+        RoleDecision.candidate_id == candidate_id,
+        RoleDecision.need_id == need.id,
+    ))
+    if (decision and decision.role_version_id == version.id
+            and decision.preferences_version == preferences["version"]
+            and decision.action == "hidden"):
+        raise RoleDiscoveryError("PROMOTION_NOT_AVAILABLE", 404)
+    write_product_event(
+        db, type="sponsored_role_impression", entity_type="promotion_campaign",
+        entity_id=campaign.id, employer_id=employer.id, actor_id=candidate_id,
+        dedupe_key=f"sponsored:impression:{candidate_id}:{campaign.id}:{at.date().isoformat()}",
+        data_mode=product_event_data_mode(settings.app_mode, candidate, employer),
+        payload={"role_version_id": version.id, "placement": "candidate_roles_shelf"}, at=at,
     )

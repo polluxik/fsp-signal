@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { api, ApiError, uploadResume } from './api'
-import type { AchievementStory, AnswerValue, Attempt, Candidate, EvidenceCard, Invite, Need,
+import type { AchievementStory, AnswerValue, AssistantAchievementDraft, Attempt, Candidate, EvidenceCard, Invite, Need,
   Profile, RoleCardOut, Search, SearchSummary, User } from './types'
 import EvidencePanel from './features/evidence/EvidencePanel'
 import InvitationPanel from './features/invitations/InvitationPanel'
@@ -9,6 +9,7 @@ import RoleCard from './features/roles/RoleCard'
 import RoleFeed from './features/roles/RoleFeed'
 import RoleEditor from './features/roles/RoleEditor'
 import InterviewConfirmation from './features/invitations/InterviewConfirmation'
+import AssistantPanel from './features/assistant/AssistantPanel'
 
 const skillNames: Record<string, string> = {
   data_trace: 'Данные и трассировка', validation: 'Валидация', http_api: 'HTTP API',
@@ -157,7 +158,25 @@ function CandidateApp({ me }: { me: User }) {
     try { await job(); await load(); setFeedback(success) } catch (err) { setError((err as Error).message) }
   }
   function updateStory(patch: Partial<AchievementStory>) {
-    setStory(current => ({ ...current, ...patch, formatted_narrative: undefined }))
+    setStory(current => ({ ...current, ...patch,
+      share_with_employers: Object.keys(patch).some(key => key !== 'share_with_employers')
+        ? false : patch.share_with_employers ?? current.share_with_employers,
+      formatted_narrative: undefined,
+    }))
+  }
+  function applyAchievementDraft(draft: AssistantAchievementDraft) {
+    setStory(current => ({
+      ...current,
+      title: draft.title || current.title,
+      context: draft.context || current.context,
+      personal_contribution: draft.personal_contribution || current.personal_contribution,
+      decision: draft.decision || current.decision,
+      result: draft.result || current.result,
+      result_scope: draft.result_scope ?? current.result_scope,
+      basis: draft.basis || current.basis,
+      share_with_employers: false,
+      formatted_narrative: undefined,
+    }))
   }
   async function saveProfile(event: FormEvent) {
     event.preventDefault()
@@ -256,6 +275,9 @@ function CandidateApp({ me }: { me: User }) {
             <label>Формат<select value={profile.work_format} onChange={e => setProfile({...profile,work_format:e.target.value})}><option value="remote">Удалённо</option><option value="hybrid">Гибрид</option><option value="office">Офис</option><option value="any">Любой</option></select></label>
             <label className="full">Опыт и задачи<textarea rows={4} value={profile.summary} onChange={e => setProfile({...profile,summary:e.target.value})}/></label>
             <div className="full"><div className="field-heading">Один рабочий эпизод — чтобы было понятно, что сделали именно вы</div><p className="small muted">Три коротких пункта сохраняют контекст, ваш вклад и результат. Решение и основание можно добавить, если помните. Мы соберём рассказ, но не будем додумывать факты или объявлять их проверенными.</p></div>
+            <AssistantPanel intent="candidate_achievement" testId="assistant-candidate-achievement"
+              promptLabel="Расскажите, что произошло" onApply={applyAchievementDraft}/>
+            <label className="full">Короткое название достижения<input maxLength={120} value={story.title} onChange={e => updateStory({title:e.target.value})} placeholder="Например: защита от повторной обработки"/></label>
             <label className="full">Контекст: какую задачу или проблему решали<input maxLength={700} value={story.context} onChange={e => updateStory({context:e.target.value})} placeholder="Например: повторная доставка события создавала риск двойной записи"/></label>
             <label className="full">Ваш личный вклад: что сделали вы<input maxLength={700} value={story.personal_contribution} onChange={e => updateStory({personal_contribution:e.target.value})} placeholder="Например: добавил защиту повторной обработки по event ID"/></label>
             <label className="full">Почему выбрали такой подход <span className="hint">необязательно</span><input maxLength={700} value={story.decision} onChange={e => updateStory({decision:e.target.value})} placeholder="Например: уникальное ограничение работает и при параллельных запросах"/></label>

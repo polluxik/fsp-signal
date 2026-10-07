@@ -1,33 +1,44 @@
 """Versioned role-card HTTP boundary; business rules live in role_cards."""
 
 from typing import Literal
+from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from .ai_assistant import AssistantError, AssistantIntent, generate_draft
 from .assessment import COMPETENCIES
+from .config import settings
 from .db import get_db
 from .domain_errors import DomainError
 from .evidence import list_candidate_evidence
-from .models import CandidateProfile, HiringNeed, User, now
+from .models import AssistantUsage, CandidateProfile, HiringNeed, User, now
 from .preferences import block_employer, preferences_data, revoke_employer_contacts, save_preferences
-from .role_discovery import RoleDiscoveryError, discover_roles, save_role_decision
+from .promotions import PromotionError, activate_demo_campaign, get_demo_campaign
+from .role_discovery import (RoleDiscoveryError, discover_roles, record_sponsored_impression,
+                             save_role_decision)
 from .role_cards import (
     close_role, create_role_version, pause_role, publish_role,
     reconfirm_role, role_card_data,
 )
 from .schemas import (
     AccessChangeResult, CandidatePreferencesIn, CandidatePreferencesOut,
-    EvidenceCard, PublishRoleIn, ReconfirmRoleIn, RoleCardOut, RoleDecisionIn,
-    RoleDecisionOut, RoleFeedOut, RoleMutationIn, RoleVersionIn,
+    AssistantDraftIn, CandidateAchievementDraft, CandidatePreferencesDraft,
+    DemoPromotionOut, EmployerRoleDraft, EvidenceCard, PublishRoleIn, ReconfirmRoleIn, RoleCardOut,
+    RoleDecisionIn, RoleDecisionOut, RoleFeedOut, RoleMutationIn, RoleVersionIn,
+    SponsoredImpressionOut,
 )
 from .security import csrf_guard, get_user, require
+from .taxonomy import available_categories, get_category
 
 
 router = APIRouter(prefix="/api/v1/employer/needs", tags=["employer-v2"])
 candidate_router = APIRouter(prefix="/api/v1/candidate", tags=["candidate-v2"])
+assistant_router = APIRouter(prefix="/api/v1/assistant", tags=["assistant"])
+_ASSISTANT_RATE_LIMIT = 10
+_ASSISTANT_RATE_WINDOW = timedelta(hours=1)
 
 
 def _raise_role_error(exc: DomainError) -> None:
@@ -42,6 +53,66 @@ def _owned_need(db: Session, user: User, need_id: str) -> HiringNeed:
     return need
 
 
+def _record_assistant_usage(db: Session, user_id: str, intent: AssistantIntent) -> None:
+    locked_user_id = db.scalar(select(User.id).where(User.id == user_id).with_for_update())
+    if locked_user_id is None:
+        raise HTTPException(status_code=401, detail="AUTH_REQUIRED")
+    cutoff = now() - _ASSISTANT_RATE_WINDOW
+    recent_requests = db.scalar(
+        select(func.count(AssistantUsage.id)).where(
+            AssistantUsage.user_id == user_id,
+            AssistantUsage.created_at >= cutoff,
+        )
+    ) or 0
+    if recent_requests >= _ASSISTANT_RATE_LIMIT:
+        db.rollback()
+        raise HTTPException(status_code=429, detail="AI_RATE_LIMIT_EXCEEDED")
+    db.add(AssistantUsage(user_id=user_id, intent=intent, created_at=now()))
+    db.commit()
+
+
+def _run_assistant_draft(intent: AssistantIntent, expected_role: Literal["candidate", "employer"],
+                         response: Response, data: AssistantDraftIn,
+                         user: User, db: Session):
+    response.headers["Cache-Control"] = "no-store"
+    require(user, expected_role)
+    if data.external_ai_consent is not True:
+        raise HTTPException(status_code=422, detail="EXTERNAL_AI_CONSENT_REQUIRED")
+    if not settings.frontierai_api_key or not settings.frontierai_api_key.strip():
+        raise HTTPException(status_code=503, detail="AI_PROVIDER_DISABLED")
+    if len(data.text) > settings.assistant_max_input_chars:
+        raise HTTPException(status_code=422, detail="AI_INPUT_TOO_LONG")
+
+    _record_assistant_usage(db, user.id, intent)
+    try:
+        return generate_draft(
+            intent, data.text, external_ai_consent=data.external_ai_consent, configured=settings,
+        )
+    except AssistantError as exc:
+        _raise_role_error(exc)
+
+
+@assistant_router.post("/candidate/preferences", response_model=CandidatePreferencesDraft,
+                       dependencies=[Depends(csrf_guard)])
+def draft_candidate_preferences(data: AssistantDraftIn, response: Response,
+                                user: User = Depends(get_user), db: Session = Depends(get_db)):
+    return _run_assistant_draft("candidate_preferences", "candidate", response, data, user, db)
+
+
+@assistant_router.post("/candidate/achievement", response_model=CandidateAchievementDraft,
+                       dependencies=[Depends(csrf_guard)])
+def draft_candidate_achievement(data: AssistantDraftIn, response: Response,
+                                user: User = Depends(get_user), db: Session = Depends(get_db)):
+    return _run_assistant_draft("candidate_achievement", "candidate", response, data, user, db)
+
+
+@assistant_router.post("/employer/role", response_model=EmployerRoleDraft,
+                       dependencies=[Depends(csrf_guard)])
+def draft_employer_role(data: AssistantDraftIn, response: Response,
+                        user: User = Depends(get_user), db: Session = Depends(get_db)):
+    return _run_assistant_draft("employer_role", "employer", response, data, user, db)
+
+
 @candidate_router.get("/evidence", response_model=list[EvidenceCard])
 def get_candidate_evidence(response: Response, user: User = Depends(get_user), db: Session = Depends(get_db)):
     require(user, "candidate")
@@ -52,13 +123,20 @@ def get_candidate_evidence(response: Response, user: User = Depends(get_user), d
 @candidate_router.get("/roles", response_model=RoleFeedOut)
 def get_candidate_roles(response: Response, cursor: str | None = Query(default=None, max_length=512),
                         limit: int = Query(default=5, ge=1, le=20),
-                        specialization: Literal["backend", "frontend"] | None = None,
-                        grade: Literal["junior", "middle"] | None = None,
+                        specialization: str | None = None,
+                        grade: str | None = None,
                         work_format: Literal["remote", "hybrid", "office"] | None = None,
                         saved_only: bool = False,
                         user: User = Depends(get_user), db: Session = Depends(get_db)):
     require(user, "candidate")
     response.headers["Cache-Control"] = "no-store"
+    categories = available_categories()
+    if specialization and not any(category.specialization == specialization for category in categories):
+        raise HTTPException(status_code=422, detail="UNSUPPORTED_CATEGORY")
+    if grade and grade not in {category.grade for category in categories}:
+        raise HTTPException(status_code=422, detail="UNSUPPORTED_GRADE")
+    if specialization and grade and get_category(specialization, grade) is None:
+        raise HTTPException(status_code=422, detail="UNSUPPORTED_CATEGORY")
     try:
         return discover_roles(db, user.id, cursor, limit, specialization=specialization,
                               grade=grade, work_format=work_format, saved_only=saved_only)
@@ -74,7 +152,7 @@ def put_candidate_role_decision(need_id: str, data: RoleDecisionIn,
     try:
         result = save_role_decision(
             db, user.id, need_id, data.action, data.expected_role_version,
-            data.expected_preferences_version, now(),
+            data.expected_preferences_version, now(), data.source_campaign_id,
         )
         db.commit()
         return result
@@ -86,11 +164,63 @@ def put_candidate_role_decision(need_id: str, data: RoleDecisionIn,
         _raise_role_error(RoleDiscoveryError("ROLE_DECISION_CONFLICT", 409))
 
 
+@candidate_router.post("/promotions/{campaign_id}/impression", response_model=SponsoredImpressionOut,
+                       dependencies=[Depends(csrf_guard)])
+def post_sponsored_impression(campaign_id: str, user: User = Depends(get_user),
+                              db: Session = Depends(get_db)):
+    require(user, "candidate")
+    try:
+        record_sponsored_impression(db, user.id, campaign_id, now())
+        db.commit()
+        return {"recorded": True}
+    except RoleDiscoveryError as exc:
+        db.rollback()
+        _raise_role_error(exc)
+
+
 @router.get("/{need_id}/role-card", response_model=RoleCardOut)
 def get_role_card(need_id: str, user: User = Depends(get_user), db: Session = Depends(get_db)):
     require(user, "employer")
     need = _owned_need(db, user, need_id)
     return role_card_data(db, need, now())
+
+
+def _demo_promotion_out(campaign) -> dict:
+    return {
+        "id": campaign.id,
+        "need_id": campaign.need_id,
+        "role_version_id": campaign.role_version_id,
+        "active_from": campaign.active_from,
+        "active_until": campaign.active_until,
+        "demo_only": True,
+        "revenue_rub": 0,
+    }
+
+
+@router.get("/{need_id}/promotion/demo", response_model=DemoPromotionOut | None)
+def get_demo_role_promotion(need_id: str, user: User = Depends(get_user), db: Session = Depends(get_db)):
+    require(user, "employer")
+    try:
+        campaign = get_demo_campaign(db, user.id, need_id, now())
+        return _demo_promotion_out(campaign) if campaign else None
+    except PromotionError as exc:
+        _raise_role_error(exc)
+
+
+@router.post("/{need_id}/promotion/demo", response_model=DemoPromotionOut, status_code=201,
+             dependencies=[Depends(csrf_guard)])
+def post_demo_role_promotion(need_id: str, response: Response,
+                             user: User = Depends(get_user), db: Session = Depends(get_db)):
+    require(user, "employer")
+    try:
+        campaign, created = activate_demo_campaign(db, user.id, need_id, now())
+        db.commit()
+        if not created:
+            response.status_code = 200
+        return _demo_promotion_out(campaign)
+    except PromotionError as exc:
+        db.rollback()
+        _raise_role_error(exc)
 
 
 @router.post("/{need_id}/versions", response_model=RoleCardOut, status_code=201,

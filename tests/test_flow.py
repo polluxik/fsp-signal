@@ -5,6 +5,7 @@ from datetime import timedelta
 from io import BytesIO
 from urllib.parse import parse_qs, urlparse
 
+import pytest
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import select  # noqa: E402
 from reportlab.pdfgen import canvas  # noqa: E402
@@ -19,6 +20,18 @@ def csrf(client: TestClient):
     return {"x-csrf-token": client.cookies.get("fsp_csrf")}
 
 
+def create_assessment_candidate(client: TestClient, email: str) -> dict:
+    person = register_verified(client, email, "candidate")
+    saved = client.put("/api/v1/candidate/profile", json={
+        "full_name": "Синтетический кандидат", "contact_email": email,
+        "summary": "Проверка категории оценки", "skills": [],
+        "consent_processing": True, "published": True, "available": True,
+        "adult_hiring_confirmed": True,
+    }, headers=csrf(client))
+    assert saved.status_code == 200, saved.text
+    return person
+
+
 def register_verified(client: TestClient, email: str, role: str) -> dict:
     created = client.post("/api/v1/auth/register", json={"email": email, "password": "CorrectHorse123!", "role": role})
     assert created.status_code == 201, created.text
@@ -28,6 +41,71 @@ def register_verified(client: TestClient, email: str, role: str) -> dict:
     assert client.post("/api/v1/auth/verify-email", json={"token": token}).status_code == 200
     assert client.post("/api/v1/auth/login", json={"email": email, "password": "CorrectHorse123!"}).status_code == 200
     return created.json()
+
+
+@pytest.mark.parametrize(("specialization", "grade", "blueprint_version", "competencies"), [
+    ("qa", "junior", "qa-junior-2026.1", {"test_design", "bug_reporting", "api_testing"}),
+    ("qa", "middle", "qa-middle-2026.1", {"risk_based_testing", "automation_design", "reliability_testing"}),
+    ("data_analyst", "junior", "data-analyst-junior-2026.1", {"sql_querying", "data_quality", "metric_definition"}),
+    ("data_analyst", "middle", "data-analyst-middle-2026.1", {"experiment_analysis", "metric_integrity", "data_validation"}),
+])
+def test_new_assessment_api_uses_the_exact_track_blueprint(specialization, grade,
+                                                           blueprint_version, competencies):
+    with TestClient(app) as candidate:
+        create_assessment_candidate(candidate, f"{specialization}-{grade}-blueprint@example.test")
+        started = candidate.post("/api/v1/candidate/assessment-attempts", json={
+            "specialization": specialization, "grade": grade,
+        }, headers=csrf(candidate))
+        assert started.status_code == 201, started.text
+        attempt = started.json()
+        assert attempt["blueprint_version"] == blueprint_version
+        assert {question["competency"] for question in attempt["questions"]} == competencies
+        assert "answer_key" not in attempt
+
+
+def test_track_change_respects_cooldown_and_keeps_one_verified_category():
+    with TestClient(app) as candidate:
+        person = create_assessment_candidate(candidate, "track-change-candidate@example.test")
+        with SessionLocal() as db:
+            profile = db.get(CandidateProfile, person["id"])
+            profile.verified_specialization = "backend"
+            profile.verified_grade = "middle"
+            profile.test_score = 85
+            profile.verification_source = "assessment"
+            profile.competencies = {"event_idempotency": 0.8}
+            profile.grade_changed_at = now()
+            db.commit()
+
+        request = {"specialization": "qa", "grade": "junior"}
+        rejected = candidate.post("/api/v1/candidate/assessment-attempts", json=request, headers=csrf(candidate))
+        assert rejected.status_code == 409
+        assert rejected.json()["detail"] == "GRADE_CHANGE_COOLDOWN"
+
+        with SessionLocal() as db:
+            profile = db.get(CandidateProfile, person["id"])
+            profile.grade_changed_at = now() - timedelta(days=31)
+            db.commit()
+        started = candidate.post("/api/v1/candidate/assessment-attempts", json=request, headers=csrf(candidate))
+        assert started.status_code == 201, started.text
+        attempt = started.json()
+        with SessionLocal() as db:
+            key = db.get(AssessmentAttempt, attempt["id"]).answer_key
+        first_phase = {question["id"]: key[question["id"]] for question in attempt["questions"]}
+        assert candidate.put(f"/api/v1/candidate/assessment-attempts/{attempt['id']}/answers",
+                             json={"answers": first_phase}, headers=csrf(candidate)).status_code == 200
+        assert candidate.post(f"/api/v1/candidate/assessment-attempts/{attempt['id']}/advance",
+                              headers=csrf(candidate)).status_code == 200
+        assert candidate.put(f"/api/v1/candidate/assessment-attempts/{attempt['id']}/answers",
+                             json={"answers": {"qaj3": key["qaj3"], "qaj6": key["qaj6"], "qaj9": key["qaj9"]}},
+                             headers=csrf(candidate)).status_code == 200
+        submitted = candidate.post(f"/api/v1/candidate/assessment-attempts/{attempt['id']}/submit",
+                                   headers=csrf(candidate))
+        assert submitted.status_code == 200, submitted.text
+        assert submitted.json()["verified_category"] == "qa:junior"
+        with SessionLocal() as db:
+            profile = db.get(CandidateProfile, person["id"])
+            assert (profile.verified_specialization, profile.verified_grade) == ("qa", "junior")
+            assert profile.verified_attempt_id == attempt["id"]
 
 
 def test_assessment_variants_are_correct_for_all_categories():

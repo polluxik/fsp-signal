@@ -19,6 +19,8 @@ const apiPort = 32_768 + Number.parseInt(runId.slice(0, 4), 16) % (49_151 - 32_7
 const frontendPort = 49_152 + Number.parseInt(runId.slice(0, 4), 16) % (65_535 - 49_152)
 const databasePath = join(tmpdir(), `fsp-signal-playwright-${runId}.sqlite3`)
 const artifactsPath = join(tmpdir(), `fsp-signal-playwright-results-${runId}`)
+const frontendEnvironment = { ...process.env }
+delete frontendEnvironment.FRONTIERAI_API_KEY
 
 process.env.FSP_SIGNAL_E2E_DB = databasePath
 process.env.FSP_SIGNAL_E2E_ARTIFACTS = artifactsPath
@@ -65,7 +67,7 @@ export default defineConfig({
       timeout: 120_000,
       reuseExistingServer: false,
       env: {
-        ...process.env,
+        ...frontendEnvironment,
         FSP_SIGNAL_API_TARGET: `http://127.0.0.1:${apiPort}`,
       },
     },

@@ -65,6 +65,46 @@ DISCOVERY_ROLE_FIXTURES = (
         "first_30_days": "Добавить проверку целостности для одного вида выгрузки.",
         "industry": "ИТ", "take_home_minutes": 30,
     },
+    {
+        "title": "QA Junior: качество пользовательских сценариев",
+        "description": "Проверять критичные сценарии, фиксировать воспроизводимые дефекты и валидировать API.",
+        "specialization": "qa", "grade": "junior",
+        "competencies": ["test_design", "bug_reporting", "api_testing"],
+        "stack": ["Postman", "SQL"], "salary_min_rub": 100000, "salary_max_rub": 150000,
+        "work_format": "remote", "work_city": None,
+        "first_30_days": "Покрыть критичный сценарий входными и граничными проверками.",
+        "industry": "ИТ", "take_home_minutes": 30,
+    },
+    {
+        "title": "QA Middle: автоматизация и устойчивость",
+        "description": "Приоритизировать риски, развивать автотесты и проверять восстановление после отказов.",
+        "specialization": "qa", "grade": "middle",
+        "competencies": ["risk_based_testing", "automation_design", "reliability_testing"],
+        "stack": ["Playwright", "Python"], "salary_min_rub": 180000, "salary_max_rub": 260000,
+        "work_format": "hybrid", "work_city": "Москва",
+        "first_30_days": "Выбрать высокорисковый поток и закрепить его автоматическими проверками.",
+        "industry": "ИТ", "take_home_minutes": 0,
+    },
+    {
+        "title": "Аналитик данных Junior: SQL и качество витрин",
+        "description": "Проверять данные, собирать SQL-выборки и согласовывать определения продуктовых метрик.",
+        "specialization": "data_analyst", "grade": "junior",
+        "competencies": ["sql_querying", "data_quality", "metric_definition"],
+        "stack": ["SQL", "Python"], "salary_min_rub": 110000, "salary_max_rub": 165000,
+        "work_format": "remote", "work_city": None,
+        "first_30_days": "Описать контракт одной витрины и добавить проверки качества данных.",
+        "industry": "ИТ", "take_home_minutes": 30,
+    },
+    {
+        "title": "Аналитик данных Middle: эксперименты и метрики",
+        "description": "Оценивать эксперименты, проверять целостность метрик и валидировать аналитические данные.",
+        "specialization": "data_analyst", "grade": "middle",
+        "competencies": ["experiment_analysis", "metric_integrity", "data_validation"],
+        "stack": ["SQL", "Python", "Tableau"], "salary_min_rub": 200000, "salary_max_rub": 290000,
+        "work_format": "office", "work_city": "Санкт-Петербург",
+        "first_30_days": "Проверить трактовку ключевого эксперимента и надёжность исходных данных.",
+        "industry": "ИТ", "take_home_minutes": 0,
+    },
 )
 
 
@@ -176,16 +216,26 @@ def seed() -> None:
             publish_role(db, employer.id, need.id, expected_version=role_version.version,
                          active_headcount_attested=True, discoverable=True, at=now())
 
+        demo_skills = {
+            "backend": ["Python", "PostgreSQL"],
+            "frontend": ["TypeScript", "React"],
+            "qa": ["Playwright", "Postman"],
+            "data_analyst": ["SQL", "Python"],
+        }
+        synthetic_profile_count = 0
         for category, skills in COMPETENCIES.items():
             specialization, grade = category.split(":")
             for index in range(12):
                 email = f"{specialization}-{grade}-{index+1}@demo.test"
                 user = db.scalar(select(User).where(User.email == email))
                 if user is not None:
-                    user.origin = "synthetic_fixture"
-                    profile = db.get(CandidateProfile, user.id)
-                    if profile and profile.adult_attested_at is None:
-                        profile.adult_attested_at = now()
+                    if user.origin == "synthetic_fixture":
+                        profile = db.get(CandidateProfile, user.id)
+                        if profile:
+                            if profile.adult_attested_at is None:
+                                profile.adult_attested_at = now()
+                            if profile.verification_source == "synthetic_fixture":
+                                synthetic_profile_count += 1
                     continue
                 user = User(email=email, password_hash=hasher.hash("DemoPass123!"),
                             role="candidate", origin="synthetic_fixture", email_verified_at=now())
@@ -200,7 +250,7 @@ def seed() -> None:
                     user_id=user.id, full_name=f"Демо кандидат {index+1}", contact_email=email,
                     contact_phone=f"+7000000{index:04d}", city="Москва",
                     summary="Синтетический профиль для демонстрации подборки.",
-                    skills=["Python", "PostgreSQL"] if specialization == "backend" else ["TypeScript", "React"],
+                    skills=demo_skills[specialization],
                     experience_months=(index+4)*5, min_salary_rub=90000 if grade == "junior" else 170000,
                     work_format="remote", consent_processing_at=now(), published_at=now(), available=True,
                     adult_attested_at=now(),
@@ -211,8 +261,10 @@ def seed() -> None:
                     fsp_id=f"demo-{user.id}" if fsp == "mock" else None,
                     fsp_status=fsp, fsp_result="finalist" if fsp == "mock" else None)
                 db.add(profile)
+                synthetic_profile_count += 1
         db.commit()
-    print("Seed ready: two employers, 48 assessment profiles, one profile-free candidate, six discovery roles.")
+    print(f"Seed ready: two employers, {synthetic_profile_count} synthetic assessment profiles, "
+          "one profile-free candidate, nine discovery roles.")
     print("Demo accounts: employer@demo.test / DemoPass123!, other@demo.test / DemoPass123!")
     print("Register a new candidate to demonstrate a real assessment.")
 

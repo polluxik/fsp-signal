@@ -1,40 +1,38 @@
-"""Four fixed blueprints. The answer key never leaves the API."""
+"""Versioned category-specific assessment blueprints. Keys remain server-side."""
 
 import random
 import secrets
-from typing import Any
+from .assessment_data_analyst import make_data_analyst_groups
+from .assessment_parts import part, structured_part
+from .assessment_qa import make_qa_groups
+from .taxonomy import available_categories, get_category
 
-BLUEPRINT_VERSION = "2026.2"
+BLUEPRINT_VERSION = "2026.2"  # Historical/default version retained for the original four tracks.
 COMPETENCIES = {
-    "backend:junior": ["data_trace", "validation", "http_api"],
-    "backend:middle": ["event_idempotency", "data_integrity", "failure_recovery"],
-    "frontend:junior": ["javascript_trace", "ui_state", "forms"],
-    "frontend:middle": ["request_races", "derived_state", "error_recovery"],
+    f"{category.specialization}:{category.grade}": [item.id for item in category.competencies]
+    for category in available_categories()
 }
 
 
-def part(identifier: str, prompt: str, points: int, answer: Any, phase: int = 1, options: list | None = None):
-    public = {"id": identifier, "prompt": prompt, "points": points, "phase": phase,
-              "type": "choice" if options else "number"}
-    if options:
-        public["options"] = options
-    return public, answer
-
-
-def structured_part(identifier: str, prompt: str, points: int, fields: list[dict], answer: dict,
-                    phase: int = 1):
-    return {"id": identifier, "prompt": prompt, "points": points, "phase": phase,
-            "type": "structured", "fields": fields}, answer
+def blueprint_version_for(specialization: str, grade: str) -> str:
+    category = get_category(specialization, grade)
+    if category is None:
+        raise ValueError("unsupported category")
+    return category.blueprint_version
 
 
 def make_assessment(specialization: str, grade: str, seed: str | None = None):
     key = f"{specialization}:{grade}"
-    if key not in COMPETENCIES:
+    if get_category(specialization, grade) is None:
         raise ValueError("unsupported category")
     rng = random.Random(int(seed, 16) if seed is not None else secrets.randbits(128))
     groups = []
 
-    if key == "backend:middle":
+    if key.startswith("qa:"):
+        groups = make_qa_groups(grade, rng)
+    elif key.startswith("data_analyst:"):
+        groups = make_data_analyst_groups(grade, rng)
+    elif key == "backend:middle":
         groups = [
             ("event_idempotency", [
                 structured_part("bm1", "После сетевого таймаута одно платёжное событие может прийти повторно. Составьте правило обработки: ключ дедупликации, защита от параллельной записи и ответ на повтор.", 12, [
@@ -115,7 +113,7 @@ def make_assessment(specialization: str, grade: str, seed: str | None = None):
                      options=[{"value":"feedback","label":"Показать ошибку и сохранить ввод"},{"value":"erase","label":"Удалить введённые данные без пояснения"}]),
             ]),
         ]
-    else:
+    elif key == "frontend:middle":
         a, b = rng.randint(1, 9), rng.randint(10, 19)
         groups = [
             ("request_races", [
@@ -135,6 +133,8 @@ def make_assessment(specialization: str, grade: str, seed: str | None = None):
                      options=[{"value":"clear","label":"Убрать старую ошибку и показать данные"},{"value":"keep","label":"Оставить ошибку как текущую"}]),
             ]),
         ]
+    else:
+        raise ValueError("unsupported category")
 
     questions, answer_key = [], {}
     for competency, parts in groups:

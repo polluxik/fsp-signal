@@ -7,7 +7,8 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from backend import seed_demo
-from backend.db import Base, SessionLocal
+from backend.assessment import COMPETENCIES
+from backend.db import Base, SessionLocal, get_db
 from backend.main import app
 from backend.models import CandidateProfile, EmployerProfile, HiringNeed, RoleDecision, RoleVersion, User, now
 from backend.role_cards import (close_role, create_initial_draft, create_role_version,
@@ -68,11 +69,11 @@ def create_public_role(employer_id: str, title: str, *, confirmed_at=None, disco
         return need.id, version.id
 
 
-def set_preferences(client: TestClient, *, salary=220000, formats=None, industries=None,
+def set_preferences(client: TestClient, *, salary=220000, formats=None, cities=None, industries=None,
                     take_home=60):
     return client.put("/api/v1/candidate/preferences", json={
         "expected_version": 1, "salary_min_rub": salary,
-        "allowed_work_formats": formats or ["remote"], "allowed_cities": [],
+        "allowed_work_formats": formats or ["remote"], "allowed_cities": cities or [],
         "excluded_industries": industries or [], "preferred_stack": [], "preferred_tasks": [],
         "max_take_home_minutes": take_home, "available": True, "adult_hiring_confirmed": True,
     }, headers=csrf(client))
@@ -418,9 +419,17 @@ def test_demo_seed_has_repeatable_discovery_roles_without_changing_primary_need(
         first_snapshot = sorted((need.id, need.current_role_version, need.publication_state)
                                 for need in discovery_needs)
         assert [need.title for need in primary_needs] == ["Backend Middle: события"]
-        assert len(discovery_needs) >= 4
-        assert {need.specialization for need in discovery_needs} == {"backend", "frontend"}
+        assert len(discovery_needs) >= 8
+        assert {need.specialization for need in discovery_needs} == {
+            "backend", "frontend", "qa", "data_analyst",
+        }
         assert {need.grade for need in discovery_needs} == {"junior", "middle"}
+        assert {(need.specialization, need.grade) for need in discovery_needs} == {
+            ("backend", "junior"), ("backend", "middle"),
+            ("frontend", "junior"), ("frontend", "middle"),
+            ("qa", "junior"), ("qa", "middle"),
+            ("data_analyst", "junior"), ("data_analyst", "middle"),
+        }
         assert all(need.publication_state == "active" and need.discoverable for need in discovery_needs)
         assert all(need.confirmed_at is not None for need in discovery_needs)
         assert len({need.confirmed_at for need in discovery_needs}) == len(discovery_needs)
@@ -433,7 +442,12 @@ def test_demo_seed_has_repeatable_discovery_roles_without_changing_primary_need(
         fixture_profiles = db.scalars(select(CandidateProfile).join(
             User, User.id == CandidateProfile.user_id
         ).where(User.role == "candidate", User.origin == "synthetic_fixture")).all()
-        assert len(fixture_profiles) == 48
+        assert len(fixture_profiles) == 96
+        category_counts = {}
+        for profile in fixture_profiles:
+            key = (profile.verified_specialization, profile.verified_grade)
+            category_counts[key] = category_counts.get(key, 0) + 1
+        assert set(category_counts.values()) == {12}
         browser_candidate = db.scalar(select(User).where(User.email == "new-candidate@demo.test"))
         assert browser_candidate and browser_candidate.origin == "synthetic_fixture"
         assert db.get(CandidateProfile, browser_candidate.id) is None
@@ -446,3 +460,91 @@ def test_demo_seed_has_repeatable_discovery_roles_without_changing_primary_need(
                                  for need in discovery_needs)
         assert second_snapshot == first_snapshot
     engine.dispose()
+
+
+def test_demo_seed_never_relabels_existing_direct_candidate_as_synthetic(tmp_path, monkeypatch, capsys):
+    engine = create_engine(f"sqlite:///{tmp_path / 'seed-collision.db'}")
+    Base.metadata.create_all(engine)
+    local_sessions = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+    with local_sessions() as db:
+        account = User(
+            email="qa-junior-1@demo.test", password_hash="existing-hash",
+            role="candidate", origin="direct_signup",
+        )
+        db.add(account)
+        db.flush()
+        profile = CandidateProfile(
+            user_id=account.id, full_name="Real candidate", adult_attested_at=None,
+        )
+        db.add(profile)
+        db.commit()
+        account_id = account.id
+
+    monkeypatch.setattr(seed_demo, "SessionLocal", local_sessions)
+    monkeypatch.setattr(seed_demo, "settings", SimpleNamespace(app_mode="demo"))
+    seed_demo.seed()
+    assert "95 synthetic assessment profiles" in capsys.readouterr().out
+
+    with local_sessions() as db:
+        account = db.get(User, account_id)
+        profile = db.get(CandidateProfile, account_id)
+        assert account.origin == "direct_signup"
+        assert profile.full_name == "Real candidate"
+        assert profile.adult_attested_at is None
+    engine.dispose()
+
+
+def test_seeded_new_categories_are_filterable_through_employer_bank_api(tmp_path, monkeypatch):
+    engine = create_engine(f"sqlite:///{tmp_path / 'bank-api.db'}")
+    Base.metadata.create_all(engine)
+    local_sessions = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+    monkeypatch.setattr(seed_demo, "SessionLocal", local_sessions)
+    monkeypatch.setattr(seed_demo, "settings", SimpleNamespace(app_mode="demo"))
+
+    def override_db():
+        with local_sessions() as db:
+            yield db
+
+    seed_demo.seed()
+    app.dependency_overrides[get_db] = override_db
+    try:
+        with TestClient(app) as employer:
+            login = employer.post("/api/v1/auth/login", json={
+                "email": "employer@demo.test", "password": "DemoPass123!",
+            })
+            assert login.status_code == 200, login.text
+            categories = employer.get("/api/v1/employer/categories")
+            assert categories.status_code == 200, categories.text
+            counts = {f"{item['specialization']}:{item['grade']}": item["count"]
+                      for item in categories.json()}
+            assert set(counts) == set(COMPETENCIES)
+            assert set(counts.values()) == {12}
+
+            for specialization, grade in (("qa", "middle"), ("data_analyst", "junior")):
+                response = employer.get("/api/v1/employer/candidates", params={
+                    "specialization": specialization, "grade": grade,
+                })
+                assert response.status_code == 200, response.text
+                assert len(response.json()) == 12
+                assert {(item["specialization"], item["grade"]) for item in response.json()} == {
+                    (specialization, grade),
+                }
+
+            unsupported = employer.get("/api/v1/employer/candidates", params={"specialization": "devops"})
+            assert unsupported.status_code == 422
+            assert unsupported.json()["detail"] == "UNSUPPORTED_CATEGORY"
+
+        with TestClient(app) as candidate:
+            login = candidate.post("/api/v1/auth/login", json={
+                "email": "qa-junior-1@demo.test", "password": "DemoPass123!",
+            })
+            assert login.status_code == 200, login.text
+            role_feed = candidate.get("/api/v1/candidate/roles", params={
+                "specialization": "qa", "grade": "junior",
+            })
+            assert role_feed.status_code == 200, role_feed.text
+            assert any((item["role"]["specialization"], item["role"]["grade"]) == ("qa", "junior")
+                       for item in role_feed.json()["items"])
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        engine.dispose()

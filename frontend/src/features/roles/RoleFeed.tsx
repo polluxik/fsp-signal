@@ -28,20 +28,24 @@ function matchLabel(item: CandidateRoleFeedItem): string {
   return 'Пока не оценивали по вашему профилю'
 }
 
-function RoleGroup({ title, items, busyId, onDecision }: {
+function RoleGroup({ title, items, busyId, onDecision, sponsored = false }: {
   title: string
   items: CandidateRoleFeedItem[]
   busyId: string | null
   onDecision: (item: CandidateRoleFeedItem, action: CandidateRoleDecision) => void
+  sponsored?: boolean
 }) {
   if (!items.length) return null
-  return <section className="feed-section">
+  return <section className={`feed-section${sponsored ? ' sponsored-feed-section' : ''}`}
+    data-testid={sponsored ? 'sponsored-role-shelf' : undefined}>
     <div className="results-heading"><h2>{title}</h2><span className="badge">{items.length}</span></div>
     <div className="feed-list">
-      {items.map(item => <div className="discovery-role" data-testid="discovery-role" data-need-id={item.need_id} key={item.need_id}>
+      {items.map(item => <div className="discovery-role" data-testid="discovery-role" data-need-id={item.need_id}
+        data-campaign-id={item.campaign_id} key={item.need_id}>
         <div className="discovery-role-heading">
           <p className="discovery-company">{item.company_name}</p>
           <div className="discovery-badges">
+            {sponsored && <span className="badge sponsored-label">Продвигаемая роль</span>}
             {item.data_mode === 'synthetic' && <span className="badge synthetic-badge">Демо-данные</span>}
             {item.data_mode === 'unknown' && <span className="badge unknown-source-badge">Источник данных не подтверждён</span>}
             <span className={`badge match-badge ${item.match_state}`}>{matchLabel(item)}</span>
@@ -81,6 +85,7 @@ function RoleGroup({ title, items, busyId, onDecision }: {
 export default function RoleFeed({ onNavigate }: Props) {
   const [filters, setFilters] = useState<Filters>({ specialization: '', grade: '', workFormat: '', savedOnly: false })
   const [items, setItems] = useState<CandidateRoleFeedItem[]>([])
+  const [sponsoredItems, setSponsoredItems] = useState<CandidateRoleFeedItem[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [emptyState, setEmptyState] = useState<CandidateRoleFeed['empty_state']>(null)
   const [loading, setLoading] = useState(true)
@@ -92,6 +97,27 @@ export default function RoleFeed({ onNavigate }: Props) {
   const [undoTarget, setUndoTarget] = useState<{ item: CandidateRoleFeedItem; index: number } | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const sequence = useRef(0)
+  const reportedCampaigns = useRef(new Set<string>())
+
+  const sponsoredCampaignKey = sponsoredItems.map(item => item.campaign_id).filter(Boolean).join('|')
+  useEffect(() => {
+    if (!sponsoredCampaignKey || typeof IntersectionObserver === 'undefined') return
+    const shelf = document.querySelector('[data-testid="sponsored-role-shelf"]')
+    if (!shelf) return
+    const observer = new IntersectionObserver(entries => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue
+        const campaignId = (entry.target as HTMLElement).dataset.campaignId
+        if (!campaignId || reportedCampaigns.current.has(campaignId)) continue
+        reportedCampaigns.current.add(campaignId)
+        void api(`/candidate/promotions/${campaignId}/impression`, 'POST')
+          .catch(() => { reportedCampaigns.current.delete(campaignId) })
+        observer.unobserve(entry.target)
+      }
+    }, { threshold: 0.25 })
+    shelf.querySelectorAll<HTMLElement>('[data-campaign-id]').forEach(card => observer.observe(card))
+    return () => observer.disconnect()
+  }, [sponsoredCampaignKey])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -99,6 +125,7 @@ export default function RoleFeed({ onNavigate }: Props) {
     setLoading(true)
     setLoadingMore(false)
     setItems([])
+    setSponsoredItems([])
     setNextCursor(null)
     setEmptyState(null)
     setError('')
@@ -106,6 +133,7 @@ export default function RoleFeed({ onNavigate }: Props) {
       .then(feed => {
         if (sequence.current !== requestSequence) return
         setItems(feed.items)
+        setSponsoredItems(feed.sponsored_items ?? [])
         setNextCursor(feed.next_cursor)
         setEmptyState(feed.empty_state)
       })
@@ -142,18 +170,23 @@ export default function RoleFeed({ onNavigate }: Props) {
         action,
         expected_role_version: item.role_version_id,
         expected_preferences_version: item.preferences_version,
+        ...(item.campaign_id ? { source_campaign_id: item.campaign_id } : {}),
       })
       if (action === 'hidden') {
-        setUndoTarget({ item, index: items.findIndex(candidate => candidate.need_id === item.need_id) })
-        setItems(current => current.filter(candidate => candidate.need_id !== item.need_id))
+        setUndoTarget({ item, index: (item.campaign_id ? sponsoredItems : items)
+          .findIndex(candidate => candidate.need_id === item.need_id) })
+        if (item.campaign_id) setSponsoredItems(current => current.filter(candidate => candidate.need_id !== item.need_id))
+        else setItems(current => current.filter(candidate => candidate.need_id !== item.need_id))
         setFeedback('')
       } else if (filters.savedOnly && action !== 'saved') {
         setFeedback('Роль убрана из сохранённых.')
         setRefreshKey(value => value + 1)
       } else {
-        setItems(current => current.map(candidate => candidate.need_id === item.need_id
+        const updateItem = (current: CandidateRoleFeedItem[]) => current.map(candidate => candidate.need_id === item.need_id
           ? { ...candidate, decision: action }
-          : candidate))
+          : candidate)
+        if (item.campaign_id) setSponsoredItems(updateItem)
+        else setItems(updateItem)
         setFeedback(action === 'saved' ? 'Роль сохранена в вашем списке.' : 'Роль убрана из сохранённых.')
       }
     } catch (err) {
@@ -177,6 +210,7 @@ export default function RoleFeed({ onNavigate }: Props) {
         action: 'none',
         expected_role_version: item.role_version_id,
         expected_preferences_version: item.preferences_version,
+        ...(item.campaign_id ? { source_campaign_id: item.campaign_id } : {}),
       })
       setUndoTarget(null)
       setFeedback('Роль возвращена в ленту.')
@@ -186,11 +220,13 @@ export default function RoleFeed({ onNavigate }: Props) {
       if (filters.savedOnly || !stillMatchesFilters) {
         setRefreshKey(value => value + 1)
       } else {
-        setItems(current => {
+        const restoreItem = (current: CandidateRoleFeedItem[]) => {
           const next = [...current]
           next.splice(Math.max(0, Math.min(index, next.length)), 0, { ...item, decision: 'none' })
           return next
-        })
+        }
+        if (item.campaign_id) setSponsoredItems(restoreItem)
+        else setItems(restoreItem)
       }
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
@@ -207,7 +243,7 @@ export default function RoleFeed({ onNavigate }: Props) {
 
   return <>
     <div className="page-heading"><p className="eyebrow">АКТУАЛЬНЫЕ РОЛИ</p><h1>Роли с понятными условиями</h1>
-      <p>Сначала покажем пять актуальных вакансий. Ваши закрытые ограничения фильтруют выдачу и не видны работодателям; сохранить или скрыть роль можно без отклика и передачи контактов.</p>
+      <p>Ваши закрытые ограничения фильтруют выдачу и не видны работодателям. Продвигаемые роли проходят те же обязательные условия, вынесены отдельно и не дублируются в общей ленте.</p>
     </div>
     <section className="card discovery-filters" aria-label="Фильтры вакансий">
       <label>Направление<select value={filters.specialization} onChange={event => { setRefreshNotice(''); setFilters(current => ({ ...current, specialization: event.target.value })) }}>
@@ -232,7 +268,7 @@ export default function RoleFeed({ onNavigate }: Props) {
       <button className="text-button" disabled={busyId !== null} onClick={() => void undoHide()}>Вернуть роль</button>
     </div>}
     {loading && <section className="card loading-panel" aria-busy="true"><div className="skeleton-line"/><div className="skeleton-line short"/><p className="muted">Подбираем актуальные роли…</p></section>}
-    {!loading && !items.length && emptyState && <section className="card empty discovery-empty">
+    {!loading && !items.length && !sponsoredItems.length && emptyState && <section className="card empty discovery-empty">
       <h2>{emptyFeedMessage[emptyState]}</h2>
       {emptyState === 'no_saved_roles'
         ? <button className="primary" onClick={() => setFilters(current => ({ ...current, savedOnly: false }))}>Показать все роли</button>
@@ -241,7 +277,9 @@ export default function RoleFeed({ onNavigate }: Props) {
           : <button className="button subtle" onClick={() => onNavigate('preferences')}>Проверить условия поиска</button>}
       {emptyState === 'no_compatible_roles' && <p className="small muted">Вы можете изменить их сами; лента не ослабляет ограничения автоматически.</p>}
     </section>}
-    {!loading && !!items.length && <>
+    {!loading && (!!items.length || !!sponsoredItems.length) && <>
+      <RoleGroup title="Продвигаемые роли" items={sponsoredItems} busyId={busyId} sponsored
+        onDecision={(item, action) => void decide(item, action)}/>
       <RoleGroup title="Подтверждённая категория и условия подходят" items={compatible} busyId={busyId} onDecision={(item, action) => void decide(item, action)}/>
       <RoleGroup title="Нужно уточнить" items={clarification} busyId={busyId} onDecision={(item, action) => void decide(item, action)}/>
       <RoleGroup title="Пока без персональной оценки" items={notAssessed} busyId={busyId} onDecision={(item, action) => void decide(item, action)}/>

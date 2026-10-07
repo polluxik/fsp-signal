@@ -23,6 +23,9 @@ EVENT_PAYLOAD_FIELDS = {
     "invitation_withdrawn": {"state_version", "role_version_id"},
     "invitation_expired": {"state_version", "role_version_id"},
     "interview_held": {"state_version", "role_version_id"},
+    "promotion_demo_activated": {"role_version_id"},
+    "sponsored_role_impression": {"role_version_id", "placement"},
+    "sponsored_role_decision": {"role_version_id", "action"},
 }
 
 
@@ -63,6 +66,19 @@ def write_product_event(
         role_version_id = payload.get("role_version_id")
         if role_version_id is not None and not isinstance(role_version_id, str):
             raise ValueError("invalid invitation role version id")
+    elif entity_type == "promotion_campaign":
+        if not isinstance(payload.get("role_version_id"), str):
+            raise ValueError("promotion event requires an allowlisted role version id")
+        if type == "promotion_demo_activated":
+            pass
+        elif type == "sponsored_role_impression":
+            if payload.get("placement") != "candidate_roles_shelf":
+                raise ValueError("invalid sponsored impression placement")
+        elif type == "sponsored_role_decision":
+            if payload.get("action") not in ("saved", "hidden", "none"):
+                raise ValueError("invalid sponsored role decision")
+        else:
+            raise ValueError("unsupported promotion event")
     else:
         raise ValueError("unsupported event entity")
     if data_mode not in ("real", "synthetic"):

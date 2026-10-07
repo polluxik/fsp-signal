@@ -6,13 +6,16 @@ import json
 import secrets
 
 from fastapi import Body, Depends, FastAPI, File, Header, HTTPException, Request, Response, UploadFile
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import ValidationError
 from sqlalchemy import func, inspect, select, text, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from .assessment import BLUEPRINT_VERSION, COMPETENCIES, grade_attempt, make_assessment, public_questions
+from .assessment import (COMPETENCIES, blueprint_version_for, grade_attempt,
+                         make_assessment, public_questions)
 from .config import settings
 from .db import Base, get_db
 from .evidence import (build_achievement_narrative, build_achievement_story_record,
@@ -29,12 +32,13 @@ from .preferences import (PreferencesError, is_blocked, preferences_data,
                           save_profile_preferences)
 from .resume_import import MAX_PDF_BYTES, ResumeImportError, preview_pdf
 from .role_cards import create_initial_draft
-from .routes_v2 import candidate_router, router as v2_router
+from .routes_v2 import assistant_router, candidate_router, router as v2_router
 from .schemas import (AcceptInvitationIn, AnswersIn, CandidateIn, EmployerIn, FspLinkIn,
                       InterviewHeldConfirmationOut, InvitationCommandIn, InvitationOut,
                       InvitationV2In, LoginIn, NeedIn, RegisterIn, RoleCardIn, SearchIn,
-                      SearchOut, StartAssessmentIn, VerifyIn)
+                      SearchOut, StartAssessmentIn, TaxonomyCategoryOut, VerifyIn)
 from .security import aware, check_password, csrf_guard, digest, get_user, hasher, new_session, require, set_auth_cookies
+from .taxonomy import available_categories, catalog_payload, get_category
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -45,10 +49,36 @@ app = FastAPI(title="ФСП Сигнал", version="0.1.0", description="Дем�
               docs_url="/api/docs", openapi_url="/api/openapi.json", lifespan=lifespan)
 app.include_router(v2_router)
 app.include_router(candidate_router)
+app.include_router(assistant_router)
+
+
+@app.exception_handler(RequestValidationError)
+async def assistant_validation_error(request: Request, exc: RequestValidationError):
+    if not request.url.path.startswith("/api/v1/assistant/"):
+        return await request_validation_exception_handler(request, exc)
+    errors = exc.errors()
+    if any(tuple(error.get("loc", ())) == ("body", "text")
+           and error.get("type") == "string_too_long" for error in errors):
+        return JSONResponse(status_code=422, content={"detail": "AI_INPUT_TOO_LONG"})
+    safe_errors = [{key: error[key] for key in ("loc", "type", "msg") if key in error}
+                   for error in errors]
+    return JSONResponse(status_code=422, content={"detail": safe_errors})
+
+
+@app.get("/api/v1/taxonomy/categories", response_model=list[TaxonomyCategoryOut])
+def get_taxonomy_categories():
+    return catalog_payload()
 
 
 def problem(code: str, status: int = 422) -> None:
     raise HTTPException(status_code=status, detail=code)
+
+
+def _supported_category(specialization: str, grade: str):
+    category = get_category(specialization, grade)
+    if category is None:
+        problem("UNSUPPORTED_CATEGORY")
+    return category
 
 
 def profile_for(db: Session, user: User) -> CandidateProfile:
@@ -318,8 +348,7 @@ def start_assessment(data: StartAssessmentIn, user: User = Depends(get_user), db
     profile = profile_for(db, user)
     if data.industry != "it":
         problem("UNSUPPORTED_INDUSTRY")
-    key = f"{data.specialization}:{data.grade}"
-    if key not in COMPETENCIES:
+    if get_category(data.specialization, data.grade) is None:
         problem("UNSUPPORTED_CATEGORY")
     recent = db.scalars(select(AssessmentAttempt).where(
         AssessmentAttempt.candidate_id == user.id,
@@ -337,7 +366,8 @@ def start_assessment(data: StartAssessmentIn, user: User = Depends(get_user), db
     seed = secrets.token_hex(16)
     questions, key_answers = make_assessment(data.specialization, data.grade, seed)
     attempt = AssessmentAttempt(candidate_id=user.id, specialization=data.specialization, grade=data.grade,
-                                blueprint_version=BLUEPRINT_VERSION, seed=seed, questions=questions, answer_key=key_answers,
+                                blueprint_version=blueprint_version_for(data.specialization, data.grade),
+                                seed=seed, questions=questions, answer_key=key_answers,
                                 answers={}, expires_at=now()+timedelta(minutes=20))
     profile.desired_specialization, profile.claimed_grade = data.specialization, data.grade
     db.add(attempt)
@@ -454,6 +484,7 @@ def employer_profile(user: User = Depends(get_user), db: Session = Depends(get_d
 @app.post("/api/v1/employer/needs/parse", dependencies=[Depends(csrf_guard)])
 def parse_need(data: NeedIn, user: User = Depends(get_user)):
     require(user, "employer")
+    _supported_category(data.specialization, data.grade)
     return {"suggested_competencies": suggest_competencies(data.description, data.specialization, data.grade),
             "requires_confirmation": True}
 
@@ -462,13 +493,12 @@ def parse_need(data: NeedIn, user: User = Depends(get_user)):
 def create_need(data: NeedIn, user: User = Depends(get_user), db: Session = Depends(get_db)):
     require(user, "employer")
     employer_for(db, user)
-    if f"{data.specialization}:{data.grade}" not in COMPETENCIES:
-        problem("UNSUPPORTED_CATEGORY")
+    category = _supported_category(data.specialization, data.grade)
     if data.salary_max_rub < data.salary_min_rub:
         problem("SALARY_RANGE_INVALID")
     if data.work_format not in ("remote", "hybrid", "office", "any"):
         problem("INVALID_WORK_FORMAT")
-    allowed = set(COMPETENCIES[f"{data.specialization}:{data.grade}"])
+    allowed = {competency.id for competency in category.competencies}
     if not set(data.competencies).issubset(allowed):
         problem("INVALID_COMPETENCY")
     need = HiringNeed(employer_id=user.id, **data.model_dump())
@@ -502,15 +532,21 @@ def list_needs(user: User = Depends(get_user), db: Session = Depends(get_db)):
 def categories(user: User = Depends(get_user), db: Session = Depends(get_db)):
     require(user, "employer")
     profiles = db.scalars(select(CandidateProfile)).all()
-    return [{"specialization": spec, "grade": grade,
-             "count": sum(can_search(p) and (p.verified_specialization, p.verified_grade) == (spec, grade) for p in profiles)}
-            for spec in ("backend", "frontend") for grade in ("junior", "middle")]
+    return [{"specialization": category.specialization, "grade": category.grade,
+             "count": sum(can_search(p) and
+                           (p.verified_specialization, p.verified_grade) ==
+                           (category.specialization, category.grade) for p in profiles)}
+            for category in available_categories()]
 
 
 @app.get("/api/v1/employer/candidates")
 def bank_candidates(specialization: str | None = None, grade: str | None = None, stack: str | None = None,
                     fsp_only: bool = False, user: User = Depends(get_user), db: Session = Depends(get_db)):
     require(user, "employer")
+    if specialization and not any(category.specialization == specialization for category in available_categories()):
+        problem("UNSUPPORTED_CATEGORY")
+    if grade and grade not in {category.grade for category in available_categories()}:
+        problem("UNSUPPORTED_GRADE")
     profiles = db.scalars(select(CandidateProfile)).all()
     selected = [p for p in profiles if can_search(p) and not is_blocked(p, user.id) and
                 (not specialization or p.verified_specialization == specialization) and
