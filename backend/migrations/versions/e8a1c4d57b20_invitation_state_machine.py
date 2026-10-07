@@ -3,8 +3,6 @@
 Revision ID: e8a1c4d57b20
 Revises: d4a7b2f019ce
 """
-from __future__ import annotations
-
 from datetime import datetime, timezone
 from typing import Sequence, Union
 

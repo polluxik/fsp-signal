@@ -217,7 +217,7 @@ def test_search_filter_stack_is_unioned_with_role_stack(monkeypatch):
         assert candidate_user["id"] not in {row["id"] for row in excluded.json()["results"]}
 
 
-def test_new_searches_default_to_match_v2_and_bank_score_has_no_fsp_bonus(monkeypatch):
+def test_new_searches_default_to_match_v2_and_bank_score_has_capped_relevant_fsp_bonus(monkeypatch):
     from backend.config import Settings
 
     monkeypatch.delenv("MATCH_ALGORITHM_VERSION", raising=False)
@@ -236,6 +236,10 @@ def test_new_searches_default_to_match_v2_and_bank_score_has_no_fsp_bonus(monkey
             profile = db.get(CandidateProfile, candidate_user["id"])
             profile.fsp_status = "verified_external"
             profile.fsp_result = "prize"
+            profile.fsp_achievement = {
+                "discipline": "программирование продуктов",
+                "mapped_specializations": ["backend"],
+            }
             db.commit()
         revised = employer.post(
             f"/api/v1/employer/needs/{need_id}/versions",
@@ -253,16 +257,18 @@ def test_new_searches_default_to_match_v2_and_bank_score_has_no_fsp_bonus(monkey
         row = next(item for item in found.json()["results"] if item["id"] == candidate_user["id"])
         assert found.json()["algorithm_version"] == "match_v2"
         assert row["match"]["algorithm_version"] == "match_v2"
-        assert row["match"]["score"] == 90.0
+        assert row["match"]["score"] == 95.0
         assert row["match"]["components"] == {
-            "competencies": None, "assessment": 0.9, "text": None,
+            "competencies": None, "assessment": 0.9, "text": None, "fsp_relevance": 1.0,
         }
         assert row["match"]["evidence_coverage"] == 0.35
-        assert set(row["match"]["components"]) == {"competencies", "assessment", "text"}
+        assert set(row["match"]["components"]) == {
+            "competencies", "assessment", "text", "fsp_relevance",
+        }
 
         bank = employer.get("/api/v1/employer/candidates?specialization=backend&grade=middle").json()
         candidate_card = next(item for item in bank if item["id"] == candidate_user["id"])
-        assert candidate_card["bank_score"] == 90.0
+        assert candidate_card["bank_score"] == 95.0
         assert candidate_card["bank_score_algorithm_version"] == "match_v2"
 
 

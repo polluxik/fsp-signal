@@ -2,7 +2,7 @@ from logging.config import fileConfig
 
 from backend.config import settings
 from backend.db import Base, engine
-import backend.models  # noqa: F401 - registers metadata
+from backend import models as _models
 
 from alembic import context
 

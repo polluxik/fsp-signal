@@ -1,0 +1,7 @@
+query_id,candidate_id,label,split,rater
+backend-middle-1,candidate-1,3,holdout,expert-a
+backend-middle-1,candidate-1,3,holdout,expert-b
+backend-middle-1,candidate-2,1,holdout,expert-a
+backend-middle-1,candidate-2,2,holdout,expert-b
+backend-middle-1,candidate-3,0,holdout,expert-a
+backend-middle-1,candidate-3,0,holdout,expert-b

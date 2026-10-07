@@ -243,7 +243,7 @@ test('role facts, selected evidence, explicit acceptance, and pair-scoped contac
   await expect.soft(targetCard.getByText(/Результат теста/)).toBeVisible({ timeout: 500 })
   await expect.soft(targetCard.getByText(/Охват доказательствами/)).toBeVisible({ timeout: 500 })
   const unknownMatchComponents = Object.entries(target.match?.components ?? {})
-    .filter(([, value]) => value == null)
+    .filter(([name, value]) => name !== 'fsp_relevance' && value == null)
     .map(([name]) => name)
   if (unknownMatchComponents.length > 0) {
     const unknownData = targetCard.locator('.unknown-match-data')

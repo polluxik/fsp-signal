@@ -7,10 +7,11 @@ from .assessment_parts import part
 
 def make_qa_groups(grade: str, rng: random.Random) -> list:
     if grade == "junior":
-        records = rng.randint(18, 32)
+        records = rng.randint(100, 9999)
+        form_name = rng.choice(("заявка на доступ", "форма возврата", "профиль участника", "регистрация на событие"))
         return [
             ("test_design", [
-                part("qaj1", f"Форма принимает заявку на доступ. Какой набор проверок лучше всего покрывает обязательное поле при {records} заявках?", 10, "boundaries",
+                part("qaj1", f"Система принимает «{form_name}». Какой набор проверок лучше всего покрывает обязательное поле при {records} записях?", 10, "boundaries",
                      options=[{"value": "boundaries", "label": "Пустое, минимально допустимое и неверно сформированное значение"},
                               {"value": "happy_only", "label": "Только один корректный пример"},
                               {"value": "random", "label": "Случайные значения без ожидаемых результатов"}]),

@@ -1,4 +1,6 @@
-"""Behavioral tests for the deliberately narrow backend-middle assessment pilot."""
+"""Behavioral tests for versioned, category-specific assessment families."""
+
+import json
 
 from backend import assessment
 from backend.assessment import BLUEPRINT_VERSION, COMPETENCIES, grade_attempt, make_assessment
@@ -108,6 +110,16 @@ def test_seeded_variants_keep_all_categories_complete_and_mutation_gated():
             incomplete_mutation = {key: value for key, value in answer_key.items()
                                    if key not in phase_two_ids}
             assert not _grade(questions, answer_key, incomplete_mutation)[1]
+
+
+def test_seeded_variants_do_not_reuse_an_identical_public_form():
+    for category in COMPETENCIES:
+        specialization, grade = category.split(":")
+        forms = set()
+        for seed in range(100):
+            questions, _ = make_assessment(specialization, grade, f"{seed:032x}")
+            forms.add(json.dumps(questions, ensure_ascii=False, sort_keys=True))
+        assert len(forms) >= 99, category
 
 
 def test_qa_and_data_analyst_tracks_have_versioned_complete_variants():

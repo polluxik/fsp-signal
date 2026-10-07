@@ -33,11 +33,14 @@ def make_assessment(specialization: str, grade: str, seed: str | None = None):
     elif key.startswith("data_analyst:"):
         groups = make_data_analyst_groups(grade, rng)
     elif key == "backend:middle":
+        domain = rng.choice(("платёж", "заказ", "уведомление", "заявка", "операция склада"))
+        event_key = rng.choice(("event_id", "operation_id", "message_id", "delivery_id"))
+        incident = rng.randint(1000, 999999)
         groups = [
             ("event_idempotency", [
-                structured_part("bm1", "После сетевого таймаута одно платёжное событие может прийти повторно. Составьте правило обработки: ключ дедупликации, защита от параллельной записи и ответ на повтор.", 12, [
+                structured_part("bm1", f"Инцидент {incident}: после сетевого таймаута {domain} может прийти повторно. Составьте правило обработки: ключ дедупликации, защита от параллельной записи и ответ на повтор.", 12, [
                     {"id": "dedupe_key", "label": "Стабильный ключ события", "points": 4,
-                     "options": [{"value": "event_id", "label": "Исходный event_id"},
+                     "options": [{"value": "event_id", "label": f"Исходный {event_key}"},
                                  {"value": "payload_hash", "label": "Хеш текущего payload"},
                                  {"value": "request_id", "label": "ID HTTP-запроса"}]},
                     {"id": "concurrency_control", "label": "Защита от параллельной обработки", "points": 4,
@@ -50,11 +53,11 @@ def make_assessment(specialization: str, grade: str, seed: str | None = None):
                                  {"value": "reject_all", "label": "Отклонить все последующие запросы"}]},
                 ], {"dedupe_key": "event_id", "concurrency_control": "unique_constraint",
                     "replay_result": "stored_result"}),
-                part("bm2", "Минимальный тест, который отличает безопасный обработчик от ошибочного: какое событие повторить и что проверить?", 8, "same_id_once",
-                     options=[{"value": "same_id_once", "label": "Отправить один event_id дважды и проверить один побочный эффект"},
-                              {"value": "two_ids", "label": "Отправить два разных event_id и проверить два эффекта"},
-                              {"value": "same_body", "label": "Отправить одинаковый body с новыми event_id"}]),
-                part("bm3", "Изменение условия: тот же event_id повторно пришёл с другим payload. Как должен ответить обработчик?", 10, "conflict", phase=2,
+                part("bm2", f"Минимальный тест для инцидента {incident}: какое событие повторить и что проверить?", 8, "same_id_once",
+                     options=[{"value": "same_id_once", "label": f"Отправить один {event_key} дважды и проверить один побочный эффект"},
+                              {"value": "two_ids", "label": f"Отправить два разных {event_key} и проверить два эффекта"},
+                              {"value": "same_body", "label": f"Отправить одинаковый body с новыми {event_key}"}]),
+                part("bm3", f"Изменение условия: тот же {event_key} повторно пришёл с другим payload. Как должен ответить обработчик?", 10, "conflict", phase=2,
                      options=[{"value": "conflict", "label": "Вернуть конфликт и не повторять побочный эффект"},
                               {"value": "apply_again", "label": "Применить новые данные как ещё одно событие"},
                               {"value": "return_old", "label": "Молча вернуть старый результат, не проверяя payload"}]),
@@ -139,6 +142,11 @@ def make_assessment(specialization: str, grade: str, seed: str | None = None):
     questions, answer_key = [], {}
     for competency, parts in groups:
         for public, answer in parts:
+            if public.get("options"):
+                rng.shuffle(public["options"])
+            for field in public.get("fields", []):
+                if field.get("options"):
+                    rng.shuffle(field["options"])
             public["competency"] = competency
             questions.append(public)
             answer_key[public["id"]] = answer

@@ -5,6 +5,12 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validat
 from .taxonomy import get_category
 
 
+class ApiError(BaseModel):
+    """Stable error envelope returned by application and security checks."""
+
+    detail: str | list[dict[str, Any]]
+
+
 class RegisterIn(BaseModel):
     email: str = Field(min_length=5, max_length=254)
     password: str = Field(min_length=10, max_length=128)
@@ -365,11 +371,15 @@ class EvidenceCard(BaseModel):
     id: str
     competency: str | None
     action: str
-    source_type: Literal["assessment_attempt", "achievement_story", "skill_claim", "legacy_aggregate"]
+    source_type: Literal[
+        "assessment_attempt", "fsp_achievement", "achievement_story", "skill_claim", "legacy_aggregate"
+    ]
     source_id: str | None
     source_version: str
     assessed_at: datetime | None
-    verification_level: Literal["verified_action", "declared", "aggregate", "synthetic_fixture"]
+    verification_level: Literal[
+        "verified_action", "verified_credential", "declared", "aggregate", "synthetic_fixture"
+    ]
     scope: str
     limitations: list[str]
     data_mode: Literal["real", "synthetic"]
@@ -509,6 +519,25 @@ class InterviewHeldConfirmationOut(BaseModel):
 
 class FspLinkIn(BaseModel):
     participant_id: str = Field(min_length=5, max_length=80)
+
+
+class FspAchievementOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    credential_version: Literal["fsp-achievement-v1"] = "fsp-achievement-v1"
+    issuer: str = Field(min_length=2, max_length=160)
+    discipline: str = Field(min_length=2, max_length=120)
+    event_name: str = Field(min_length=2, max_length=240)
+    event_date: str = Field(min_length=10, max_length=10)
+    result: Literal["participant", "finalist", "prize"]
+    result_scope: Literal["individual", "team"]
+    personal_role: str = Field(default="", max_length=500)
+    evidence_url: str | None = Field(default=None, max_length=1000)
+    mapped_specializations: list[Literal["backend", "frontend", "qa", "data_analyst"]] = Field(
+        default_factory=list, max_length=4
+    )
+    verified_at: datetime
+    source: Literal["fsp_registry", "synthetic_fixture"]
 
 
 class AssistantDraftIn(BaseModel):

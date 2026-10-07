@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -102,6 +100,7 @@ class CandidateProfile(Base):
     fsp_id: Mapped[str | None] = mapped_column(String(80))
     fsp_status: Mapped[str] = mapped_column(String(30), default="unlinked")
     fsp_result: Mapped[str | None] = mapped_column(String(40))
+    fsp_achievement: Mapped[dict] = mapped_column(JSON, default=dict)
     __table_args__ = (
         CheckConstraint("min_salary_rub >= 0", name="candidate_min_salary_nonnegative"),
         CheckConstraint("preferences_version >= 1", name="candidate_preferences_version"),

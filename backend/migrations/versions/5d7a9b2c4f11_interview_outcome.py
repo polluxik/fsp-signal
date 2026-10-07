@@ -3,8 +3,6 @@
 Revision ID: 5d7a9b2c4f11
 Revises: e8a1c4d57b20
 """
-from __future__ import annotations
-
 from typing import Sequence, Union
 
 from alembic import op

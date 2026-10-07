@@ -1,7 +1,7 @@
 """Runtime safety contracts that don't need an external database."""
 
 from backend.db import engine as test_engine, make_engine
-from backend.main import ready
+from backend.main import app, ready
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -51,7 +51,7 @@ def test_pytest_database_is_initialized_by_the_current_alembic_revision():
         revision = connection.exec_driver_sql(
             "SELECT version_num FROM alembic_version"
         ).scalar_one()
-    assert revision == "a40e8c9f621b"
+    assert revision == "f7c2a1d93e10"
 
 
 def test_csrf_guard_accepts_the_configured_origin_and_rejects_another_origin():
@@ -78,3 +78,27 @@ def test_csrf_guard_accepts_the_configured_origin_and_rejects_another_origin():
         assert error.detail == "ORIGIN_FORBIDDEN"
     else:
         raise AssertionError("CSRF guard accepted a different origin")
+
+
+def test_openapi_documents_error_envelope_and_cookie_csrf_security():
+    schema = app.openapi()
+    schemes = schema["components"]["securitySchemes"]
+    assert schemes["CookieSession"] == {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "fsp_session",
+        "description": "HttpOnly session cookie issued by POST /api/v1/auth/login.",
+    }
+    protected = schema["paths"]["/api/v1/candidate/profile"]["put"]
+    assert protected["security"] == [{
+        "CookieSession": [],
+        "CsrfCookie": [],
+        "CsrfHeader": [],
+    }]
+    included_router_operation = schema["paths"]["/api/v1/candidate/preferences"]["put"]
+    assert included_router_operation["security"] == protected["security"]
+    assert protected["responses"]["409"] == {"$ref": "#/components/responses/Error409"}
+    live = schema["paths"]["/api/v1/health/live"]["get"]
+    assert "security" not in live
+    assert "401" not in live["responses"]
+    assert "security" not in schema["paths"]["/api/v1/calendars/{token}"]["get"]

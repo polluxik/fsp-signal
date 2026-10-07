@@ -1,0 +1,271 @@
+{
+  "status": "synthetic_mechanics_only",
+  "model_version": "assessment-stress-v1",
+  "profiles_per_group_per_category": 20,
+  "groups": [
+    "weak",
+    "boundary",
+    "strong"
+  ],
+  "limitations": [
+    "Ответы сгенерированы явной latent-ability моделью, а не получены от людей.",
+    "Сложность и дискриминативность заданий заданы как допущения и не подтверждают релевантность роли.",
+    "Результат проверяет только устойчивость scoring mechanics; человеческий пилот и экспертный rubric review остаются обязательными."
+  ],
+  "proposed_gates": {
+    "minimum_pass_fail_agreement": 0.8,
+    "maximum_threshold_crossing_rate": 0.1,
+    "maximum_absolute_form_mean_gap": 5.0,
+    "minimum_strong_minus_weak_mean_score": 30.0
+  },
+  "categories": [
+    {
+      "category": "backend:junior",
+      "profiles": 60,
+      "forms_per_profile": 2,
+      "pass_fail_agreement": 0.95,
+      "threshold_crossing_rate": 0.05,
+      "mean_absolute_score_difference": 2.583,
+      "spearman_score_correlation": 0.9861,
+      "form_1_mean_score": 62.083,
+      "form_2_mean_score": 61.5,
+      "absolute_form_mean_gap": 0.583,
+      "groups": {
+        "weak": {
+          "profiles": 20,
+          "mean_score": 14.875,
+          "pass_rate": 0
+        },
+        "boundary": {
+          "profiles": 20,
+          "mean_score": 72,
+          "pass_rate": 0.55
+        },
+        "strong": {
+          "profiles": 20,
+          "mean_score": 98.5,
+          "pass_rate": 0.975
+        }
+      },
+      "strong_minus_weak_mean_score": 83.625,
+      "strong_minus_weak_pass_rate": 0.975
+    },
+    {
+      "category": "backend:middle",
+      "profiles": 60,
+      "forms_per_profile": 2,
+      "pass_fail_agreement": 1.0,
+      "threshold_crossing_rate": 0.0,
+      "mean_absolute_score_difference": 1.433,
+      "spearman_score_correlation": 0.9867,
+      "form_1_mean_score": 59.8,
+      "form_2_mean_score": 59.933,
+      "absolute_form_mean_gap": 0.133,
+      "groups": {
+        "weak": {
+          "profiles": 20,
+          "mean_score": 7.575,
+          "pass_rate": 0
+        },
+        "boundary": {
+          "profiles": 20,
+          "mean_score": 73.9,
+          "pass_rate": 0.25
+        },
+        "strong": {
+          "profiles": 20,
+          "mean_score": 98.125,
+          "pass_rate": 1
+        }
+      },
+      "strong_minus_weak_mean_score": 90.55,
+      "strong_minus_weak_pass_rate": 1
+    },
+    {
+      "category": "data_analyst:junior",
+      "profiles": 60,
+      "forms_per_profile": 2,
+      "pass_fail_agreement": 1.0,
+      "threshold_crossing_rate": 0.0,
+      "mean_absolute_score_difference": 1.95,
+      "spearman_score_correlation": 0.99,
+      "form_1_mean_score": 59.717,
+      "form_2_mean_score": 59.433,
+      "absolute_form_mean_gap": 0.283,
+      "groups": {
+        "weak": {
+          "profiles": 20,
+          "mean_score": 12.1,
+          "pass_rate": 0
+        },
+        "boundary": {
+          "profiles": 20,
+          "mean_score": 67.125,
+          "pass_rate": 0.3
+        },
+        "strong": {
+          "profiles": 20,
+          "mean_score": 99.5,
+          "pass_rate": 1
+        }
+      },
+      "strong_minus_weak_mean_score": 87.4,
+      "strong_minus_weak_pass_rate": 1
+    },
+    {
+      "category": "data_analyst:middle",
+      "profiles": 60,
+      "forms_per_profile": 2,
+      "pass_fail_agreement": 0.95,
+      "threshold_crossing_rate": 0.05,
+      "mean_absolute_score_difference": 2.433,
+      "spearman_score_correlation": 0.9833,
+      "form_1_mean_score": 58.9,
+      "form_2_mean_score": 59.467,
+      "absolute_form_mean_gap": 0.567,
+      "groups": {
+        "weak": {
+          "profiles": 20,
+          "mean_score": 9.425,
+          "pass_rate": 0
+        },
+        "boundary": {
+          "profiles": 20,
+          "mean_score": 69.775,
+          "pass_rate": 0.25
+        },
+        "strong": {
+          "profiles": 20,
+          "mean_score": 98.35,
+          "pass_rate": 0.925
+        }
+      },
+      "strong_minus_weak_mean_score": 88.925,
+      "strong_minus_weak_pass_rate": 0.925
+    },
+    {
+      "category": "frontend:junior",
+      "profiles": 60,
+      "forms_per_profile": 2,
+      "pass_fail_agreement": 1.0,
+      "threshold_crossing_rate": 0.0,
+      "mean_absolute_score_difference": 1.5,
+      "spearman_score_correlation": 0.9936,
+      "form_1_mean_score": 52.167,
+      "form_2_mean_score": 51.667,
+      "absolute_form_mean_gap": 0.5,
+      "groups": {
+        "weak": {
+          "profiles": 20,
+          "mean_score": 3.25,
+          "pass_rate": 0
+        },
+        "boundary": {
+          "profiles": 20,
+          "mean_score": 57.75,
+          "pass_rate": 0.15
+        },
+        "strong": {
+          "profiles": 20,
+          "mean_score": 94.75,
+          "pass_rate": 0.8
+        }
+      },
+      "strong_minus_weak_mean_score": 91.5,
+      "strong_minus_weak_pass_rate": 0.8
+    },
+    {
+      "category": "frontend:middle",
+      "profiles": 60,
+      "forms_per_profile": 2,
+      "pass_fail_agreement": 0.9833,
+      "threshold_crossing_rate": 0.0167,
+      "mean_absolute_score_difference": 1.417,
+      "spearman_score_correlation": 0.9825,
+      "form_1_mean_score": 62.917,
+      "form_2_mean_score": 62.5,
+      "absolute_form_mean_gap": 0.417,
+      "groups": {
+        "weak": {
+          "profiles": 20,
+          "mean_score": 9.875,
+          "pass_rate": 0
+        },
+        "boundary": {
+          "profiles": 20,
+          "mean_score": 78.25,
+          "pass_rate": 0.475
+        },
+        "strong": {
+          "profiles": 20,
+          "mean_score": 100,
+          "pass_rate": 1
+        }
+      },
+      "strong_minus_weak_mean_score": 90.125,
+      "strong_minus_weak_pass_rate": 1
+    },
+    {
+      "category": "qa:junior",
+      "profiles": 60,
+      "forms_per_profile": 2,
+      "pass_fail_agreement": 0.9833,
+      "threshold_crossing_rate": 0.0167,
+      "mean_absolute_score_difference": 0.883,
+      "spearman_score_correlation": 0.994,
+      "form_1_mean_score": 61.883,
+      "form_2_mean_score": 61.333,
+      "absolute_form_mean_gap": 0.55,
+      "groups": {
+        "weak": {
+          "profiles": 20,
+          "mean_score": 12.575,
+          "pass_rate": 0
+        },
+        "boundary": {
+          "profiles": 20,
+          "mean_score": 75.45,
+          "pass_rate": 0.325
+        },
+        "strong": {
+          "profiles": 20,
+          "mean_score": 96.8,
+          "pass_rate": 0.85
+        }
+      },
+      "strong_minus_weak_mean_score": 84.225,
+      "strong_minus_weak_pass_rate": 0.85
+    },
+    {
+      "category": "qa:middle",
+      "profiles": 60,
+      "forms_per_profile": 2,
+      "pass_fail_agreement": 1.0,
+      "threshold_crossing_rate": 0.0,
+      "mean_absolute_score_difference": 1.283,
+      "spearman_score_correlation": 0.9922,
+      "form_1_mean_score": 52.567,
+      "form_2_mean_score": 53.117,
+      "absolute_form_mean_gap": 0.55,
+      "groups": {
+        "weak": {
+          "profiles": 20,
+          "mean_score": 4.95,
+          "pass_rate": 0
+        },
+        "boundary": {
+          "profiles": 20,
+          "mean_score": 57.7,
+          "pass_rate": 0.1
+        },
+        "strong": {
+          "profiles": 20,
+          "mean_score": 95.875,
+          "pass_rate": 0.9
+        }
+      },
+      "strong_minus_weak_mean_score": 90.925,
+      "strong_minus_weak_pass_rate": 0.9
+    }
+  ]
+}

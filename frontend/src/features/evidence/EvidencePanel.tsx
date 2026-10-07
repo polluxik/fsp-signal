@@ -13,6 +13,7 @@ type Props = {
 
 const levelNames: Record<EvidenceCard['verification_level'], string> = {
   verified_action: 'Действие проверено заданием',
+  verified_credential: 'Проверено по данным ФСП',
   declared: 'Заявлено кандидатом',
   aggregate: 'Подтверждена категория, без сохранённого действия',
   synthetic_fixture: 'Синтетическая демонстрация',
@@ -20,6 +21,7 @@ const levelNames: Record<EvidenceCard['verification_level'], string> = {
 
 const sourceNames: Record<EvidenceCard['source_type'], string> = {
   assessment_attempt: 'Практическая проверка',
+  fsp_achievement: 'Достижение ФСП',
   achievement_story: 'История достижения',
   skill_claim: 'Навык из профиля',
   legacy_aggregate: 'Ранее сохранённая категория',
@@ -76,7 +78,7 @@ export default function EvidencePanel({ candidateId, mode = 'self', selectedIds 
           {selectable && <input type="checkbox" aria-label={`Добавить: ${sourceNames[card.source_type]}`}
             checked={selectedIds.includes(card.id)} onChange={() => toggle(card.id)}/>}
           <div><span className="badge">{sourceNames[card.source_type]}</span>
-            <span className={`badge ${card.verification_level === 'verified_action' ? 'green' : ''}`}>{levelNames[card.verification_level]}</span></div>
+            <span className={`badge ${['verified_action', 'verified_credential'].includes(card.verification_level) ? 'green' : ''}`}>{levelNames[card.verification_level]}</span></div>
         </div>
         <p className="evidence-action">{card.action}</p>
         {card.competency && <p className="small muted">Компетенция: {card.competency}</p>}

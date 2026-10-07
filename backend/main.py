@@ -6,6 +6,8 @@ import json
 import secrets
 
 from fastapi import Body, Depends, FastAPI, File, Header, HTTPException, Request, Response, UploadFile
+from fastapi.openapi.utils import get_openapi
+from fastapi.routing import APIRoute
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -22,7 +24,7 @@ from .evidence import (build_achievement_narrative, build_achievement_story_reco
                        list_candidate_evidence)
 from .invitations import (InvitationError, confirm_interview_held,
                           create_invitation as create_invitation_record, transition_invitation)
-from .matching import (can_search, eligible, evaluate_compatibility, explain_profile, fsp_bonus,
+from .matching import (can_search, eligible, evaluate_compatibility, explain_profile, fsp_bonus, fsp_relevance,
                        public_candidate, score_profile, score_profile_v2, suggest_competencies)
 from .models import (AssessmentAttempt, CandidateProfile, ContactGrant, EmailToken, EmployerProfile,
                      HiringNeed, Invitation, LoginSession, MailOutbox, RoleVersion,
@@ -34,7 +36,7 @@ from .resume_import import MAX_PDF_BYTES, ResumeImportError, preview_pdf
 from .role_cards import create_initial_draft
 from .routes_v2 import assistant_router, candidate_router, router as v2_router
 from .scheduling import router as scheduling_router
-from .schemas import (AcceptInvitationIn, AnswersIn, CandidateIn, EmployerIn, FspLinkIn,
+from .schemas import (AcceptInvitationIn, AnswersIn, ApiError, CandidateIn, EmployerIn, FspLinkIn,
                       InterviewHeldConfirmationOut, InvitationCommandIn, InvitationOut,
                       InvitationV2In, LoginIn, NeedIn, RegisterIn, RoleCardIn, SearchIn,
                       SearchOut, StartAssessmentIn, TaxonomyCategoryOut, VerifyIn)
@@ -46,12 +48,142 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title="ФСП Сигнал", version="0.1.0", description="Демонстрационный API обратного найма",
+COMMON_ERROR_RESPONSES = {
+    401: {"model": ApiError, "description": "Нет действующей cookie-сессии или учетные данные неверны."},
+    403: {"model": ApiError, "description": "Недостаточно прав, не подтвержден email или не пройдена CSRF-проверка."},
+    404: {"model": ApiError, "description": "Ресурс не найден либо недоступен текущему пользователю."},
+    409: {"model": ApiError, "description": "Конфликт состояния, версии или повторной операции."},
+    413: {"model": ApiError, "description": "Загруженный файл превышает допустимый размер."},
+    429: {"model": ApiError, "description": "Превышен лимит попыток или запросов."},
+    503: {"model": ApiError, "description": "Зависимость или настроенная внешняя возможность временно недоступна."},
+}
+
+API_DESCRIPTION = """Демонстрационный API платформы обратного найма «ФСП Сигнал».
+
+Авторизация использует HttpOnly cookie `fsp_session`. Изменяющие состояние запросы
+дополнительно требуют совпадающие cookie `fsp_csrf` и заголовок `x-csrf-token`.
+Бизнес-ошибки возвращаются как `{\"detail\": \"MACHINE_READABLE_CODE\"}`; ошибки
+валидации FastAPI возвращают HTTP 422. В демо данные ФСП поступают из явно
+обозначенного mock-провайдера: организаторы хакатона не предоставили API ФСП.
+"""
+
+
+app = FastAPI(title="ФСП Сигнал", version="0.1.0", description=API_DESCRIPTION,
               docs_url="/api/docs", openapi_url="/api/openapi.json", lifespan=lifespan)
 app.include_router(v2_router)
 app.include_router(candidate_router)
 app.include_router(assistant_router)
 app.include_router(scheduling_router)
+
+
+def _dependency_calls(dependant):
+    for dependency in dependant.dependencies:
+        if dependency.call is not None:
+            yield dependency.call
+        yield from _dependency_calls(dependency)
+
+
+def _api_routes(routes):
+    """Flatten regular and lazily included FastAPI routers for documentation."""
+    for route in routes:
+        if isinstance(route, APIRoute):
+            yield route
+        elif hasattr(route, "original_router"):
+            yield from _api_routes(route.original_router.routes)
+
+
+def documented_openapi():
+    """Expose the cookie/CSRF contract that FastAPI cannot infer from Request."""
+    if app.openapi_schema:
+        return app.openapi_schema
+    schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        openapi_version=app.openapi_version,
+        description=app.description,
+        routes=app.routes,
+    )
+    security_schemes = schema.setdefault("components", {}).setdefault("securitySchemes", {})
+    security_schemes.update({
+        "CookieSession": {
+            "type": "apiKey",
+            "in": "cookie",
+            "name": "fsp_session",
+            "description": "HttpOnly session cookie issued by POST /api/v1/auth/login.",
+        },
+        "CsrfCookie": {
+            "type": "apiKey",
+            "in": "cookie",
+            "name": "fsp_csrf",
+            "description": "Readable CSRF cookie issued together with the session.",
+        },
+        "CsrfHeader": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "x-csrf-token",
+            "description": "Must exactly match the fsp_csrf cookie on state-changing requests.",
+        },
+    })
+    schemas = schema["components"].setdefault("schemas", {})
+    schemas["ApiError"] = ApiError.model_json_schema(ref_template="#/components/schemas/{model}")
+    response_components = schema["components"].setdefault("responses", {})
+    for status, metadata in COMMON_ERROR_RESPONSES.items():
+        response_components[f"Error{status}"] = {
+            "description": metadata["description"],
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApiError"}}},
+        }
+    for route in _api_routes(app.routes):
+        dependencies = set(_dependency_calls(route.dependant))
+        requirement = {}
+        if get_user in dependencies:
+            requirement["CookieSession"] = []
+        if csrf_guard in dependencies:
+            requirement["CsrfCookie"] = []
+            requirement["CsrfHeader"] = []
+        if not requirement:
+            requirement = None
+        path_item = schema["paths"].get(route.path_format, {})
+        for method in route.methods:
+            operation = path_item.get(method.lower())
+            if operation is not None:
+                if requirement:
+                    # One Security Requirement Object means all listed schemes are required (AND).
+                    operation["security"] = [requirement]
+                documented_errors = set()
+                if get_user in dependencies:
+                    documented_errors.update((401, 403))
+                if csrf_guard in dependencies:
+                    documented_errors.update((403, 409))
+                if "{" in route.path_format:
+                    documented_errors.add(404)
+                if route.path_format == "/api/v1/auth/register":
+                    documented_errors.add(409)
+                elif route.path_format == "/api/v1/auth/verify-email":
+                    documented_errors.add(409)
+                elif route.path_format == "/api/v1/auth/login":
+                    documented_errors.update((401, 403))
+                if route.path_format in {
+                    "/api/v1/candidate/resume/preview",
+                    "/api/v1/meetings/{meeting_id}/recording",
+                }:
+                    documented_errors.add(413)
+                if (route.path_format == "/api/v1/candidate/assessment-attempts"
+                        or route.path_format.startswith("/api/v1/assistant/")):
+                    documented_errors.add(429)
+                if route.path_format in {
+                    "/api/v1/health/ready",
+                    "/api/v1/candidate/passport.pdf",
+                } or route.path_format.startswith("/api/v1/assistant/"):
+                    documented_errors.add(503)
+                for status in sorted(documented_errors):
+                    operation["responses"][str(status)] = {
+                        "$ref": f"#/components/responses/Error{status}"
+                    }
+    app.openapi_schema = schema
+    return schema
+
+
+app.openapi = documented_openapi
 
 
 @app.exception_handler(RequestValidationError)
@@ -116,6 +248,7 @@ def candidate_private(profile: CandidateProfile) -> dict:
         "adult_hiring_confirmed": bool(profile.adult_attested_at),
         "work_format": profile.work_format, "fsp_id": profile.fsp_id,
         "fsp_status": profile.fsp_status, "fsp_result": profile.fsp_result,
+        "fsp_achievement": profile.fsp_achievement or None,
         "next_grade_change_at": (aware(profile.grade_changed_at)+timedelta(days=30)).isoformat()
         if profile.grade_changed_at else None,
     }
@@ -328,11 +461,34 @@ def fsp_link(data: FspLinkIn, user: User = Depends(get_user), db: Session = Depe
     profile.fsp_id = data.participant_id
     if settings.app_mode == "demo" and settings.fsp_provider == "mock" and data.participant_id == f"demo-{user.id}":
         profile.fsp_status, profile.fsp_result = "mock", "finalist"
+        specialization = profile.verified_specialization or profile.desired_specialization or "backend"
+        discipline_by_specialization = {
+            "backend": "программирование продуктов",
+            "frontend": "программирование продуктов",
+            "qa": "информационная безопасность",
+            "data_analyst": "алгоритмическое программирование",
+        }
+        profile.fsp_achievement = {
+            "credential_version": "fsp-achievement-v1",
+            "issuer": "ФСП России (демонстрационная запись)",
+            "discipline": discipline_by_specialization.get(specialization, "программирование продуктов"),
+            "event_name": "Демонстрационный кубок ФСП",
+            "event_date": "2026-09-20",
+            "result": "finalist",
+            "result_scope": "team",
+            "personal_role": "Участник команды; личный вклад требует подтверждения на интервью.",
+            "evidence_url": None,
+            "mapped_specializations": [specialization],
+            "verified_at": now().isoformat(),
+            "source": "synthetic_fixture",
+        }
     else:
         profile.fsp_status, profile.fsp_result = "unverified", None
+        profile.fsp_achievement = {}
     db.commit()
     return {"fsp_id": profile.fsp_id, "status": profile.fsp_status,
-            "result": profile.fsp_result, "demo_expected_id": f"demo-{user.id}" if settings.app_mode == "demo" else None}
+            "result": profile.fsp_result, "achievement": profile.fsp_achievement or None,
+            "demo_expected_id": f"demo-{user.id}" if settings.app_mode == "demo" else None}
 
 
 @app.delete("/api/v1/candidate/fsp-link", dependencies=[Depends(csrf_guard)])
@@ -340,6 +496,7 @@ def unlink_fsp(user: User = Depends(get_user), db: Session = Depends(get_db)):
     require(user, "candidate")
     profile = profile_for(db, user)
     profile.fsp_id, profile.fsp_status, profile.fsp_result = None, "unlinked", None
+    profile.fsp_achievement = {}
     db.commit()
     return {"status": "unlinked"}
 
@@ -557,7 +714,9 @@ def bank_candidates(specialization: str | None = None, grade: str | None = None,
                 (not fsp_only or bool(fsp_bonus(p)))]
     def bank_score(profile: CandidateProfile) -> float:
         if settings.match_algorithm_version == "match_v2":
-            return float(profile.test_score or 0)
+            base = float(profile.test_score or 0)
+            specialization = profile.verified_specialization or ""
+            return min(100.0, base + 5 * fsp_relevance(profile, specialization))
         return 90 * (profile.test_score or 0) / 100 + 10 * fsp_bonus(profile)
 
     selected.sort(key=lambda p: (p.verified_specialization, p.verified_grade,

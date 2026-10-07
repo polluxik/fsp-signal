@@ -3,8 +3,6 @@
 Revision ID: c6b21e90a441
 Revises: 41dbe7c98854
 """
-from __future__ import annotations
-
 import hashlib
 import json
 from typing import Sequence, Union

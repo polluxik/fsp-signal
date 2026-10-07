@@ -1,19 +1,21 @@
 """End-to-end API rules, using the real evaluator and separate users."""
 
+from dataclasses import replace
 import re
 from datetime import timedelta
 from io import BytesIO
 from urllib.parse import parse_qs, urlparse
 
 import pytest
-from fastapi.testclient import TestClient  # noqa: E402
-from sqlalchemy import select  # noqa: E402
-from reportlab.pdfgen import canvas  # noqa: E402
+from fastapi.testclient import TestClient
+from sqlalchemy import select
+from reportlab.pdfgen import canvas
 
-from backend.assessment import COMPETENCIES, grade_attempt, make_assessment  # noqa: E402
-from backend.db import SessionLocal  # noqa: E402
-from backend.main import app  # noqa: E402
-from backend.models import AssessmentAttempt, CandidateProfile, Invitation, MailOutbox, now  # noqa: E402
+from backend.assessment import COMPETENCIES, grade_attempt, make_assessment
+import backend.main as main_module
+from backend.db import SessionLocal
+from backend.main import app
+from backend.models import AssessmentAttempt, CandidateProfile, Invitation, MailOutbox, now
 
 
 def csrf(client: TestClient):
@@ -41,6 +43,36 @@ def register_verified(client: TestClient, email: str, role: str) -> dict:
     assert client.post("/api/v1/auth/verify-email", json={"token": token}).status_code == 200
     assert client.post("/api/v1/auth/login", json={"email": email, "password": "CorrectHorse123!"}).status_code == 200
     return created.json()
+
+
+def test_demo_fsp_link_returns_a_structured_role_mapped_credential_and_unlinks(monkeypatch):
+    monkeypatch.setattr(main_module, "settings", replace(
+        main_module.settings, app_mode="demo", fsp_provider="mock"))
+    with TestClient(app) as candidate:
+        person = create_assessment_candidate(candidate, "fsp-credential-flow@example.test")
+        with SessionLocal() as db:
+            profile = db.get(CandidateProfile, person["id"])
+            profile.verified_specialization = "qa"
+            profile.verified_grade = "junior"
+            profile.test_score = 84
+            profile.verification_source = "assessment"
+            db.commit()
+
+        linked = candidate.post("/api/v1/candidate/fsp-link", headers=csrf(candidate), json={
+            "participant_id": f"demo-{person['id']}",
+        })
+        assert linked.status_code == 200, linked.text
+        payload = linked.json()
+        assert payload["status"] == "mock"
+        assert payload["achievement"]["source"] == "synthetic_fixture"
+        assert payload["achievement"]["mapped_specializations"] == ["qa"]
+        assert payload["achievement"]["discipline"] == "информационная безопасность"
+        assert candidate.get("/api/v1/candidate/profile").json()["fsp_achievement"] == payload["achievement"]
+
+        unlinked = candidate.delete("/api/v1/candidate/fsp-link", headers=csrf(candidate))
+        assert unlinked.status_code == 200
+        profile = candidate.get("/api/v1/candidate/profile").json()
+        assert profile["fsp_status"] == "unlinked" and profile["fsp_achievement"] is None
 
 
 @pytest.mark.parametrize(("specialization", "grade", "blueprint_version", "competencies"), [
