@@ -9,10 +9,9 @@ const stages = [['matched', 'Профили в подборках'], ['invited',
 export default function RoleFunnel({ needId, versionId, revision }: { needId: string; versionId: string; revision: string }) {
   const [data, setData] = useState<Funnel | null>(null)
   const [historicalVersion, setHistoricalVersion] = useState('')
-  const [mode, setMode] = useState<'real' | 'synthetic' | null>(null)
   const [error, setError] = useState('')
   const [retry, setRetry] = useState(0)
-  useEffect(() => { setHistoricalVersion(''); setMode(null); setData(null) }, [needId, versionId])
+  useEffect(() => { setHistoricalVersion(''); setData(null) }, [needId, versionId])
   useEffect(() => {
     const controller = new AbortController()
     setError('')
@@ -21,7 +20,7 @@ export default function RoleFunnel({ needId, versionId, revision }: { needId: st
       .catch(err => { if (!controller.signal.aborted) setError(err.message) })
     return () => controller.abort()
   }, [needId, versionId, historicalVersion, revision, retry])
-  const selectedMode = mode ?? (data && Object.values(data.real).some(count => count > 0) ? 'real' : 'synthetic')
+  const selectedMode = data && Object.values(data.real).some(count => count > 0) ? 'real' : 'synthetic'
   return <section className="card role-funnel" data-testid="role-funnel">
     <div className="section-title"><div><p className="eyebrow">АКТИВНОСТЬ ПО РОЛИ</p><h2>От подбора до встречи</h2></div>
       <button className="button subtle" onClick={() => setRetry(value => value + 1)}>Обновить воронку</button></div>
@@ -30,12 +29,8 @@ export default function RoleFunnel({ needId, versionId, revision }: { needId: st
       <label>Версия роли в воронке<select value={historicalVersion || versionId} onChange={event => { setHistoricalVersion(event.target.value); setData(null) }}>
         {data.versions.map(version => <option key={version.id} value={version.id}>v{version.version} · {version.title}</option>)}</select></label>
       {!data.current && <p className="small muted">История прежних условий. Новые приглашения относятся к текущей версии роли.</p>}
-      <div className="segmented pipeline-mode" aria-label="Данные воронки">
-        <button className={selectedMode === 'synthetic' ? 'active' : ''} aria-pressed={selectedMode === 'synthetic'} onClick={() => setMode('synthetic')}>Тестовые данные</button>
-        <button className={selectedMode === 'real' ? 'active' : ''} aria-pressed={selectedMode === 'real'} onClick={() => setMode('real')}>Реальные данные</button>
-      </div>
       <ol className="pipeline-stages">{stages.map(([key, label]) => <li key={key}><strong data-testid={`funnel-${key}`}>{data[selectedMode][key]}</strong><span>{label}</span></li>)}</ol>
-      <p className="small muted">{selectedMode === 'synthetic' ? 'Учебные данные, не результаты реального найма. ' : ''}{data.explanation}</p>
+      <p className="small muted">{data.explanation}</p>
     </>}
   </section>
 }

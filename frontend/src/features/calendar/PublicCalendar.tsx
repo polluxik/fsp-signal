@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { api } from '../../api'
+import { displayText } from '../../presentation'
 import type { Invite, User } from '../../types'
 import { type Calendar, type Meeting, type Slot, moment } from './types'
 
@@ -44,7 +45,7 @@ export default function PublicCalendar({ me, auth }: { me: User | null; auth: Re
   const days = [...new Set(slots.map(slot => new Date(slot.starts_at).toLocaleDateString('ru-RU')))]
   return <main className="booking-page"><a href="/" className="logo">ФСП <strong>СИГНАЛ</strong></a>
     <div className="page-heading"><p className="eyebrow">ДАВАЙТЕ ПОЗНАКОМИМСЯ</p><h1>Выберите время созвона</h1>
-      <p>{calendar?.company_name ?? 'Загружаем календарь…'}</p></div>
+      <p>{calendar?.company_name ? displayText(calendar.company_name) : 'Загружаем календарь…'}</p></div>
     {error && <div className="notice bad" role="alert">{error}</div>}
     {booked ? <section className="card booking-success"><span className="badge green">Встреча назначена</span><h2>{moment(booked.starts_at)}</h2>
       <p>Оба участника получат уведомление. Время показано в {localZone}.</p>

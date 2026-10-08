@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../api'
+import { displayText } from '../../presentation'
 import type { EvidenceCard } from '../../types'
 
 type Props = {
@@ -16,7 +17,7 @@ const levelNames: Record<EvidenceCard['verification_level'], string> = {
   verified_credential: 'Проверено по данным ФСП',
   declared: 'Заявлено кандидатом',
   aggregate: 'Подтверждена категория, без сохранённого действия',
-  synthetic_fixture: 'Синтетическая демонстрация',
+  synthetic_fixture: 'Источник не подтверждён',
 }
 
 const sourceNames: Record<EvidenceCard['source_type'], string> = {
@@ -80,10 +81,9 @@ export default function EvidencePanel({ candidateId, mode = 'self', selectedIds 
           <div><span className="badge">{sourceNames[card.source_type]}</span>
             <span className={`badge ${['verified_action', 'verified_credential'].includes(card.verification_level) ? 'green' : ''}`}>{levelNames[card.verification_level]}</span></div>
         </div>
-        <p className="evidence-action">{card.action}</p>
+        <p className="evidence-action">{displayText(card.action)}</p>
         {card.competency && <p className="small muted">Компетенция: {card.competency}</p>}
-        <ul className="evidence-limitations">{card.limitations.map(limit => <li key={limit}>{limit}</li>)}</ul>
-        {card.data_mode === 'synthetic' && <p className="small synthetic-note">Синтетические демонстрационные данные — не реальный результат кандидата.</p>}
+        <ul className="evidence-limitations">{card.limitations.map(limit => <li key={limit}>{displayText(limit)}</li>)}</ul>
       </article>)}
     </div>}
   </section>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, uploadMeetingRecording } from '../../api'
+import { displayText } from '../../presentation'
 import type { Invite } from '../../types'
 import BookingLink from './BookingLink'
 import { type Meeting, moment } from './types'
@@ -82,7 +83,7 @@ function MeetingCard({ initial, viewer, capabilities, onChanged }: {
     } catch (err) { stream.current?.getTracks().forEach(track => track.stop()); setError((err as Error).message) }
   }
   return <article className="card meeting-card" data-testid="meeting-card"><div className="section-title"><div>
-    <p className="eyebrow">{viewer === 'candidate' ? meeting.company_name : meeting.candidate_alias}</p>
+    <p className="eyebrow">{displayText(viewer === 'candidate' ? meeting.company_name : meeting.candidate_alias)}</p>
     <h3>{moment(meeting.starts_at)} — {new Date(meeting.ends_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</h3>
     </div><span className={`badge ${meeting.state === 'cancelled' ? '' : 'green'}`}>{meeting.state === 'cancelled' ? 'Отменена' : finished ? 'Время завершено' : 'Назначена'}</span></div>
     {error && <div className="notice bad" role="alert">{error}</div>}{notice && <div className="notice good" role="status">{notice}</div>}
@@ -143,7 +144,7 @@ export default function MeetingList({ viewer, onChanged }: { viewer: 'candidate'
   return <section className="meetings-panel"><div className="section-title"><h2>Ваши встречи</h2><button className="button outline" onClick={() => void load().then(() => setError('')).catch(err => setError(err.message))}>Обновить встречи</button></div>
     <p className="small muted">Время показано в {Intl.DateTimeFormat().resolvedOptions().timeZone}.</p>
     {error && <div className="notice bad" role="alert">{error}</div>}
-    {viewer === 'candidate' && invites.length > 0 && <section className="card"><h3>Назначить разговор</h3>{invites.map(invite => <div className="calendar-invitation" key={invite.id}><span>{invite.company_name}</span><BookingLink invitationId={invite.id}/></div>)}</section>}
+    {viewer === 'candidate' && invites.length > 0 && <section className="card"><h3>Назначить разговор</h3>{invites.map(invite => <div className="calendar-invitation" key={invite.id}><span>{displayText(invite.company_name)}</span><BookingLink invitationId={invite.id}/></div>)}</section>}
     {!meetings.length && <div className="card empty">Пока нет назначенных встреч.</div>}
     {meetings.map(meeting => <MeetingCard key={meeting.id} initial={meeting} viewer={viewer} capabilities={capabilities} onChanged={onChanged}/>)}
   </section>

@@ -199,12 +199,13 @@ test('company setup is reachable after company-profile-required on role creation
   await employer.close()
 })
 
-test('seed role provenance is visible in the employer role preview', async ({ browser }) => {
+test('role preview shows published status without internal fixture labels', async ({ browser }) => {
   const employer = await browser.newPage()
   await signIn(employer, 'employer@demo.test')
   await employer.getByRole('button', { name: 'Роль и условия' }).click()
   await expect(employer.getByRole('heading', { name: 'Сделайте вакансию понятной до отклика' })).toBeVisible()
-  await expect(employer.getByText('Синтетическая вакансия').first()).toBeVisible()
+  await expect(employer.getByText('Опубликована', { exact: true }).first()).toBeVisible()
+  await expect(employer.locator('main')).not.toContainText(/демо|синтетическ|вымышлен/i)
   await employer.close()
 })
 
@@ -240,7 +241,7 @@ test('role facts, selected evidence, explicit acceptance, and pair-scoped contac
   const targetAlias = target.alias as string
   const targetCard = employerPage.locator('.candidate-card').filter({ hasText: targetAlias })
   await expect.soft(targetCard.getByText(/Соответствие роли/)).toBeVisible({ timeout: 500 })
-  await expect.soft(targetCard.getByText(/Результат теста/)).toBeVisible({ timeout: 500 })
+  await expect.soft(targetCard.getByText(/Оценка профиля/)).toBeVisible({ timeout: 500 })
   await expect.soft(targetCard.getByText(/Охват доказательствами/)).toBeVisible({ timeout: 500 })
   const unknownMatchComponents = Object.entries(target.match?.components ?? {})
     .filter(([name, value]) => name !== 'fsp_relevance' && value == null)
@@ -293,7 +294,7 @@ test('role facts, selected evidence, explicit acceptance, and pair-scoped contac
   await expect(selectedEvidence).toBeChecked()
   await expect(employerPage.getByRole('checkbox', { name: 'Добавить: Навык из профиля' }).first()).not.toBeChecked()
   const legacyEvidence = employerPage.locator('.evidence-item').filter({ hasText: 'Ранее сохранённая категория' })
-  await expect(legacyEvidence).toContainText('Синтетическая демонстрация')
+  await expect(legacyEvidence).toContainText('Источник не подтверждён')
   await expect(legacyEvidence).not.toContainText('Действие проверено заданием')
   const declaredEvidence = employerPage.locator('.evidence-item').filter({ hasText: 'Навык из профиля' })
   await expect(declaredEvidence).toHaveCount(2)

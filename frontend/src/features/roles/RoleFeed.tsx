@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, ApiError } from '../../api'
+import { displayText } from '../../presentation'
 import type { CandidateRoleDecision, CandidateRoleFeed, CandidateRoleFeedItem } from '../../types'
 import RoleCard from './RoleCard'
 import MatchDetails from './MatchDetails'
@@ -45,10 +46,9 @@ function RoleGroup({ title, items, busyId, onDecision, sponsored = false }: {
       {items.map(item => <div className="discovery-role" data-testid="discovery-role" data-need-id={item.need_id}
         data-campaign-id={item.campaign_id} key={item.need_id}>
         <div className="discovery-role-heading">
-          <p className="discovery-company">{item.company_name}</p>
+          <p className="discovery-company">{displayText(item.company_name)}</p>
           <div className="discovery-badges">
             {sponsored && <span className="badge sponsored-label">Продвигаемая роль</span>}
-            {item.data_mode === 'synthetic' && <span className="badge synthetic-badge">Демо-данные</span>}
             {item.data_mode === 'unknown' && <span className="badge unknown-source-badge">Источник данных не подтверждён</span>}
             <span className={`badge match-badge ${item.match_state}`}>{matchLabel(item)}</span>
           </div>

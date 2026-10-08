@@ -32,7 +32,7 @@ export default function CandidateJourney({ onNavigate, onResume }: {
         {journey.next_step ? <button className="primary" onClick={() => onNavigate(journey.next_step!.tab)}>{journey.next_step.label}</button>
           : <p>Всё готово. Приглашения придут с зарплатой и условиями; время встречи выберете после принятия.</p>}
         {journey.active_attempt && <p><button className="button subtle" onClick={() => onResume(journey.active_attempt!.id)}>Продолжить незавершённый тест</button></p>}
-        <p className="small muted">Учитываются только сохранённые данные. Компании подбирают по категории и вашим условиям. ФСП ID необязателен{journey.fsp_status === 'mock' ? '; подключена демонстрационная запись' : ''}.</p>
+        <p className="small muted">Учитываются только сохранённые данные. Компании подбирают по категории и вашим условиям. ФСП ID необязателен.</p>
       </>}
   </section>
 }

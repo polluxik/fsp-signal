@@ -6,9 +6,9 @@ test('employer activates a free demo campaign and the candidate sees one labeled
   await signIn(employer, 'employer@demo.test')
   await employer.getByRole('button', { name: 'Роль и условия' }).click()
   await expect(employer.getByRole('heading', { name: 'Опишите реальную работу' })).toBeVisible()
-  const activate = employer.getByRole('button', { name: 'Включить продвижение (демо)' })
+  const activate = employer.getByRole('button', { name: 'Включить продвижение' })
   await expect(activate).toBeVisible()
-  await expect(employer.getByText('Демо — без оплаты')).toBeVisible()
+  await expect(employer.getByText('Без оплаты')).toBeVisible()
   let failFirstActivation = true
   await employer.route('**/api/v1/employer/needs/*/promotion/demo', async route => {
     if (route.request().method() === 'POST' && failFirstActivation) {
@@ -20,7 +20,7 @@ test('employer activates a free demo campaign and the candidate sees one labeled
   await expect(employer.getByRole('alert')).toContainText('Роль должна быть активной')
   await expect(activate).toBeEnabled()
   await activate.click()
-  await expect(employer.getByRole('status').filter({ hasText: 'Демо-продвижение активно до' })).toBeVisible()
+  await expect(employer.getByRole('status').filter({ hasText: 'Продвижение активно до' })).toBeVisible()
   await employer.screenshot({ path: testInfo.outputPath('employer-demo-promotion.png'), fullPage: true })
 
   const promotion = await employer.evaluate(async () => {

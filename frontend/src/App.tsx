@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { api, ApiError, uploadResume } from './api'
+import { displayText } from './presentation'
 import type { AchievementStory, AnswerValue, AssistantAchievementDraft, Attempt, Candidate, EvidenceCard, Invite, Need,
   Profile, RoleCardOut, Search, SearchSummary, User } from './types'
 import EvidencePanel from './features/evidence/EvidencePanel'
@@ -116,7 +117,6 @@ function Auth({ onLogin }: { onLogin: () => void }) {
         <label>Пароль<input type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={10} required/></label>
         <button className="primary wide" disabled={busy}>{busy ? 'Подождите…' : mode === 'register' ? 'Создать профиль' : 'Войти'}</button>
       </form>
-      <p className="small muted">Локальная демонстрация использует синтетические данные ФСП.</p>
     </section>
   </main>
 }
@@ -148,7 +148,7 @@ function CandidateApp({ me }: { me: User }) {
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({})
   const [spec, setSpec] = useState('backend')
   const [grade, setGrade] = useState('junior')
-  const [fspId, setFspId] = useState(`demo-${me.id}`)
+  const [fspId, setFspId] = useState('')
   const [feedback, setFeedback] = useState('')
   const [error, setError] = useState('')
   const [importWarnings, setImportWarnings] = useState<string[]>([])
@@ -159,12 +159,13 @@ function CandidateApp({ me }: { me: User }) {
       api<typeof grants>('/candidate/contact-grants'), api<typeof history>('/candidate/assessment-history'),
     ])
     if (p) {
+      const visibleProfile = { ...p, full_name: displayText(p.full_name), summary: displayText(p.summary) }
       setProfile(current => current.preferences_version != null && p.preferences_version != null
         && current.preferences_version > p.preferences_version
-        ? { ...p, preferences_version: current.preferences_version,
+        ? { ...visibleProfile, preferences_version: current.preferences_version,
             min_salary_rub: current.min_salary_rub, work_format: current.work_format,
             available: current.available, adult_hiring_confirmed: current.adult_hiring_confirmed }
-        : p)
+        : visibleProfile)
       setSkillsText((p.skills || []).join(', '))
       setStory({ ...emptyAchievementStory, ...(p.achievement_story ?? {}) })
     }
@@ -269,7 +270,7 @@ function CandidateApp({ me }: { me: User }) {
   return <div className="workspace">
     <header className="topbar"><span className="logo">ФСП <strong>СИГНАЛ</strong></span><span className="top-id">{me.email}</span></header>
     <div className="shell"><aside className="sidebar"><p className="overline">КАБИНЕТ КАНДИДАТА</p>
-      {[['roles','Для меня'],['profile','Мой профиль'],['preferences','Условия поиска'],['evidence','Доказательства'],['test','Проверка навыков'],['offers','Приглашения'],['meetings','Встречи'],['fsp','ФСП ID и доступ'], ...(me.demo_market_enabled ? [['market','Рынок · демо']] : [])].map(([id, label]) =>
+      {[['roles','Для меня'],['profile','Мой профиль'],['preferences','Условия поиска'],['evidence','Доказательства'],['test','Проверка навыков'],['offers','Приглашения'],['meetings','Встречи'],['fsp','ФСП ID и доступ'], ...(me.demo_market_enabled ? [['market','Рынок']] : [])].map(([id, label]) =>
         <button key={id} className={tab === id ? 'active' : ''} onClick={() => { if (id !== 'market') leaveMarket(); setTab(id); setError(''); setFeedback('') }}>{label}</button>)}
       <div className="sidebar-bottom"><CategoryBadge spec={profile.verified_specialization} grade={profile.verified_grade}/><p className="small muted">Контакты открываются только по вашему решению.</p></div>
     </aside><main className="content">
@@ -287,7 +288,7 @@ function CandidateApp({ me }: { me: User }) {
       }))}/></>}
       {tab === 'evidence' && <><div className="page-heading"><p className="eyebrow">ФАКТЫ О ВАШЕЙ РАБОТЕ</p><h1>Проверенное отдельно от заявленного</h1><p>Короткий ввод помогает быстро начать; в истории достижений можно сохранить контекст, личный вклад, решение, результат и его основание.</p></div><EvidencePanel/></>}
       {tab === 'profile' && <><div className="page-heading"><p className="eyebrow">ПАСПОРТ НАВЫКОВ</p><h1>Пусть навыки говорят за вас</h1><p>Работодатель увидит категорию после теста. Контакты остаются закрытыми до принятия приглашения.</p></div>
-        <div className="summary-grid"><div className="metric"><span>Категория</span><CategoryBadge spec={profile.verified_specialization} grade={profile.verified_grade}/></div><div className="metric"><span>Результат теста</span><strong>{profile.test_score ?? '—'}<small>{profile.test_score != null ? ' / 100' : ''}</small></strong></div><div className="metric"><span>ФСП</span><strong>{profile.fsp_status === 'mock' ? 'Демо' : profile.fsp_status === 'verified_external' ? 'Подтверждено' : 'Нет истории'}</strong></div></div>
+        <div className="summary-grid"><div className="metric"><span>Категория</span><CategoryBadge spec={profile.verified_specialization} grade={profile.verified_grade}/></div><div className="metric"><span>Результат теста</span><strong>{profile.test_score ?? '—'}<small>{profile.test_score != null ? ' / 100' : ''}</small></strong></div><div className="metric"><span>ФСП</span><strong>{profile.fsp_status === 'mock' ? 'Не подтверждено' : profile.fsp_status === 'verified_external' ? 'Подтверждено' : 'Нет истории'}</strong></div></div>
         <section className="card"><div className="section-title"><div><h2>Профиль кандидата</h2><p className="muted">Заявленные навыки отмечены отдельно от результата теста.</p></div>{profile.verified_grade && <a className="button subtle" href="/api/v1/candidate/passport.pdf">Скачать PDF</a>}</div>
           <label>Загрузить PDF-резюме для заполнения черновика<input type="file" accept="application/pdf,.pdf" disabled={importBusy} onChange={e => { void importResume(e.target.files?.[0]); e.target.value = '' }}/></label>
           <p className="small muted">До 5 МБ и 10 страниц, только PDF с текстовым слоем. Файл не сохраняется; импорт не публикует профиль.</p>
@@ -333,17 +334,17 @@ function CandidateApp({ me }: { me: User }) {
         <div className="page-heading"><p className="eyebrow">ИСТОЧНИК ДОСТИЖЕНИЙ</p><h1>Связь с ФСП ID</h1>
           <p>История соревнований дополняет тест. Если истории нет, вы участвуете в подборе на равных.</p></div>
         <section className="card"><h2>Состояние связи</h2>
-          <Notice>{profile.fsp_status === 'mock' ? 'Подключена демонстрационная запись. Это не реальный реестр ФСП.' : profile.fsp_status === 'unverified' ? 'ID введён, но принадлежность не подтверждена.' : 'ФСП ID не подключён.'}</Notice>
+          <Notice>{profile.fsp_status === 'mock' ? 'Принадлежность записи требует подтверждения.' : profile.fsp_status === 'unverified' ? 'ID введён, но принадлежность не подтверждена.' : 'ФСП ID не подключён.'}</Notice>
           <label>ФСП ID<input value={fspId} onChange={e => setFspId(e.target.value)}/></label>
-          <p className="small muted">Для локальной демонстрации используйте ID: demo-{me.id}. Произвольный ID останется неподтверждённым.</p>
+          <p className="small muted">Укажите свой ID ФСП. До проверки принадлежности запись остаётся неподтверждённой.</p>
           <div className="actions"><button className="primary" onClick={() => action(() => api('/candidate/fsp-link','POST',{participant_id:fspId}), 'Статус связи обновлён')}>Связать ID</button>
             <button className="button subtle" onClick={() => action(() => api('/candidate/fsp-link','DELETE'), 'Связь удалена')}>Отключить</button></div>
           {profile.fsp_achievement && <div className="story-preview"><span className="badge green">{profile.fsp_achievement.result === 'prize' ? 'Призовое место' : profile.fsp_achievement.result === 'finalist' ? 'Финалист' : 'Участник'}</span>
-            <h3>{profile.fsp_achievement.event_name}</h3>
+            <h3>{displayText(profile.fsp_achievement.event_name)}</h3>
             <p><strong>Дисциплина:</strong> {profile.fsp_achievement.discipline} · {fmtDate(profile.fsp_achievement.event_date)}</p>
             <p><strong>Масштаб:</strong> {profile.fsp_achievement.result_scope === 'team' ? 'командный результат' : 'индивидуальный результат'}</p>
             <p>{profile.fsp_achievement.personal_role}</p>
-            <p className="small muted">Источник: {profile.fsp_achievement.issuer}. В ранжировании достижение даёт только ограниченный буст внутри уже подтверждённой категории.</p></div>}
+            <p className="small muted">Источник: {displayText(profile.fsp_achievement.issuer)}. В ранжировании достижение даёт только ограниченный буст внутри уже подтверждённой категории.</p></div>}
         </section>
         <section className="card"><h2>Доступ компаний к контактам</h2>
           {grants.some(grant => !grant.revoked_at) && <p className="small muted">Отзыв закроет компании дальнейший доступ к контактам, но не удалит данные, которые она уже увидела или сохранила.</p>}
@@ -399,7 +400,7 @@ function EmployerApp({ me }: { me: User }) {
     const [c, n, o, b, h] = await Promise.all([api<typeof company | null>('/employer/company'),
       api<Need[]>('/employer/needs'), api<Invite[]>('/employer/invitations'),
       api<Candidate[]>('/employer/candidates'), api<SearchSummary[]>('/employer/searches')])
-    if (c) setCompany(c)
+    if (c) setCompany({ ...c, company_name: displayText(c.company_name), description: displayText(c.description) })
     setNeeds(n); setOffers(o); setBank(b); setSnapshots(h)
     if (n.length) setNeedId(current => current || n[0].id)
     else setShowNeedForm(true)
@@ -517,7 +518,7 @@ function EmployerApp({ me }: { me: User }) {
       return
     }
     setOffer({ offer_text:`Приглашаем обсудить роль ${need?.title ?? 'в нашей команде'} и задачи команды.`,
-      reason:candidate.match?.reasons?.slice(0,2).join('. ') ?? `Подтверждена категория ${candidate.specialization} ${candidate.grade}.`,
+      reason:candidate.match?.reasons?.slice(0,2).map(displayText).join('. ') ?? `Подтверждена категория ${candidate.specialization} ${candidate.grade}.`,
       salary_min_rub:roleCard.payload.salary_min_rub ?? need?.salary_min_rub ?? 180000,
       salary_max_rub:roleCard.payload.salary_max_rub ?? need?.salary_max_rub ?? 230000,
       work_format:roleCard.payload.work_format ?? 'remote', employer_contact:(roleCard.payload.employer_contact ?? company.contact_email) || me.email })
@@ -612,7 +613,7 @@ function EmployerApp({ me }: { me: User }) {
     return <article className="candidate-card card">
       <div className="section-title">
         <div>
-          <p className="eyebrow">{candidate.verification_source === 'synthetic_fixture' ? 'СИНТЕТИЧЕСКИЙ ПРОФИЛЬ'
+          <p className="eyebrow">{candidate.verification_source === 'synthetic_fixture' ? 'ИСТОЧНИК ОЦЕНКИ НЕ ПОДТВЕРЖДЁН'
             : candidate.verification_source === 'assessment' ? 'КАТЕГОРИЯ ПОДТВЕРЖДЕНА ТЕСТОМ' : 'КАТЕГОРИЯ НЕ ПОДТВЕРЖДЕНА'}</p>
           <h3>{candidate.alias}</h3>
         </div>
@@ -621,14 +622,14 @@ function EmployerApp({ me }: { me: User }) {
         <div><span>{candidate.match ? 'Соответствие роли' : 'Оценка в банке'}</span>
           <strong>{candidate.match ? candidate.match.score == null ? 'Недостаточно данных' : `${candidate.match.score}/100`
             : candidate.bank_score == null ? 'Нет данных' : `${candidate.bank_score}/100`}</strong></div>
-        <div><span>{candidate.verification_source === 'synthetic_fixture' ? 'Результат теста · учебные данные' : 'Результат теста'}</span>
+        <div><span>{candidate.verification_source === 'synthetic_fixture' ? 'Оценка профиля' : 'Результат теста'}</span>
           <strong>{candidate.test_score}/100</strong></div>
         {candidate.match && <div><span>Охват доказательствами</span>
           <strong>{candidate.match.evidence_coverage == null ? 'Недостаточно данных' : `${Math.round(candidate.match.evidence_coverage * 100)}%`}</strong></div>}
       </div>
       <CategoryBadge spec={candidate.specialization} grade={candidate.grade}/>
       <div className="evidence-row">
-        <span>ФСП: {candidate.fsp_status === 'mock' ? 'демо-достижение' : candidate.fsp_status === 'verified_external' ? 'подтверждено' : 'нет подтверждения'}</span>
+        <span>ФСП: {candidate.fsp_status === 'mock' ? 'нет подтверждения' : candidate.fsp_status === 'verified_external' ? 'подтверждено' : 'нет подтверждения'}</span>
         {candidate.fsp_achievement && <span>{candidate.fsp_achievement.discipline} · {candidate.fsp_achievement.result === 'prize' ? 'призовое место' : candidate.fsp_achievement.result === 'finalist' ? 'финалист' : 'участник'}</span>}
       </div>
       {unknownSignals.length > 0 && <p className="small muted unknown-match-data">
@@ -636,8 +637,8 @@ function EmployerApp({ me }: { me: User }) {
       </p>}
       <p className="small muted">Заявленные навыки: {candidate.skills_declared?.join(', ') || '—'} · не считаются результатом проверки</p>
       {candidate.match && <>
-        <ul className="reasons">{candidate.match.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>
-        {candidate.match.gaps.length > 0 && <p className="gap">{candidate.match.gaps.join('; ')}</p>}
+        <ul className="reasons">{candidate.match.reasons.map(reason => <li key={reason}>{displayText(reason)}</li>)}</ul>
+        {candidate.match.gaps.length > 0 && <p className="gap">{candidate.match.gaps.map(displayText).join('; ')}</p>}
       </>}
       <button className="button outline" disabled={evidenceBusy || inviteBusy || staleSearch || (tab === 'shortlist' && !shortlist.data?.current) || !activeRoleCard || activeRoleCard.publication_state !== 'active' || !activeRoleCard.fresh}
         onClick={() => void choose(candidate)}>Пригласить с условиями →</button>
@@ -648,7 +649,7 @@ function EmployerApp({ me }: { me: User }) {
         onClick={() => void shortlist.toggle(candidate.id)}>{shortlistEntry?.saved ? 'Убрать из избранного' : 'Сохранить кандидата'}</button>
     </article>
   }
-  return <div className="workspace"><header className="topbar"><span className="logo">ФСП <strong>СИГНАЛ</strong></span><span className="top-id">{company.company_name || me.email}</span></header><div className="shell"><aside className="sidebar"><p className="overline">КАБИНЕТ РАБОТОДАТЕЛЯ</p>{[['search','Найти специалиста'],['need','Роль и условия'],['bank','Банк кандидатов'],['offers','Приглашения'],['calendar','Календарь HR'],['shortlist','Избранные кандидаты'],['company','Компания'], ...(me.demo_market_enabled ? [['market','Рынок · демо']] : [])].map(([id,label]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => {if (id !== 'market') leaveMarket();setTab(id);clearSelectedCandidate();setError('');setFeedback('');setReturnToInvitation(false);setReturnToNeed(false);setCompanySetupRequired(false)}}>{label}</button>)}<div className="sidebar-bottom"><p className="small muted">В этой демонстрации достижения ФСП синтетические.</p></div></aside><main className="content">
+  return <div className="workspace"><header className="topbar"><span className="logo">ФСП <strong>СИГНАЛ</strong></span><span className="top-id">{company.company_name || me.email}</span></header><div className="shell"><aside className="sidebar"><p className="overline">КАБИНЕТ РАБОТОДАТЕЛЯ</p>{[['search','Найти специалиста'],['need','Роль и условия'],['bank','Банк кандидатов'],['offers','Приглашения'],['calendar','Календарь HR'],['shortlist','Избранные кандидаты'],['company','Компания'], ...(me.demo_market_enabled ? [['market','Рынок']] : [])].map(([id,label]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => {if (id !== 'market') leaveMarket();setTab(id);clearSelectedCandidate();setError('');setFeedback('');setReturnToInvitation(false);setReturnToNeed(false);setCompanySetupRequired(false)}}>{label}</button>)}</aside><main className="content">
     {error && !companySetupRequired && <Notice tone="bad">{error}</Notice>}
     {companySetupRequired && !selected && tab !== 'company' && error && <div className="notice bad" role="alert">{error}
       <button className="text-button" type="button" onClick={() => {
@@ -737,7 +738,7 @@ function EmployerApp({ me }: { me: User }) {
     </>}
     {tab === 'market' && me.demo_market_enabled && <DemoMarket viewer="employer"/>}
     {tab === 'calendar' && <CalendarPanel/>}
-    {tab === 'offers' && <><div className="page-heading"><p className="eyebrow">ИСХОДЯЩИЕ ПРЕДЛОЖЕНИЯ</p><h1>Нанимайте по обещаниям, которые можно проверить</h1><p>Каждое приглашение привязано к выбранным доказательствам и конкретной версии условий.</p></div>{offers.length === 0 ? <div className="empty card">Пока нет приглашений.</div> : offers.map(invite => <article className="card offer-card" key={invite.id}><div className="section-title"><div><h2>{invite.company_name} → Кандидат #{invite.candidate_id.slice(0,8)}</h2><p className="muted">{invite.offer_text}</p></div><span className={`badge ${invite.state === 'accepted' ? 'green' : ''}`}>{statusName(invite.state)}</span></div><div className="salary">{rubles(invite.salary_min_rub)} — {rubles(invite.salary_max_rub)} <small>в месяц · до налогов</small></div><p><strong>Основание:</strong> {invite.reason}</p>{['sent', 'viewed'].includes(invite.state) && <button className="button subtle" type="button" disabled={inviteActionBusyId === invite.id} onClick={() => void withdrawInvitation(invite)}>{inviteActionBusyId === invite.id ? 'Отзываем…' : 'Отозвать приглашение'}</button>}{invite.state === 'accepted' && <><InterviewConfirmation invite={invite} viewer="employer" onChanged={load}/><BookingLink invitationId={invite.id} employer/><button className="button outline" onClick={() => showContact(invite.candidate_id)}>Показать контакты кандидата #{invite.candidate_id.slice(0,8)}</button></>}{contacts[invite.candidate_id] && invite.state === 'accepted' && <Notice tone="good">{contacts[invite.candidate_id].full_name} · {contacts[invite.candidate_id].email} · {contacts[invite.candidate_id].phone}</Notice>}</article>)}</>}
+    {tab === 'offers' && <><div className="page-heading"><p className="eyebrow">ИСХОДЯЩИЕ ПРЕДЛОЖЕНИЯ</p><h1>Нанимайте по обещаниям, которые можно проверить</h1><p>Каждое приглашение привязано к выбранным доказательствам и конкретной версии условий.</p></div>{offers.length === 0 ? <div className="empty card">Пока нет приглашений.</div> : offers.map(invite => <article className="card offer-card" key={invite.id}><div className="section-title"><div><h2>{displayText(invite.company_name)} → Кандидат #{invite.candidate_id.slice(0,8)}</h2><p className="muted">{invite.offer_text}</p></div><span className={`badge ${invite.state === 'accepted' ? 'green' : ''}`}>{statusName(invite.state)}</span></div><div className="salary">{rubles(invite.salary_min_rub)} — {rubles(invite.salary_max_rub)} <small>в месяц · до налогов</small></div><p><strong>Основание:</strong> {displayText(invite.reason)}</p>{['sent', 'viewed'].includes(invite.state) && <button className="button subtle" type="button" disabled={inviteActionBusyId === invite.id} onClick={() => void withdrawInvitation(invite)}>{inviteActionBusyId === invite.id ? 'Отзываем…' : 'Отозвать приглашение'}</button>}{invite.state === 'accepted' && <><InterviewConfirmation invite={invite} viewer="employer" onChanged={load}/><BookingLink invitationId={invite.id} employer/><button className="button outline" onClick={() => showContact(invite.candidate_id)}>Показать контакты кандидата #{invite.candidate_id.slice(0,8)}</button></>}{contacts[invite.candidate_id] && invite.state === 'accepted' && <Notice tone="good">{contacts[invite.candidate_id].full_name} · {contacts[invite.candidate_id].email} · {contacts[invite.candidate_id].phone}</Notice>}</article>)}</>}
   </main></div></div>
 }
 

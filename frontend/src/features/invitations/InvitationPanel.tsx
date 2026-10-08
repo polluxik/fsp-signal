@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api } from '../../api'
+import { displayText } from '../../presentation'
 import type { CandidatePreferences, Invite, RoleCardPayload } from '../../types'
 import RoleCard from '../roles/RoleCard'
 import InterviewConfirmation from './InterviewConfirmation'
@@ -45,7 +46,7 @@ const verificationNames: Record<string, string> = {
   verified_action: 'Проверенное действие',
   declared: 'Заявлено кандидатом',
   aggregate: 'Агрегированный результат оценки',
-  synthetic_fixture: 'Синтетический пример',
+  synthetic_fixture: 'Источник не подтверждён',
 }
 
 export default function InvitationPanel({ invites, onChanged }: Props) {
@@ -125,10 +126,10 @@ export default function InvitationPanel({ invites, onChanged }: Props) {
     {feedback && <div className="notice good" role="status">{feedback}</div>}
     {invites.length === 0 ? <div className="empty card">Пока нет приглашений. Заполните условия поиска и проверьте навыки, чтобы получать подходящие предложения.</div> : invites.map(invite =>
       <article className="card offer-card" key={invite.id}>
-        <div className="section-title"><div><span className="eyebrow">{invite.company_name}</span><h2>{invite.offer_text}</h2></div>
+        <div className="section-title"><div><span className="eyebrow">{displayText(invite.company_name)}</span><h2>{invite.offer_text}</h2></div>
           <span className={`badge ${invite.state === 'accepted' ? 'green' : ''}`}>{statusName(invite.state)}</span></div>
         <p className="salary">{rubles(invite.salary_min_rub)} — {rubles(invite.salary_max_rub)} <small>в месяц · до налогов</small></p>
-        <p><strong>Почему пригласили:</strong> {invite.reason}</p>
+        <p><strong>Почему пригласили:</strong> {displayText(invite.reason)}</p>
         <p className="small muted">Актуально на момент отправки · {invite.created_at ? date(invite.created_at) : 'дата не сохранена'} · решить до {date(invite.expires_at)}</p>
         {invite.state === 'accepted' && invite.response_due_at && <p className="small muted">Работодатель указал срок следующего шага до {date(invite.response_due_at)}.</p>}
         {invite.state === 'accepted' && <><InterviewConfirmation invite={invite} viewer="candidate" onChanged={onChanged}/><BookingLink invitationId={invite.id}/></>}
@@ -140,7 +141,7 @@ export default function InvitationPanel({ invites, onChanged }: Props) {
     {active && <div className="modal-backdrop" onClick={() => { if (!busy) setActive(null) }}>
       <section className="modal card invitation-review" role="dialog" aria-modal="true" aria-labelledby="invitation-title" onClick={event => event.stopPropagation()}>
         <button className="close" type="button" onClick={() => setActive(null)} aria-label="Закрыть">×</button>
-        <p className="eyebrow">ВЕРСИЯ УСЛОВИЙ · {active.company_name}</p>
+        <p className="eyebrow">ВЕРСИЯ УСЛОВИЙ · {displayText(active.company_name)}</p>
         <h2 id="invitation-title">Проверьте предложение до решения</h2>
         <div className={`compatibility-summary ${active.compatibility?.status ?? 'unknown'}`}>
           <strong>{compatibilityText(active)}</strong>
@@ -154,7 +155,7 @@ export default function InvitationPanel({ invites, onChanged }: Props) {
         {active.evidence_refs?.length ? <section className="invitation-evidence"><h3>На каких фактах основано приглашение</h3>
           {active.evidence_refs.map(card => <div className="invitation-evidence-item" key={card.id}>
             <span className={`badge ${card.verification_level === 'verified_action' ? 'green' : ''}`}>{verificationNames[card.verification_level] ?? 'Уровень подтверждения неизвестен'}</span>
-            <p>{card.action}</p><ul className="evidence-limitations">{card.limitations.map(item => <li key={item}>{item}</li>)}</ul>
+            <p>{displayText(card.action)}</p><ul className="evidence-limitations">{card.limitations.map(item => <li key={item}>{displayText(item)}</li>)}</ul>
           </div>)}
         </section> : <p className="small muted">Для этой старой версии приглашения источники доказательств не сохранялись.</p>}
         {active.explanation_snapshot?.agenda?.length ? <section className="role-detail"><h4>Что можно обсудить</h4>

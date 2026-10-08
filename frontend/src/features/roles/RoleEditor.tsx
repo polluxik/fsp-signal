@@ -380,17 +380,17 @@ export default function RoleEditor({ need, companyContact, onSaved }: Props) {
           {role?.publication_state === 'active' && <button className="button subtle" type="button" disabled={busy} onClick={() => changeState('pause')}>Пауза</button>}
           {role?.publication_state !== 'closed' && <button className="text-button" type="button" disabled={busy} onClick={() => changeState('close')}>Закрыть роль</button>}
         </div>
-        {role?.publication_state === 'active' && role.discoverable && role.fresh && <section className="full role-promotion-control" aria-label="Демо-продвижение вакансии">
+        {role?.publication_state === 'active' && role.discoverable && role.fresh && <section className="full role-promotion-control" aria-label="Продвижение вакансии">
           <div>
             <p className="eyebrow">ОТДЕЛЬНАЯ ПОЛКА · БЕЗ ВЛИЯНИЯ НА MATCHING</p>
             {promotion
-              ? <p className="promotion-status" role="status">Демо-продвижение активно до {promotionEndDate(promotion.active_until)}. Оплаты нет, выручка — ₽0.</p>
+              ? <p className="promotion-status" role="status">Продвижение активно до {promotionEndDate(promotion.active_until)}. Оплаты нет, выручка — ₽0.</p>
               : <p className="muted">Покажем актуальную роль в отдельном блоке подходящим кандидатам на 14 дней. На органическую выдачу и условия роли это не влияет.</p>}
-            <p className="promotion-no-charge">Демо — без оплаты</p>
+            <p className="promotion-no-charge">Без оплаты</p>
           </div>
           {!promotion && <button className="button promotion-button" type="button" disabled={promotionBusy}
             onClick={() => void activatePromotion()}>
-            {promotionBusy ? 'Включаем…' : 'Включить продвижение (демо)'}
+            {promotionBusy ? 'Включаем…' : 'Включить продвижение'}
           </button>}
           {promotionError && <p className="notice bad promotion-error" role="alert">{promotionError}</p>}
         </section>}

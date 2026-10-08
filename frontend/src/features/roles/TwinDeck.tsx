@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { displayText } from '../../presentation'
 import type { CandidateRoleDecision, CandidateRoleFeedItem } from '../../types'
 import RoleCard from './RoleCard'
 import MatchDetails from './MatchDetails'
@@ -23,7 +24,7 @@ export default function TwinDeck({ items, busy, decide }: { items: CandidateRole
       onPointerMove={event => { if (start.current !== null) setDrag(event.clientX - start.current) }}
       onPointerCancel={() => { start.current = null; setDrag(0) }}
       onPointerUp={() => { if (drag > 90) void choose('saved'); else if (drag < -90) void choose('hidden'); start.current = null; setDrag(0) }}>
-      <div className="twin-company"><span>{item.company_name}</span>{item.data_mode === 'synthetic' && <span className="badge synthetic-badge">Демо-данные</span>}</div>
+      <div className="twin-company"><span>{displayText(item.company_name)}</span></div>
       <h2>{item.role.title}</h2><div className="twin-tags"><span className="badge">{item.role.specialization} · {item.role.grade}</span><span className="badge">{{ remote: 'Удалённо', hybrid: 'Гибрид', office: 'Офис' }[item.role.work_format]}</span></div>
       <div className="salary">{item.role.salary_min_rub.toLocaleString('ru-RU')} — {item.role.salary_max_rub.toLocaleString('ru-RU')} ₽<small>в месяц · до налогов</small></div>
       <MatchDetails item={item}/><p className="twin-description">{item.role.description}</p><div className="twin-first-days"><strong>Первые 30 дней</strong><p>{item.role.first_30_days}</p></div>

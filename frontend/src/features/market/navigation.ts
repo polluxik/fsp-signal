@@ -1,7 +1,8 @@
-const keys = ['demo_market', 'market_family', 'market_level', 'market_format', 'market_q', 'market_offset']
+const keys = ['market', 'demo_market', 'market_family', 'market_level', 'market_format', 'market_q', 'market_offset']
 
 export function initialWorkspaceTab(fallback: string) {
-  return new URLSearchParams(location.search).has('demo_market') ? 'market' : fallback
+  const params = new URLSearchParams(location.search)
+  return params.has('market') || params.has('demo_market') ? 'market' : fallback
 }
 
 export function leaveMarket() {

@@ -37,7 +37,7 @@ export default function RoleCard({ role, status, confirmedAt, recordedAt, source
     && typeof role.salary_max_rub === 'number' && role.salary_max_rub >= role.salary_min_rub
   const location = role.work_format === 'remote' ? 'Удалённо' : role.work_city || 'Город не указан'
   const tasks = role.competencies?.map(item => competencyNames[item] ?? item) ?? []
-  const sourceLabel = source === 'synthetic_demo' ? 'Синтетическая вакансия'
+  const sourceLabel = source === 'synthetic_demo' ? null
     : source === 'employer_declared' ? 'Заявлено работодателем'
       : source === 'legacy_import' ? 'Импортированные условия · источник не подтверждён' : null
   const sourceClass = source === 'synthetic_demo' ? 'synthetic-badge' : source === 'legacy_import' ? 'unknown-source-badge' : ''
