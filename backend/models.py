@@ -208,6 +208,23 @@ class ProductEvent(Base):
     )
 
 
+class EmployerShortlistEntry(Base):
+    """Employer-private choice pinned to one immutable role version."""
+    __tablename__ = "employer_shortlist"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    employer_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    need_id: Mapped[str] = mapped_column(ForeignKey("hiring_needs.id"))
+    role_version_id: Mapped[str] = mapped_column(ForeignKey("role_versions.id"))
+    candidate_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    saved: Mapped[bool] = mapped_column(Boolean, default=True)
+    state_version: Mapped[int] = mapped_column(Integer, default=1)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    __table_args__ = (
+        UniqueConstraint("employer_id", "role_version_id", "candidate_id", name="uq_shortlist_employer_role_candidate"),
+        CheckConstraint("state_version >= 1", name="shortlist_state_version"),
+    )
+
+
 class AssessmentAttempt(Base):
     __tablename__ = "assessment_attempts"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)

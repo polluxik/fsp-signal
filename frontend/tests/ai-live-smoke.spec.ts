@@ -30,7 +30,7 @@ test('configured FrontierAI provider returns a validated preference draft throug
   expect(draft.salary_min_rub).toBe(160000)
   expect(draft.preferred_stack).toContain('Python')
   await expect(assistant.getByRole('heading', { name: 'Черновик предпочтений' })).toBeVisible()
-  await expect(assistant.getByText(/160/)).toBeVisible()
+  await expect(assistant.locator('dd').filter({ hasText: /160/ })).toBeVisible()
 })
 
 test('configured FrontierAI provider returns an achievement draft through the real app route', async ({ page }) => {

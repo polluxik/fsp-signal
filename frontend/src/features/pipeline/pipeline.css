@@ -1,0 +1,8 @@
+.role-funnel { margin: 20px 0; }
+.pipeline-mode { margin: 16px 0; max-width: 420px; }
+.pipeline-stages { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; list-style: none; padding: 0; }
+.pipeline-stages li { padding: 16px 12px; border: 1px solid #d9ded8; border-radius: 10px; display: flex; flex-direction: column; gap: 8px; }
+.pipeline-stages strong { font-size: 28px; color: #285a47; }
+.pipeline-stages span { font-size: 13px; }
+.shortlist-action { margin-top: 10px; }
+@media (max-width: 760px) { .pipeline-stages { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pipeline-stages li:last-child { grid-column: 1 / -1; } }

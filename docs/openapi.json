@@ -2372,6 +2372,230 @@
         ]
       }
     },
+    "/api/v1/employer/needs/{need_id}/shortlist": {
+      "get": {
+        "tags": [
+          "Employer pipeline"
+        ],
+        "summary": "Read Shortlist",
+        "operationId": "read_shortlist_api_v1_employer_needs__need_id__shortlist_get",
+        "parameters": [
+          {
+            "name": "need_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Need Id"
+            }
+          },
+          {
+            "name": "role_version_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Role Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShortlistOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
+      }
+    },
+    "/api/v1/employer/needs/{need_id}/shortlist/{candidate_id}": {
+      "put": {
+        "tags": [
+          "Employer pipeline"
+        ],
+        "summary": "Change Shortlist",
+        "operationId": "change_shortlist_api_v1_employer_needs__need_id__shortlist__candidate_id__put",
+        "parameters": [
+          {
+            "name": "need_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Need Id"
+            }
+          },
+          {
+            "name": "candidate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Candidate Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShortlistCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShortlistState"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": [],
+            "CsrfCookie": [],
+            "CsrfHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/employer/needs/{need_id}/funnel": {
+      "get": {
+        "tags": [
+          "Employer pipeline"
+        ],
+        "summary": "Role Funnel",
+        "operationId": "role_funnel_api_v1_employer_needs__need_id__funnel_get",
+        "parameters": [
+          {
+            "name": "need_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Need Id"
+            }
+          },
+          {
+            "name": "role_version_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Role Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunnelOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
+      }
+    },
     "/api/v1/taxonomy/categories": {
       "get": {
         "summary": "Get Taxonomy Categories",
@@ -6109,6 +6333,146 @@
         ],
         "title": "EvidenceCard"
       },
+      "EvidenceGap": {
+        "properties": {
+          "competency": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Competency"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "unknown",
+              "gap"
+            ],
+            "title": "Status"
+          },
+          "question": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 5,
+            "title": "Question"
+          }
+        },
+        "type": "object",
+        "required": [
+          "competency",
+          "status",
+          "question"
+        ],
+        "title": "EvidenceGap"
+      },
+      "FspAchievementOut": {
+        "properties": {
+          "credential_version": {
+            "type": "string",
+            "const": "fsp-achievement-v1",
+            "title": "Credential Version",
+            "default": "fsp-achievement-v1"
+          },
+          "issuer": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 2,
+            "title": "Issuer"
+          },
+          "discipline": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Discipline"
+          },
+          "event_name": {
+            "type": "string",
+            "maxLength": 240,
+            "minLength": 2,
+            "title": "Event Name"
+          },
+          "event_date": {
+            "type": "string",
+            "maxLength": 10,
+            "minLength": 10,
+            "title": "Event Date"
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "participant",
+              "finalist",
+              "prize"
+            ],
+            "title": "Result"
+          },
+          "result_scope": {
+            "type": "string",
+            "enum": [
+              "individual",
+              "team"
+            ],
+            "title": "Result Scope"
+          },
+          "personal_role": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Personal Role",
+            "default": ""
+          },
+          "evidence_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Url"
+          },
+          "mapped_specializations": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "backend",
+                "frontend",
+                "qa",
+                "data_analyst"
+              ]
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Mapped Specializations"
+          },
+          "verified_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Verified At"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "fsp_registry",
+              "synthetic_fixture"
+            ],
+            "title": "Source"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "issuer",
+          "discipline",
+          "event_name",
+          "event_date",
+          "result",
+          "result_scope",
+          "verified_at",
+          "source"
+        ],
+        "title": "FspAchievementOut"
+      },
       "FspLinkIn": {
         "properties": {
           "participant_id": {
@@ -6123,6 +6487,99 @@
           "participant_id"
         ],
         "title": "FspLinkIn"
+      },
+      "FunnelCounts": {
+        "properties": {
+          "matched": {
+            "type": "integer",
+            "title": "Matched",
+            "default": 0
+          },
+          "invited": {
+            "type": "integer",
+            "title": "Invited",
+            "default": 0
+          },
+          "accepted": {
+            "type": "integer",
+            "title": "Accepted",
+            "default": 0
+          },
+          "scheduled": {
+            "type": "integer",
+            "title": "Scheduled",
+            "default": 0
+          },
+          "held": {
+            "type": "integer",
+            "title": "Held",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "FunnelCounts"
+      },
+      "FunnelOut": {
+        "properties": {
+          "need_id": {
+            "type": "string",
+            "title": "Need Id"
+          },
+          "role_version_id": {
+            "type": "string",
+            "title": "Role Version Id"
+          },
+          "role_version": {
+            "type": "integer",
+            "title": "Role Version"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "current": {
+            "type": "boolean",
+            "title": "Current"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineVersion"
+            },
+            "type": "array",
+            "title": "Versions"
+          },
+          "real": {
+            "$ref": "#/components/schemas/FunnelCounts"
+          },
+          "synthetic": {
+            "$ref": "#/components/schemas/FunnelCounts"
+          },
+          "invitation_states": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Invitation States"
+          },
+          "explanation": {
+            "type": "string",
+            "title": "Explanation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "need_id",
+          "role_version_id",
+          "role_version",
+          "title",
+          "current",
+          "versions",
+          "real",
+          "synthetic",
+          "invitation_states",
+          "explanation"
+        ],
+        "title": "FunnelOut"
       },
       "HTTPValidationError": {
         "properties": {
@@ -6613,6 +7070,94 @@
         ],
         "title": "LoginIn"
       },
+      "MatchExplanation": {
+        "properties": {
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          },
+          "gaps": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceGap"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Gaps"
+          }
+        },
+        "type": "object",
+        "title": "MatchExplanation"
+      },
+      "MatchResult": {
+        "properties": {
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "components": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Components"
+          },
+          "evidence_coverage": {
+            "type": "number",
+            "title": "Evidence Coverage"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          },
+          "gaps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Gaps"
+          },
+          "explanation": {
+            "$ref": "#/components/schemas/MatchExplanation"
+          },
+          "algorithm_version": {
+            "type": "string",
+            "enum": [
+              "match_v1",
+              "match_v2"
+            ],
+            "title": "Algorithm Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "score",
+          "components",
+          "evidence_coverage",
+          "explanation",
+          "algorithm_version"
+        ],
+        "title": "MatchResult"
+      },
       "MaterialsIn": {
         "properties": {
           "expected_version": {
@@ -6701,6 +7246,29 @@
           "salary_max_rub"
         ],
         "title": "NeedIn"
+      },
+      "PipelineVersion": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "title"
+        ],
+        "title": "PipelineVersion"
       },
       "PublishRoleIn": {
         "properties": {
@@ -7342,6 +7910,250 @@
           "unavailable_count"
         ],
         "title": "SearchOut"
+      },
+      "ShortlistCandidate": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "alias": {
+            "type": "string",
+            "title": "Alias"
+          },
+          "specialization": {
+            "type": "string",
+            "title": "Specialization"
+          },
+          "grade": {
+            "type": "string",
+            "title": "Grade"
+          },
+          "test_score": {
+            "type": "integer",
+            "title": "Test Score"
+          },
+          "competencies": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Competencies"
+          },
+          "verification_source": {
+            "type": "string",
+            "title": "Verification Source"
+          },
+          "assessed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessed At"
+          },
+          "skills_declared": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skills Declared"
+          },
+          "experience_months_declared": {
+            "type": "integer",
+            "title": "Experience Months Declared"
+          },
+          "work_format": {
+            "type": "string",
+            "title": "Work Format"
+          },
+          "fsp_status": {
+            "type": "string",
+            "title": "Fsp Status"
+          },
+          "fsp_result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fsp Result"
+          },
+          "fsp_achievement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FspAchievementOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "match": {
+            "$ref": "#/components/schemas/MatchResult"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "alias",
+          "specialization",
+          "grade",
+          "test_score",
+          "competencies",
+          "verification_source",
+          "assessed_at",
+          "skills_declared",
+          "experience_months_declared",
+          "work_format",
+          "fsp_status",
+          "fsp_result",
+          "fsp_achievement",
+          "match"
+        ],
+        "title": "ShortlistCandidate"
+      },
+      "ShortlistCommand": {
+        "properties": {
+          "role_version_id": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 1,
+            "title": "Role Version Id"
+          },
+          "expected_version": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Version"
+          },
+          "saved": {
+            "type": "boolean",
+            "title": "Saved"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role_version_id",
+          "expected_version",
+          "saved"
+        ],
+        "title": "ShortlistCommand"
+      },
+      "ShortlistItem": {
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "title": "Candidate Id"
+          },
+          "role_version_id": {
+            "type": "string",
+            "title": "Role Version Id"
+          },
+          "saved": {
+            "type": "boolean",
+            "title": "Saved"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "candidate": {
+            "$ref": "#/components/schemas/ShortlistCandidate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "role_version_id",
+          "saved",
+          "version",
+          "candidate"
+        ],
+        "title": "ShortlistItem"
+      },
+      "ShortlistOut": {
+        "properties": {
+          "need_id": {
+            "type": "string",
+            "title": "Need Id"
+          },
+          "role_version_id": {
+            "type": "string",
+            "title": "Role Version Id"
+          },
+          "role_version": {
+            "type": "integer",
+            "title": "Role Version"
+          },
+          "current": {
+            "type": "boolean",
+            "title": "Current"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineVersion"
+            },
+            "type": "array",
+            "title": "Versions"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/ShortlistItem"
+            },
+            "type": "array",
+            "title": "Entries"
+          },
+          "unavailable_count": {
+            "type": "integer",
+            "title": "Unavailable Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "need_id",
+          "role_version_id",
+          "role_version",
+          "current",
+          "versions",
+          "entries",
+          "unavailable_count"
+        ],
+        "title": "ShortlistOut"
+      },
+      "ShortlistState": {
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "title": "Candidate Id"
+          },
+          "role_version_id": {
+            "type": "string",
+            "title": "Role Version Id"
+          },
+          "saved": {
+            "type": "boolean",
+            "title": "Saved"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "role_version_id",
+          "saved",
+          "version"
+        ],
+        "title": "ShortlistState"
       },
       "SponsoredCandidateRoleFeedItem": {
         "properties": {

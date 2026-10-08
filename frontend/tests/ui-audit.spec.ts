@@ -22,7 +22,7 @@ test('candidate and employer sections fit a narrow mobile viewport', async ({ br
 
   const employer = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
   await signIn(employer, 'employer@demo.test')
-  for (const section of ['Найти специалиста', 'Роль и условия', 'Банк кандидатов', 'Приглашения', 'Компания']) {
+  for (const section of ['Найти специалиста', 'Роль и условия', 'Банк кандидатов', 'Приглашения', 'Избранные кандидаты', 'Компания']) {
     await employer.getByRole('button', { name: section }).click()
     await expect(employer.locator('.sidebar button.active')).toHaveText(section)
     await expectNoHorizontalOverflow(employer)

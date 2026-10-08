@@ -38,6 +38,7 @@ from .role_cards import create_initial_draft
 from .routes_v2 import assistant_router, candidate_router, router as v2_router
 from .scheduling import router as scheduling_router
 from .candidate_progress import router as progress_router
+from .employer_pipeline import router as pipeline_router
 from .schemas import (AcceptInvitationIn, AnswersIn, ApiError, CandidateIn, EmployerIn, FspLinkIn,
                       InterviewHeldConfirmationOut, InvitationCommandIn, InvitationOut,
                       InvitationV2In, LoginIn, NeedIn, RegisterIn, RoleCardIn, SearchIn,
@@ -77,6 +78,7 @@ app.include_router(candidate_router)
 app.include_router(assistant_router)
 app.include_router(scheduling_router)
 app.include_router(progress_router)
+app.include_router(pipeline_router)
 
 
 def _dependency_calls(dependant):

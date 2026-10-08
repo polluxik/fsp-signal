@@ -17,6 +17,9 @@ import BookingLink from './features/calendar/BookingLink'
 import CandidateJourney from './features/progress/CandidateJourney'
 import AssessmentReport from './features/progress/AssessmentReport'
 import AssessmentPlan from './features/progress/AssessmentPlan'
+import RoleFunnel from './features/pipeline/RoleFunnel'
+import { useShortlist } from './features/pipeline/useShortlist'
+import './features/pipeline/pipeline.css'
 import './features/progress/progress.css'
 import './features/calendar/calendar.css'
 
@@ -357,6 +360,7 @@ function EmployerApp({ me }: { me: User }) {
   const [needs, setNeeds] = useState<Need[]>([])
   const [needId, setNeedId] = useState('')
   const [roleCard, setRoleCard] = useState<RoleCardOut | null>(null)
+  const [shortlistVersion, setShortlistVersion] = useState<string | null>(null)
   const [showNeedForm, setShowNeedForm] = useState(false)
   const [searchBusy, setSearchBusy] = useState(false)
   const [needForm, setNeedForm] = useState({ title:'', description:'', specialization:'backend', grade:'middle',
@@ -593,9 +597,12 @@ function EmployerApp({ me }: { me: User }) {
   }
   const activeNeed = needs.find(item => item.id === needId) ?? null
   const activeRoleCard = roleCard?.need_id === needId ? roleCard : null
+  const shortlist = useShortlist(needId, tab === 'shortlist' ? shortlistVersion || activeNeed?.role_version_id || null : activeNeed?.role_version_id || null, tab)
+  const funnelRevision = `${tab}:${search?.id ?? ''}:${offers.map(item => `${item.id}:${item.state_version}`).join(',')}`
   const staleSearch = tab === 'search' && !!search
     && (search.changed_since_search || search.role_version_id !== activeNeed?.role_version_id)
   function CandidateCard({ candidate }: { candidate: Candidate }) {
+    const shortlistEntry = shortlist.data?.entries.find(item => item.candidate_id === candidate.id)
     const unknownSignals = Object.entries(candidate.match?.components ?? {})
       .filter(([name, value]) => name !== 'fsp_relevance' && value == null)
       .map(([name]) => matchSignalNames[name] ?? name)
@@ -629,11 +636,16 @@ function EmployerApp({ me }: { me: User }) {
         <ul className="reasons">{candidate.match.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>
         {candidate.match.gaps.length > 0 && <p className="gap">{candidate.match.gaps.join('; ')}</p>}
       </>}
-      <button className="button outline" disabled={evidenceBusy || inviteBusy || staleSearch || !activeRoleCard || activeRoleCard.publication_state !== 'active' || !activeRoleCard.fresh}
+      <button className="button outline" disabled={evidenceBusy || inviteBusy || staleSearch || (tab === 'shortlist' && !shortlist.data?.current) || !activeRoleCard || activeRoleCard.publication_state !== 'active' || !activeRoleCard.fresh}
         onClick={() => void choose(candidate)}>Пригласить с условиями →</button>
+      <button className="button subtle shortlist-action" aria-pressed={!!shortlistEntry?.saved}
+        disabled={!shortlist.data || shortlist.loading || !!shortlist.busy || (!shortlistEntry?.saved &&
+          (staleSearch || !activeRoleCard?.fresh || activeRoleCard.publication_state !== 'active' ||
+           candidate.specialization !== activeNeed?.specialization || candidate.grade !== activeNeed?.grade || !shortlist.data.current))}
+        onClick={() => void shortlist.toggle(candidate.id)}>{shortlistEntry?.saved ? 'Убрать из избранного' : 'Сохранить кандидата'}</button>
     </article>
   }
-  return <div className="workspace"><header className="topbar"><span className="logo">ФСП <strong>СИГНАЛ</strong></span><span className="top-id">{company.company_name || me.email}</span></header><div className="shell"><aside className="sidebar"><p className="overline">КАБИНЕТ РАБОТОДАТЕЛЯ</p>{[['search','Найти специалиста'],['need','Роль и условия'],['bank','Банк кандидатов'],['offers','Приглашения'],['calendar','Календарь HR'],['company','Компания']].map(([id,label]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => {setTab(id);clearSelectedCandidate();setError('');setFeedback('');setReturnToInvitation(false);setReturnToNeed(false);setCompanySetupRequired(false)}}>{label}</button>)}<div className="sidebar-bottom"><p className="small muted">В этой демонстрации достижения ФСП синтетические.</p></div></aside><main className="content">
+  return <div className="workspace"><header className="topbar"><span className="logo">ФСП <strong>СИГНАЛ</strong></span><span className="top-id">{company.company_name || me.email}</span></header><div className="shell"><aside className="sidebar"><p className="overline">КАБИНЕТ РАБОТОДАТЕЛЯ</p>{[['search','Найти специалиста'],['need','Роль и условия'],['bank','Банк кандидатов'],['offers','Приглашения'],['calendar','Календарь HR'],['shortlist','Избранные кандидаты'],['company','Компания']].map(([id,label]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => {setTab(id);clearSelectedCandidate();setError('');setFeedback('');setReturnToInvitation(false);setReturnToNeed(false);setCompanySetupRequired(false)}}>{label}</button>)}<div className="sidebar-bottom"><p className="small muted">В этой демонстрации достижения ФСП синтетические.</p></div></aside><main className="content">
     {error && !companySetupRequired && <Notice tone="bad">{error}</Notice>}
     {companySetupRequired && !selected && tab !== 'company' && error && <div className="notice bad" role="alert">{error}
       <button className="text-button" type="button" onClick={() => {
@@ -641,9 +653,10 @@ function EmployerApp({ me }: { me: User }) {
       }}>Перейти к профилю компании</button>
     </div>}
     {feedback && <Notice tone="good">{feedback}</Notice>}
+    {tab === 'bank' && shortlist.error && <Notice tone="bad">{shortlist.error}</Notice>}
     {tab === 'company' && <><div className="page-heading"><p className="eyebrow">КОМПАНИЯ</p><h1>Кто приглашает кандидата?</h1><p>Название и способ связи будут указаны в каждом предложении.</p></div>{((selected && returnToInvitation) || returnToNeed) && <div className="notice info" role="status">{returnToNeed ? 'Черновик роли сохранён в этой вкладке.' : 'Черновик приглашения сохранён в этой вкладке.'} <button className="text-button" type="button" onClick={() => { setTab(returnToNeed ? 'need' : 'search'); setReturnToInvitation(false); setReturnToNeed(false); setCompanySetupRequired(false); setError('') }}>{returnToNeed ? 'Вернуться к роли' : 'Вернуться к приглашению'}</button></div>}<section className="card"><form className="form-grid" onSubmit={saveCompany}><label>Название компании<input value={company.company_name} onChange={e => setCompany({...company,company_name:e.target.value})} required/></label><label>Направление деятельности<input value={company.industry} onChange={e => setCompany({...company,industry:e.target.value})}/></label><label className="full">О команде<textarea rows={4} value={company.description} onChange={e => setCompany({...company,description:e.target.value})}/></label><label>Контактный email<input type="email" value={company.contact_email} onChange={e => setCompany({...company,contact_email:e.target.value})} required/></label><div className="full"><button className="primary">Сохранить компанию</button></div></form></section></>}
     {tab === 'need' && needs.length > 0 && <><div className="page-heading"><p className="eyebrow">РОЛЬ И УСЛОВИЯ</p><h1>Сделайте вакансию понятной до отклика</h1><p>Сначала короткая потребность, затем задача первых 30 дней, зарплата, нагрузка и прозрачные этапы отбора.</p></div>
-      <section className="search-bar card role-selector"><label>Потребность команды<select value={needId} onChange={event => { setNeedId(event.target.value); setSearch(null); clearSelectedCandidate() }}>{needs.map(item => <option key={item.id} value={item.id}>{item.title} · {item.grade}</option>)}</select></label>
+      <section className="search-bar card role-selector"><label>Потребность команды<select value={needId} onChange={event => { setNeedId(event.target.value); setShortlistVersion(null); setSearch(null); clearSelectedCandidate() }}>{needs.map(item => <option key={item.id} value={item.id}>{item.title} · {item.grade}</option>)}</select></label>
         {!showNeedForm && <button className="button outline" onClick={() => setShowNeedForm(true)}>Новая потребность</button>}
       </section>
       {activeNeed && !showNeedForm && <RoleEditor key={activeNeed.id} need={activeNeed} companyContact={company.contact_email || me.email} onSaved={onRoleSaved}/>}
@@ -652,13 +665,15 @@ function EmployerApp({ me }: { me: User }) {
     {tab === 'search' && <>
       <div className="page-heading"><p className="eyebrow">ОБРАТНЫЙ НАЙМ</p><h1>Найдите человека по тому, что он умеет</h1>
         <p>Сначала подтверждённые действия и понятная задача. Контакт — только после принятия конкретных условий.</p></div>
-      <section className="search-bar card"><label>Потребность<select value={needId} onChange={event => { setNeedId(event.target.value); setSearch(null) }}>
+      <section className="search-bar card"><label>Потребность<select value={needId} onChange={event => { setNeedId(event.target.value); setShortlistVersion(null); setSearch(null) }}>
         <option value="">Выберите потребность</option>{needs.map(item => <option key={item.id} value={item.id}>{item.title} · {item.grade}</option>)}</select></label>
         <label className="inline-check"><input type="checkbox" checked={fspOnly} onChange={event => setFspOnly(event.target.checked)}/> Только с историей ФСП</label>
         <button className="primary" disabled={searchBusy || !activeRoleCard || activeRoleCard.publication_state !== 'active' || !activeRoleCard.fresh}
           onClick={runSearch}>{searchBusy ? 'Формируем подборку…' : 'Показать подборку'}</button>
       </section>
       {needs.length === 0 && <Notice>Создайте профиль компании и заполните условия первой роли.</Notice>}
+      {activeNeed?.role_version_id && <RoleFunnel key={needId} needId={needId} versionId={activeNeed.role_version_id} revision={funnelRevision}/>}
+      {shortlist.error && <Notice tone="bad">{shortlist.error}</Notice>}
       {activeRoleCard && <div className="role-search-preview"><RoleCard role={activeRoleCard.payload} status={activeRoleCard.publication_state}
         confirmedAt={activeRoleCard.confirmed_at} source={activeRoleCard.source} compact/><button className="text-button" onClick={() => setTab('need')}>Изменить условия роли</button></div>}
       {needs.length > 0 && (!activeRoleCard || activeRoleCard.publication_state !== 'active' || !activeRoleCard.fresh) &&
@@ -700,6 +715,23 @@ function EmployerApp({ me }: { me: User }) {
       </div>}
     </>}
     {tab === 'bank' && <><div className="page-heading"><p className="eyebrow">БАНК КАНДИДАТОВ</p><h1>Все открытые проверенные профили</h1><p>{bank[0]?.bank_score_algorithm_version === 'match_v2' ? 'Порядок внутри подтверждённой категории учитывает тест и ограниченный релевантный буст ФСП.' : bank[0]?.bank_score_algorithm_version === 'match_v1' ? 'Порядок внутри категории учитывает тест и дополнительный сигнал ФСП.' : 'Порядок внутри категории определяется выбранной версией алгоритма; ФСП можно фильтровать отдельно.'}</p></div><section className="search-bar card"><label>Специализация<select value={bankSpec} onChange={e => setBankSpec(e.target.value)}><option value="">Все</option><option value="backend">Backend</option><option value="frontend">Frontend</option><option value="qa">QA</option><option value="data_analyst">Аналитика данных</option></select></label><label>Грейд<select value={bankGrade} onChange={e => setBankGrade(e.target.value)}><option value="">Все</option><option value="junior">Junior</option><option value="middle">Middle</option></select></label><label>Стек (заявлен)<input value={bankStack} onChange={e => setBankStack(e.target.value)} placeholder="Python"/></label><label className="inline-check"><input type="checkbox" checked={bankFsp} onChange={e => setBankFsp(e.target.checked)}/> С историей ФСП</label><button className="primary" onClick={filterBank}>Применить фильтры</button></section>{bank.length ? <div className="candidate-grid">{bank.map(candidate => <CandidateCard key={candidate.id} candidate={candidate}/>)}</div> : <div className="empty card">Пока нет подходящих опубликованных профилей.</div>}</>}
+    {tab === 'shortlist' && <>
+      <div className="page-heading"><p className="eyebrow">ВАШ ПРИВАТНЫЙ СПИСОК</p><h1>Избранные кандидаты</h1><p>Сохранённые профили привязаны к версии условий. Кандидаты и другие компании не видят ваш выбор.</p></div>
+      <section className="search-bar card"><label>Роль для избранного<select value={needId} onChange={event => { setNeedId(event.target.value); setShortlistVersion(null); setSearch(null); clearSelectedCandidate() }}>
+        {needs.map(need => <option key={need.id} value={need.id}>{need.title} · {need.grade}</option>)}</select></label>
+        {shortlist.data && <label>Версия роли в избранном<select value={shortlist.data.role_version_id} onChange={event => setShortlistVersion(event.target.value)}>
+          {shortlist.data.versions.map(version => <option key={version.id} value={version.id}>v{version.version} · {version.title}</option>)}</select></label>}
+        <button className="button outline" onClick={shortlist.refresh}>Обновить избранное</button>
+      </section>
+      {shortlist.error && <Notice tone="bad">{shortlist.error}</Notice>}
+      {shortlist.loading ? <p role="status">Проверяем доступность сохранённых профилей…</p> : shortlist.data && <>
+        {!shortlist.data.current && <Notice>Это список для прежних условий. Для нового приглашения выберите актуальную версию и сформируйте подборку.</Notice>}
+        <p className="small muted">Версия v{shortlist.data.role_version}. Карточки проверяются по актуальным согласиям, категории, блокировкам и условиям кандидата.</p>
+        {shortlist.data.entries.some(entry => entry.saved) ? <div className="candidate-grid" data-testid="shortlist-cards">{shortlist.data.entries.filter(entry => entry.saved).map(entry => <CandidateCard key={entry.candidate_id} candidate={entry.candidate}/>)}</div>
+          : <div className="empty card">В этой версии пока нет доступных избранных кандидатов. <button className="text-button" onClick={() => { setShortlistVersion(null); setTab('search') }}>Открыть подборку</button></div>}
+        {shortlist.data.unavailable_count > 0 && <p className="muted">Недоступных сохранённых профилей: {shortlist.data.unavailable_count}. Их данные скрыты.</p>}
+      </>}
+    </>}
     {tab === 'calendar' && <CalendarPanel/>}
     {tab === 'offers' && <><div className="page-heading"><p className="eyebrow">ИСХОДЯЩИЕ ПРЕДЛОЖЕНИЯ</p><h1>Нанимайте по обещаниям, которые можно проверить</h1><p>Каждое приглашение привязано к выбранным доказательствам и конкретной версии условий.</p></div>{offers.length === 0 ? <div className="empty card">Пока нет приглашений.</div> : offers.map(invite => <article className="card offer-card" key={invite.id}><div className="section-title"><div><h2>{invite.company_name} → Кандидат #{invite.candidate_id.slice(0,8)}</h2><p className="muted">{invite.offer_text}</p></div><span className={`badge ${invite.state === 'accepted' ? 'green' : ''}`}>{statusName(invite.state)}</span></div><div className="salary">{rubles(invite.salary_min_rub)} — {rubles(invite.salary_max_rub)} <small>в месяц · до налогов</small></div><p><strong>Основание:</strong> {invite.reason}</p>{['sent', 'viewed'].includes(invite.state) && <button className="button subtle" type="button" disabled={inviteActionBusyId === invite.id} onClick={() => void withdrawInvitation(invite)}>{inviteActionBusyId === invite.id ? 'Отзываем…' : 'Отозвать приглашение'}</button>}{invite.state === 'accepted' && <><InterviewConfirmation invite={invite} viewer="employer" onChanged={load}/><BookingLink invitationId={invite.id} employer/><button className="button outline" onClick={() => showContact(invite.candidate_id)}>Показать контакты кандидата #{invite.candidate_id.slice(0,8)}</button></>}{contacts[invite.candidate_id] && invite.state === 'accepted' && <Notice tone="good">{contacts[invite.candidate_id].full_name} · {contacts[invite.candidate_id].email} · {contacts[invite.candidate_id].phone}</Notice>}</article>)}</>}
   </main></div></div>

@@ -51,7 +51,7 @@ def test_pytest_database_is_initialized_by_the_current_alembic_revision():
         revision = connection.exec_driver_sql(
             "SELECT version_num FROM alembic_version"
         ).scalar_one()
-    assert revision == "f7c2a1d93e10"
+    assert revision == "b26c19d745ef"
 
 
 def test_csrf_guard_accepts_the_configured_origin_and_rejects_another_origin():
