@@ -18,6 +18,8 @@ import CandidateJourney from './features/progress/CandidateJourney'
 import AssessmentReport from './features/progress/AssessmentReport'
 import AssessmentPlan from './features/progress/AssessmentPlan'
 import RoleFunnel from './features/pipeline/RoleFunnel'
+import DemoMarket from './features/market/DemoMarket'
+import { initialWorkspaceTab, leaveMarket } from './features/market/navigation'
 import { useShortlist } from './features/pipeline/useShortlist'
 import './features/pipeline/pipeline.css'
 import './features/progress/progress.css'
@@ -134,7 +136,7 @@ function Verify({ onDone }: { onDone: () => void }) {
 }
 
 function CandidateApp({ me }: { me: User }) {
-  const [tab, setTab] = useState('roles')
+  const [tab, setTab] = useState(() => me.demo_market_enabled ? initialWorkspaceTab('roles') : 'roles')
   const [profile, setProfile] = useState<Profile>(emptyProfile)
   const [story, setStory] = useState<AchievementStory>(emptyAchievementStory)
   const [skillsText, setSkillsText] = useState('')
@@ -267,12 +269,13 @@ function CandidateApp({ me }: { me: User }) {
   return <div className="workspace">
     <header className="topbar"><span className="logo">ФСП <strong>СИГНАЛ</strong></span><span className="top-id">{me.email}</span></header>
     <div className="shell"><aside className="sidebar"><p className="overline">КАБИНЕТ КАНДИДАТА</p>
-      {[['roles','Для меня'],['profile','Мой профиль'],['preferences','Условия поиска'],['evidence','Доказательства'],['test','Проверка навыков'],['offers','Приглашения'],['meetings','Встречи'],['fsp','ФСП ID и доступ']].map(([id, label]) =>
-        <button key={id} className={tab === id ? 'active' : ''} onClick={() => { setTab(id); setError(''); setFeedback('') }}>{label}</button>)}
+      {[['roles','Для меня'],['profile','Мой профиль'],['preferences','Условия поиска'],['evidence','Доказательства'],['test','Проверка навыков'],['offers','Приглашения'],['meetings','Встречи'],['fsp','ФСП ID и доступ'], ...(me.demo_market_enabled ? [['market','Рынок · демо']] : [])].map(([id, label]) =>
+        <button key={id} className={tab === id ? 'active' : ''} onClick={() => { if (id !== 'market') leaveMarket(); setTab(id); setError(''); setFeedback('') }}>{label}</button>)}
       <div className="sidebar-bottom"><CategoryBadge spec={profile.verified_specialization} grade={profile.verified_grade}/><p className="small muted">Контакты открываются только по вашему решению.</p></div>
     </aside><main className="content">
       {error && <Notice tone="bad">{error}</Notice>}{feedback && <Notice tone="good">{feedback}</Notice>}
       {tab === 'roles' && <><CandidateJourney onNavigate={setTab} onResume={id => { void resumeTest(id) }}/><RoleFeed onNavigate={setTab}/></>}
+      {tab === 'market' && me.demo_market_enabled && <DemoMarket viewer="candidate"/>}
       {tab === 'meetings' && <><div className="page-heading"><p className="eyebrow">СЛЕДУЮЩИЙ ШАГ</p><h1>Встречи и договорённости</h1><p>Выберите время разговора и сохраните материалы вместе с работодателем.</p></div><MeetingList viewer="candidate"/></>}
       {tab === 'preferences' && <><div className="page-heading"><p className="eyebrow">ВАШИ ПРАВИЛА</p><h1>Подборка под ваши условия</h1><p>Сохранённые ограничения фильтруют выдачу. Их значения остаются закрытыми от компаний.</p></div><PreferencesPanel onSaved={preferences => setProfile(current => ({
         ...current,
@@ -355,7 +358,7 @@ function CandidateApp({ me }: { me: User }) {
 }
 
 function EmployerApp({ me }: { me: User }) {
-  const [tab, setTab] = useState('search')
+  const [tab, setTab] = useState(() => me.demo_market_enabled ? initialWorkspaceTab('search') : 'search')
   const [company, setCompany] = useState({ company_name:'', description:'', industry:'', contact_email:me.email })
   const [needs, setNeeds] = useState<Need[]>([])
   const [needId, setNeedId] = useState('')
@@ -645,7 +648,7 @@ function EmployerApp({ me }: { me: User }) {
         onClick={() => void shortlist.toggle(candidate.id)}>{shortlistEntry?.saved ? 'Убрать из избранного' : 'Сохранить кандидата'}</button>
     </article>
   }
-  return <div className="workspace"><header className="topbar"><span className="logo">ФСП <strong>СИГНАЛ</strong></span><span className="top-id">{company.company_name || me.email}</span></header><div className="shell"><aside className="sidebar"><p className="overline">КАБИНЕТ РАБОТОДАТЕЛЯ</p>{[['search','Найти специалиста'],['need','Роль и условия'],['bank','Банк кандидатов'],['offers','Приглашения'],['calendar','Календарь HR'],['shortlist','Избранные кандидаты'],['company','Компания']].map(([id,label]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => {setTab(id);clearSelectedCandidate();setError('');setFeedback('');setReturnToInvitation(false);setReturnToNeed(false);setCompanySetupRequired(false)}}>{label}</button>)}<div className="sidebar-bottom"><p className="small muted">В этой демонстрации достижения ФСП синтетические.</p></div></aside><main className="content">
+  return <div className="workspace"><header className="topbar"><span className="logo">ФСП <strong>СИГНАЛ</strong></span><span className="top-id">{company.company_name || me.email}</span></header><div className="shell"><aside className="sidebar"><p className="overline">КАБИНЕТ РАБОТОДАТЕЛЯ</p>{[['search','Найти специалиста'],['need','Роль и условия'],['bank','Банк кандидатов'],['offers','Приглашения'],['calendar','Календарь HR'],['shortlist','Избранные кандидаты'],['company','Компания'], ...(me.demo_market_enabled ? [['market','Рынок · демо']] : [])].map(([id,label]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => {if (id !== 'market') leaveMarket();setTab(id);clearSelectedCandidate();setError('');setFeedback('');setReturnToInvitation(false);setReturnToNeed(false);setCompanySetupRequired(false)}}>{label}</button>)}<div className="sidebar-bottom"><p className="small muted">В этой демонстрации достижения ФСП синтетические.</p></div></aside><main className="content">
     {error && !companySetupRequired && <Notice tone="bad">{error}</Notice>}
     {companySetupRequired && !selected && tab !== 'company' && error && <div className="notice bad" role="alert">{error}
       <button className="text-button" type="button" onClick={() => {
@@ -732,6 +735,7 @@ function EmployerApp({ me }: { me: User }) {
         {shortlist.data.unavailable_count > 0 && <p className="muted">Недоступных сохранённых профилей: {shortlist.data.unavailable_count}. Их данные скрыты.</p>}
       </>}
     </>}
+    {tab === 'market' && me.demo_market_enabled && <DemoMarket viewer="employer"/>}
     {tab === 'calendar' && <CalendarPanel/>}
     {tab === 'offers' && <><div className="page-heading"><p className="eyebrow">ИСХОДЯЩИЕ ПРЕДЛОЖЕНИЯ</p><h1>Нанимайте по обещаниям, которые можно проверить</h1><p>Каждое приглашение привязано к выбранным доказательствам и конкретной версии условий.</p></div>{offers.length === 0 ? <div className="empty card">Пока нет приглашений.</div> : offers.map(invite => <article className="card offer-card" key={invite.id}><div className="section-title"><div><h2>{invite.company_name} → Кандидат #{invite.candidate_id.slice(0,8)}</h2><p className="muted">{invite.offer_text}</p></div><span className={`badge ${invite.state === 'accepted' ? 'green' : ''}`}>{statusName(invite.state)}</span></div><div className="salary">{rubles(invite.salary_min_rub)} — {rubles(invite.salary_max_rub)} <small>в месяц · до налогов</small></div><p><strong>Основание:</strong> {invite.reason}</p>{['sent', 'viewed'].includes(invite.state) && <button className="button subtle" type="button" disabled={inviteActionBusyId === invite.id} onClick={() => void withdrawInvitation(invite)}>{inviteActionBusyId === invite.id ? 'Отзываем…' : 'Отозвать приглашение'}</button>}{invite.state === 'accepted' && <><InterviewConfirmation invite={invite} viewer="employer" onChanged={load}/><BookingLink invitationId={invite.id} employer/><button className="button outline" onClick={() => showContact(invite.candidate_id)}>Показать контакты кандидата #{invite.candidate_id.slice(0,8)}</button></>}{contacts[invite.candidate_id] && invite.state === 'accepted' && <Notice tone="good">{contacts[invite.candidate_id].full_name} · {contacts[invite.candidate_id].email} · {contacts[invite.candidate_id].phone}</Notice>}</article>)}</>}
   </main></div></div>

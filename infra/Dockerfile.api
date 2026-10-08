@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends fonts-dejavu-co
 COPY backend/requirements.txt /app/backend/requirements.txt
 RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 COPY backend /app/backend
+COPY data/synthetic_market_v1 /app/data/synthetic_market_v1
 COPY alembic.ini /app/alembic.ini
 CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
 

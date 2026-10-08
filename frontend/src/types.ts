@@ -1,4 +1,4 @@
-export type User = { id: string; email: string; role: 'candidate' | 'employer'; email_verified: boolean }
+export type User = { id: string; email: string; role: 'candidate' | 'employer'; email_verified: boolean; demo_market_enabled?: boolean }
 
 export type AchievementStory = {
   title: string

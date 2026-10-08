@@ -225,6 +225,22 @@ class EmployerShortlistEntry(Base):
     )
 
 
+class SyntheticMarketRecord(Base):
+    """Isolated demo corpus; never an account, verified profile, or hiring need."""
+    __tablename__ = "synthetic_market_records"
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    dataset_version: Mapped[str] = mapped_column(String(40))
+    kind: Mapped[str] = mapped_column(String(16))
+    family_id: Mapped[str] = mapped_column(String(64))
+    level: Mapped[str | None] = mapped_column(String(16))
+    payload: Mapped[dict] = mapped_column(JSON)
+    __table_args__ = (
+        CheckConstraint("kind IN ('family','profile','vacancy')", name="market_record_kind"),
+        CheckConstraint("level IS NULL OR level IN ('junior','middle','senior','lead')", name="market_record_level"),
+        Index("ix_market_dataset_kind_family", "dataset_version", "kind", "family_id"),
+    )
+
+
 class AssessmentAttempt(Base):
     __tablename__ = "assessment_attempts"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)

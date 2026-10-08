@@ -310,6 +310,8 @@ def seed() -> None:
                     profile = db.get(CandidateProfile, peer.id)
                     db.add(RoleDecision(candidate_id=peer.id, need_id=need.id, role_version_id=version.id,
                                         action="saved", preferences_version=profile.preferences_version))
+        from .seed_market import seed_market
+        seed_market(db)
         db.commit()
     print(f"Seed ready: two employers, {synthetic_profile_count} synthetic assessment profiles, "
           "one profile-free candidate, nine discovery roles.")

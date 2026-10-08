@@ -13,7 +13,7 @@ async function expectNoHorizontalOverflow(page: import('@playwright/test').Page)
 test('candidate and employer sections fit a narrow mobile viewport', async ({ browser }) => {
   const candidate = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
   await signIn(candidate, 'backend-middle-1@demo.test')
-  for (const section of ['Для меня', 'Условия поиска', 'Доказательства', 'Мой профиль', 'Проверка навыков', 'Приглашения', 'ФСП ID и доступ']) {
+  for (const section of ['Для меня', 'Условия поиска', 'Доказательства', 'Мой профиль', 'Проверка навыков', 'Приглашения', 'ФСП ID и доступ', 'Рынок · демо']) {
     await candidate.getByRole('button', { name: section }).click()
     await expect(candidate.locator('.sidebar button.active')).toHaveText(section)
     await expectNoHorizontalOverflow(candidate)
@@ -22,7 +22,7 @@ test('candidate and employer sections fit a narrow mobile viewport', async ({ br
 
   const employer = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
   await signIn(employer, 'employer@demo.test')
-  for (const section of ['Найти специалиста', 'Роль и условия', 'Банк кандидатов', 'Приглашения', 'Избранные кандидаты', 'Компания']) {
+  for (const section of ['Найти специалиста', 'Роль и условия', 'Банк кандидатов', 'Приглашения', 'Избранные кандидаты', 'Компания', 'Рынок · демо']) {
     await employer.getByRole('button', { name: section }).click()
     await expect(employer.locator('.sidebar button.active')).toHaveText(section)
     await expectNoHorizontalOverflow(employer)

@@ -409,6 +409,7 @@ def test_demo_seed_has_repeatable_discovery_roles_without_changing_primary_need(
     local_sessions = sessionmaker(bind=engine, autoflush=False, autocommit=False)
     monkeypatch.setattr(seed_demo, "SessionLocal", local_sessions)
     monkeypatch.setattr(seed_demo, "settings", SimpleNamespace(app_mode="demo"))
+    monkeypatch.setattr("backend.seed_market.settings", SimpleNamespace(app_mode="demo"))
 
     seed_demo.seed()
     with local_sessions() as db:
@@ -482,6 +483,7 @@ def test_demo_seed_never_relabels_existing_direct_candidate_as_synthetic(tmp_pat
 
     monkeypatch.setattr(seed_demo, "SessionLocal", local_sessions)
     monkeypatch.setattr(seed_demo, "settings", SimpleNamespace(app_mode="demo"))
+    monkeypatch.setattr("backend.seed_market.settings", SimpleNamespace(app_mode="demo"))
     seed_demo.seed()
     assert "95 synthetic assessment profiles" in capsys.readouterr().out
 
@@ -500,6 +502,7 @@ def test_seeded_new_categories_are_filterable_through_employer_bank_api(tmp_path
     local_sessions = sessionmaker(bind=engine, autoflush=False, autocommit=False)
     monkeypatch.setattr(seed_demo, "SessionLocal", local_sessions)
     monkeypatch.setattr(seed_demo, "settings", SimpleNamespace(app_mode="demo"))
+    monkeypatch.setattr("backend.seed_market.settings", SimpleNamespace(app_mode="demo"))
 
     def override_db():
         with local_sessions() as db:

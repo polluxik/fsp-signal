@@ -2596,6 +2596,491 @@
         ]
       }
     },
+    "/api/v1/demo-market/catalog": {
+      "get": {
+        "tags": [
+          "Synthetic demo market"
+        ],
+        "summary": "Catalog",
+        "operationId": "catalog_api_v1_demo_market_catalog_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketCatalog"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
+      }
+    },
+    "/api/v1/demo-market/profiles": {
+      "get": {
+        "tags": [
+          "Synthetic demo market"
+        ],
+        "summary": "Profiles",
+        "operationId": "profiles_api_v1_demo_market_profiles_get",
+        "parameters": [
+          {
+            "name": "family",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Family"
+            }
+          },
+          {
+            "name": "level",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "junior",
+                    "middle",
+                    "senior",
+                    "lead"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Level"
+            }
+          },
+          {
+            "name": "work_format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "remote",
+                    "hybrid",
+                    "office"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Work Format"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120,
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 40,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
+      }
+    },
+    "/api/v1/demo-market/vacancies": {
+      "get": {
+        "tags": [
+          "Synthetic demo market"
+        ],
+        "summary": "Vacancies",
+        "operationId": "vacancies_api_v1_demo_market_vacancies_get",
+        "parameters": [
+          {
+            "name": "family",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Family"
+            }
+          },
+          {
+            "name": "level",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "junior",
+                    "middle",
+                    "senior",
+                    "lead"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Level"
+            }
+          },
+          {
+            "name": "work_format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "remote",
+                    "hybrid",
+                    "office"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Work Format"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120,
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 40,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
+      }
+    },
+    "/api/v1/demo-market/profiles/{profile_id}": {
+      "get": {
+        "tags": [
+          "Synthetic demo market"
+        ],
+        "summary": "Profile Detail",
+        "operationId": "profile_detail_api_v1_demo_market_profiles__profile_id__get",
+        "parameters": [
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
+      }
+    },
+    "/api/v1/demo-market/vacancies/{vacancy_id}": {
+      "get": {
+        "tags": [
+          "Synthetic demo market"
+        ],
+        "summary": "Vacancy Detail",
+        "operationId": "vacancy_detail_api_v1_demo_market_vacancies__vacancy_id__get",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Vacancy Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
+      }
+    },
+    "/api/v1/demo-market/vacancies/{vacancy_id}/compare/{profile_id}": {
+      "get": {
+        "tags": [
+          "Synthetic demo market"
+        ],
+        "summary": "Comparison",
+        "operationId": "comparison_api_v1_demo_market_vacancies__vacancy_id__compare__profile_id__get",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketComparison"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
+      }
+    },
     "/api/v1/taxonomy/categories": {
       "get": {
         "summary": "Get Taxonomy Categories",
@@ -5896,6 +6381,41 @@
         ],
         "title": "ConsentIn"
       },
+      "DeclaredCheck": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "passed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passed"
+          },
+          "explanation": {
+            "type": "string",
+            "title": "Explanation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "label",
+          "passed",
+          "explanation"
+        ],
+        "title": "DeclaredCheck"
+      },
       "DemoPromotionOut": {
         "properties": {
           "id": {
@@ -7069,6 +7589,319 @@
           "password"
         ],
         "title": "LoginIn"
+      },
+      "MarketCard": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "profile",
+              "vacancy"
+            ],
+            "title": "Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "family_id": {
+            "type": "string",
+            "title": "Family Id"
+          },
+          "family_name": {
+            "type": "string",
+            "title": "Family Name"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "junior",
+              "middle",
+              "senior",
+              "lead"
+            ],
+            "title": "Level"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "work_formats": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "remote",
+                "hybrid",
+                "office"
+              ]
+            },
+            "type": "array",
+            "title": "Work Formats"
+          },
+          "skills": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skills"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "salary_min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Salary Min"
+          },
+          "salary_max": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Salary Max"
+          },
+          "data_mode": {
+            "type": "string",
+            "const": "synthetic",
+            "title": "Data Mode",
+            "default": "synthetic"
+          },
+          "assessment_status": {
+            "type": "string",
+            "const": "not_assessed",
+            "title": "Assessment Status",
+            "default": "not_assessed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "family_id",
+          "family_name",
+          "level",
+          "city",
+          "work_formats",
+          "skills",
+          "summary",
+          "salary_min",
+          "salary_max"
+        ],
+        "title": "MarketCard"
+      },
+      "MarketCatalog": {
+        "properties": {
+          "dataset_version": {
+            "type": "string",
+            "title": "Dataset Version"
+          },
+          "data_mode": {
+            "type": "string",
+            "const": "synthetic",
+            "title": "Data Mode",
+            "default": "synthetic"
+          },
+          "profiles": {
+            "type": "integer",
+            "title": "Profiles"
+          },
+          "vacancies": {
+            "type": "integer",
+            "title": "Vacancies"
+          },
+          "families": {
+            "items": {
+              "$ref": "#/components/schemas/MarketFamily"
+            },
+            "type": "array",
+            "title": "Families"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset_version",
+          "profiles",
+          "vacancies",
+          "families"
+        ],
+        "title": "MarketCatalog"
+      },
+      "MarketComparison": {
+        "properties": {
+          "profile_id": {
+            "type": "string",
+            "title": "Profile Id"
+          },
+          "vacancy_id": {
+            "type": "string",
+            "title": "Vacancy Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "compatible",
+              "incompatible",
+              "unknown"
+            ],
+            "title": "Status"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/DeclaredCheck"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "matched_skills": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Matched Skills"
+          },
+          "missing_skills": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Skills"
+          },
+          "data_mode": {
+            "type": "string",
+            "const": "synthetic",
+            "title": "Data Mode",
+            "default": "synthetic"
+          },
+          "assessment_status": {
+            "type": "string",
+            "const": "not_assessed",
+            "title": "Assessment Status",
+            "default": "not_assessed"
+          },
+          "notice": {
+            "type": "string",
+            "title": "Notice",
+            "default": "Сравнение вымышленных заявленных условий. Навыки и уровень не проверены; это не вероятность найма."
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_id",
+          "vacancy_id",
+          "status",
+          "checks",
+          "matched_skills",
+          "missing_skills"
+        ],
+        "title": "MarketComparison"
+      },
+      "MarketDetail": {
+        "properties": {
+          "card": {
+            "$ref": "#/components/schemas/MarketCard"
+          },
+          "details": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Details"
+          }
+        },
+        "type": "object",
+        "required": [
+          "card",
+          "details"
+        ],
+        "title": "MarketDetail"
+      },
+      "MarketFamily": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Aliases"
+          },
+          "profile_count": {
+            "type": "integer",
+            "title": "Profile Count"
+          },
+          "vacancy_count": {
+            "type": "integer",
+            "title": "Vacancy Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "aliases",
+          "profile_count",
+          "vacancy_count"
+        ],
+        "title": "MarketFamily"
+      },
+      "MarketPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MarketCard"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "offset",
+          "limit"
+        ],
+        "title": "MarketPage"
       },
       "MatchExplanation": {
         "properties": {

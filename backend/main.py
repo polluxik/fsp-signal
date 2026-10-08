@@ -39,6 +39,7 @@ from .routes_v2 import assistant_router, candidate_router, router as v2_router
 from .scheduling import router as scheduling_router
 from .candidate_progress import router as progress_router
 from .employer_pipeline import router as pipeline_router
+from .market import router as market_router
 from .schemas import (AcceptInvitationIn, AnswersIn, ApiError, CandidateIn, EmployerIn, FspLinkIn,
                       InterviewHeldConfirmationOut, InvitationCommandIn, InvitationOut,
                       InvitationV2In, LoginIn, NeedIn, RegisterIn, RoleCardIn, SearchIn,
@@ -79,6 +80,7 @@ app.include_router(assistant_router)
 app.include_router(scheduling_router)
 app.include_router(progress_router)
 app.include_router(pipeline_router)
+app.include_router(market_router)
 
 
 def _dependency_calls(dependant):
@@ -397,7 +399,7 @@ def logout(response: Response, request: Request, user: User = Depends(get_user),
 @app.get("/api/v1/me")
 def me(user: User = Depends(get_user)):
     return {"id": user.id, "email": user.email, "role": user.role,
-            "email_verified": bool(user.email_verified_at)}
+            "email_verified": bool(user.email_verified_at), "demo_market_enabled": settings.app_mode == "demo"}
 
 
 @app.put("/api/v1/candidate/profile", dependencies=[Depends(csrf_guard)])
