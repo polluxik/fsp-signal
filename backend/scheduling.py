@@ -180,6 +180,7 @@ def read_calendar(user: User = Depends(get_user), db: Session = Depends(get_db))
 @router.put("/employer/calendar", dependencies=[Depends(csrf_guard)])
 def update_calendar(data: CalendarSettingsIn, user: User = Depends(get_user), db: Session = Depends(get_db)):
     require(user, "employer")
+    _employer_lock(db, user.id)
     calendar = _calendar(db, user.id)
     calendar.timezone, calendar.call_url = data.timezone, data.call_url
     db.commit()
@@ -195,6 +196,9 @@ def add_availability(data: AvailabilityIn, user: User = Depends(get_user), db: S
     seconds = (data.ends_at - data.starts_at).total_seconds()
     if seconds % (data.duration_minutes * 60):
         fail("AVAILABILITY_NOT_DIVISIBLE", 422)
+    # Initialization is atomic but existing calendars no longer acquire a lock.
+    # Serialize the overlap check and insert against every HR availability edit.
+    _employer_lock(db, user.id)
     calendar = _calendar(db, user.id)
     if db.scalar(select(AvailabilitySlot.id).where(
         AvailabilitySlot.employer_id == user.id, AvailabilitySlot.active.is_(True),

@@ -1,12 +1,12 @@
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import timedelta
-from threading import Barrier
+from threading import Barrier, Event
 
 import httpx
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import event, select
 
 from backend import meeting_ai
 from backend.config import settings
@@ -81,6 +81,51 @@ def test_calendar_initialization_is_idempotent_under_concurrent_first_reads():
         with SessionLocal() as db:
             assert len(db.scalars(select(InterviewCalendar).where(
                 InterviewCalendar.employer_id == employer["id"])).all()) == 1
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(engine.dialect.name != 'postgresql', reason='requires dedicated PostgreSQL *_test database')
+def test_concurrent_ranges_in_existing_calendar_cannot_create_overlapping_slots():
+    email = f"calendar-range-race-{now().timestamp()}@example.test"
+    with TestClient(app) as first, TestClient(app) as second:
+        employer = register_verified(first, email, 'employer')
+        assert second.post('/api/v1/auth/login', json={
+            'email': email, 'password': 'CorrectHorse123!',
+        }).status_code == 200
+        assert first.get('/api/v1/employer/calendar').status_code == 200
+        barrier = Barrier(2)
+        first_insert = Event()
+        competing_insert = Event()
+
+        def hold_first_slot_insert(connection, cursor, statement, parameters, context, executemany):
+            if not statement.lower().startswith('insert into availability_slots'):
+                return
+            if first_insert.is_set():
+                competing_insert.set()
+            else:
+                first_insert.set()
+                # Pause after the overlap check, before any slots are visible.
+                # A competing request must wait at the employer lock; without
+                # that lock it also inserts and produces two successful ranges.
+                competing_insert.wait(timeout=1)
+        start = (now() + timedelta(days=1)).replace(microsecond=0)
+        payload = {'starts_at': start.isoformat(),
+                   'ends_at': (start + timedelta(hours=1)).isoformat(), 'duration_minutes': 30}
+
+        def add(client):
+            barrier.wait(timeout=10)
+            return client.post('/api/v1/employer/calendar/availability', headers=csrf(client), json=payload).status_code
+
+        event.listen(engine, 'before_cursor_execute', hold_first_slot_insert)
+        try:
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                futures = [pool.submit(add, first), pool.submit(add, second)]
+                assert sorted(future.result(timeout=30) for future in futures) == [201, 409]
+        finally:
+            event.remove(engine, 'before_cursor_execute', hold_first_slot_insert)
+        with SessionLocal() as db:
+            slots = db.scalars(select(AvailabilitySlot).where(AvailabilitySlot.employer_id == employer['id'])).all()
+            assert len(slots) == 2
 
 
 def test_hr_range_timezone_overlap_book_cancel_and_access():

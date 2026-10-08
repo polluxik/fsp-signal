@@ -8,6 +8,7 @@ import secrets
 from fastapi import Body, Depends, FastAPI, File, Header, HTTPException, Request, Response, UploadFile
 from fastapi.openapi.utils import get_openapi
 from fastapi.routing import APIRoute
+from .assessment_policy import failed_higher_attempts, grade_change_cooling_down
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -512,13 +513,15 @@ def start_assessment(data: StartAssessmentIn, user: User = Depends(get_user), db
     recent = db.scalars(select(AssessmentAttempt).where(
         AssessmentAttempt.candidate_id == user.id,
         AssessmentAttempt.started_at >= now()-timedelta(days=7)).order_by(AssessmentAttempt.started_at.desc())).all()
-    if len(recent) >= 3:
+    # A failed higher grade consumes its own retry budget, not the lower
+    # grade's budget. It still cannot bypass a same-grade cooldown or retry cap.
+    refunded = failed_higher_attempts(recent, data.specialization, data.grade)
+    if len(recent) - len(refunded) >= 3:
         problem("ASSESSMENT_ATTEMPT_LIMIT", 429)
     if any(a.state == "in_progress" and aware(a.expires_at) > now() for a in recent):
         problem("ASSESSMENT_ALREADY_IN_PROGRESS", 409)
-    if profile.verified_grade and (profile.verified_specialization, profile.verified_grade) != (data.specialization, data.grade):
-        if profile.grade_changed_at and aware(profile.grade_changed_at)+timedelta(days=30) > now():
-            problem("GRADE_CHANGE_COOLDOWN", 409)
+    if grade_change_cooling_down(profile, data.specialization, data.grade, recent, now()):
+        problem("GRADE_CHANGE_COOLDOWN", 409)
     same = [a for a in recent if (a.specialization, a.grade) == (data.specialization, data.grade)]
     if same and aware(same[0].started_at)+timedelta(hours=72) > now():
         problem("ASSESSMENT_RETRY_COOLDOWN", 409)
@@ -596,7 +599,10 @@ def submit_assessment(attempt_id: str, user: User = Depends(get_user), db: Sessi
     profile = profile_for(db, user)
     if passed:
         changing = (profile.verified_specialization, profile.verified_grade) != (attempt.specialization, attempt.grade)
-        if changing and profile.grade_changed_at and aware(profile.grade_changed_at)+timedelta(days=30) > now():
+        recent = db.scalars(select(AssessmentAttempt).where(
+            AssessmentAttempt.candidate_id == user.id,
+            AssessmentAttempt.started_at >= now() - timedelta(days=7))).all()
+        if grade_change_cooling_down(profile, attempt.specialization, attempt.grade, recent, now()):
             problem("GRADE_CHANGE_COOLDOWN", 409)
         profile.verified_specialization, profile.verified_grade = attempt.specialization, attempt.grade
         profile.test_score, profile.competencies, profile.test_verified_at = score, competencies, now()

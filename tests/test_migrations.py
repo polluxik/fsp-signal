@@ -6,6 +6,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -154,7 +155,8 @@ def _legacy_invitation_database(database: Path, invitations: list[tuple[str, str
             f"invite-{suffix}", "employer-duplicate", "candidate-duplicate", None, None,
             "Duplicate Co", "Discuss the role with our team.", "Legacy invitation.",
             "team@example.test", 180000, 220000, "remote", state, f"key-{suffix}",
-            (suffix[0] * 64), "2026-10-01T00:00:00+00:00", "2026-10-08T00:00:00+00:00", None,
+            (suffix[0] * 64), "2026-10-01T00:00:00+00:00",
+            (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(), None,
         ) for suffix, state in invitations],
     )
     connection.commit()
