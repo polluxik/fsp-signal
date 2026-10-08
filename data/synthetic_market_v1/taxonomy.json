@@ -1,0 +1,1383 @@
+{
+  "version": "it_roles_v1",
+  "families": [
+    {
+      "id": "backend",
+      "name_ru": "Backend-разработка",
+      "name_en": "Backend development",
+      "parent_area": "Разработка ПО",
+      "aliases": [
+        "backend developer",
+        "API engineer",
+        "серверная разработка"
+      ],
+      "subtypes": [
+        "API и сервисы",
+        "интеграции",
+        "высоконагруженные системы"
+      ],
+      "skills": [
+        {
+          "id": "go",
+          "label": "Go"
+        },
+        {
+          "id": "java",
+          "label": "Java"
+        },
+        {
+          "id": "python",
+          "label": "Python"
+        },
+        {
+          "id": "postgresql",
+          "label": "PostgreSQL"
+        },
+        {
+          "id": "redis",
+          "label": "Redis"
+        },
+        {
+          "id": "kafka",
+          "label": "Kafka"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "frontend",
+      "name_ru": "Frontend-разработка",
+      "name_en": "Frontend development",
+      "parent_area": "Разработка ПО",
+      "aliases": [
+        "frontend developer",
+        "web UI",
+        "клиентская разработка"
+      ],
+      "subtypes": [
+        "личные кабинеты",
+        "интерфейсы данных",
+        "сложные формы"
+      ],
+      "skills": [
+        {
+          "id": "typescript",
+          "label": "TypeScript"
+        },
+        {
+          "id": "react",
+          "label": "React"
+        },
+        {
+          "id": "accessibility",
+          "label": "доступность интерфейсов"
+        },
+        {
+          "id": "web-performance",
+          "label": "производительность web"
+        },
+        {
+          "id": "playwright",
+          "label": "Playwright"
+        },
+        {
+          "id": "design-systems",
+          "label": "дизайн-системы"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "fullstack",
+      "name_ru": "Full-stack-разработка",
+      "name_en": "Full-stack development",
+      "parent_area": "Разработка ПО",
+      "aliases": [
+        "full-stack developer",
+        "веб-разработчик полного цикла"
+      ],
+      "subtypes": [
+        "внутренние продукты",
+        "порталы",
+        "рабочие инструменты"
+      ],
+      "skills": [
+        {
+          "id": "typescript",
+          "label": "TypeScript"
+        },
+        {
+          "id": "react",
+          "label": "React"
+        },
+        {
+          "id": "python",
+          "label": "Python"
+        },
+        {
+          "id": "fastapi",
+          "label": "FastAPI"
+        },
+        {
+          "id": "postgresql",
+          "label": "PostgreSQL"
+        },
+        {
+          "id": "api-design",
+          "label": "проектирование API"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "ios",
+      "name_ru": "iOS-разработка",
+      "name_en": "iOS development",
+      "parent_area": "Мобильная разработка",
+      "aliases": [
+        "iOS engineer",
+        "Swift developer",
+        "разработчик iOS"
+      ],
+      "subtypes": [
+        "клиентские приложения",
+        "офлайн-сценарии",
+        "платёжные экраны"
+      ],
+      "skills": [
+        {
+          "id": "swift",
+          "label": "Swift"
+        },
+        {
+          "id": "swiftui",
+          "label": "SwiftUI"
+        },
+        {
+          "id": "uikit",
+          "label": "UIKit"
+        },
+        {
+          "id": "async-await",
+          "label": "Swift Concurrency"
+        },
+        {
+          "id": "core-data",
+          "label": "Core Data"
+        },
+        {
+          "id": "xctest",
+          "label": "XCTest"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "android_mobile",
+      "name_ru": "Android и кроссплатформенная мобильная разработка",
+      "name_en": "Android and cross-platform mobile",
+      "parent_area": "Мобильная разработка",
+      "aliases": [
+        "Android developer",
+        "Kotlin engineer",
+        "Flutter developer",
+        "React Native developer"
+      ],
+      "subtypes": [
+        "Android",
+        "кроссплатформенные приложения",
+        "мобильные рабочие места"
+      ],
+      "skills": [
+        {
+          "id": "kotlin",
+          "label": "Kotlin"
+        },
+        {
+          "id": "compose",
+          "label": "Jetpack Compose"
+        },
+        {
+          "id": "android-testing",
+          "label": "тестирование Android"
+        },
+        {
+          "id": "flutter",
+          "label": "Flutter"
+        },
+        {
+          "id": "react-native",
+          "label": "React Native"
+        },
+        {
+          "id": "offline-first",
+          "label": "offline-first"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "desktop",
+      "name_ru": "Desktop-разработка",
+      "name_en": "Desktop development",
+      "parent_area": "Клиентские приложения",
+      "aliases": [
+        "desktop developer",
+        "application developer",
+        "разработчик настольных приложений"
+      ],
+      "subtypes": [
+        "рабочие станции",
+        "инструменты операторов",
+        "локальная обработка"
+      ],
+      "skills": [
+        {
+          "id": "csharp",
+          "label": "C#"
+        },
+        {
+          "id": "dotnet",
+          "label": ".NET"
+        },
+        {
+          "id": "qt",
+          "label": "Qt"
+        },
+        {
+          "id": "electron",
+          "label": "Electron"
+        },
+        {
+          "id": "desktop-security",
+          "label": "безопасность desktop"
+        },
+        {
+          "id": "auto-update",
+          "label": "автообновление"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "embedded",
+      "name_ru": "Embedded и firmware",
+      "name_en": "Embedded and firmware",
+      "parent_area": "Системная разработка",
+      "aliases": [
+        "embedded developer",
+        "firmware engineer",
+        "IoT developer"
+      ],
+      "subtypes": [
+        "устройства телеметрии",
+        "контроллеры",
+        "периферия"
+      ],
+      "skills": [
+        {
+          "id": "c",
+          "label": "C"
+        },
+        {
+          "id": "cpp",
+          "label": "C++"
+        },
+        {
+          "id": "rtos",
+          "label": "RTOS"
+        },
+        {
+          "id": "embedded-linux",
+          "label": "Embedded Linux"
+        },
+        {
+          "id": "uart",
+          "label": "UART"
+        },
+        {
+          "id": "hardware-debug",
+          "label": "отладка hardware"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "game_dev",
+      "name_ru": "Разработка игр",
+      "name_en": "Game development",
+      "parent_area": "Интерактивные продукты",
+      "aliases": [
+        "game developer",
+        "gameplay engineer",
+        "разработчик игр"
+      ],
+      "subtypes": [
+        "игровые механики",
+        "инструменты контента",
+        "симуляции"
+      ],
+      "skills": [
+        {
+          "id": "csharp",
+          "label": "C#"
+        },
+        {
+          "id": "unity",
+          "label": "Unity"
+        },
+        {
+          "id": "unreal",
+          "label": "Unreal Engine"
+        },
+        {
+          "id": "gameplay-systems",
+          "label": "игровые системы"
+        },
+        {
+          "id": "profiling",
+          "label": "профилирование"
+        },
+        {
+          "id": "build-pipeline",
+          "label": "конвейер сборки"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "software_architecture",
+      "name_ru": "Архитектура ПО",
+      "name_en": "Software architecture",
+      "parent_area": "Архитектура и анализ",
+      "aliases": [
+        "software architect",
+        "system architect",
+        "архитектор приложений"
+      ],
+      "subtypes": [
+        "распределённые системы",
+        "границы доменов",
+        "эволюция платформы"
+      ],
+      "skills": [
+        {
+          "id": "adr",
+          "label": "ADR"
+        },
+        {
+          "id": "ddd",
+          "label": "DDD"
+        },
+        {
+          "id": "event-driven",
+          "label": "event-driven design"
+        },
+        {
+          "id": "system-design",
+          "label": "проектирование систем"
+        },
+        {
+          "id": "api-governance",
+          "label": "управление API"
+        },
+        {
+          "id": "observability",
+          "label": "наблюдаемость"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "data_analytics",
+      "name_ru": "Аналитика данных",
+      "name_en": "Data analytics",
+      "parent_area": "Данные и аналитика",
+      "aliases": [
+        "data analyst",
+        "product analyst",
+        "аналитик данных"
+      ],
+      "subtypes": [
+        "продуктовые метрики",
+        "операционная аналитика",
+        "эксперименты"
+      ],
+      "skills": [
+        {
+          "id": "sql",
+          "label": "SQL"
+        },
+        {
+          "id": "python",
+          "label": "Python"
+        },
+        {
+          "id": "statistics",
+          "label": "статистика"
+        },
+        {
+          "id": "metric-design",
+          "label": "дизайн метрик"
+        },
+        {
+          "id": "experimentation",
+          "label": "эксперименты"
+        },
+        {
+          "id": "data-quality",
+          "label": "качество данных"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "bi_analytics_engineering",
+      "name_ru": "BI и аналитическая разработка",
+      "name_en": "BI and analytics engineering",
+      "parent_area": "Данные и аналитика",
+      "aliases": [
+        "BI developer",
+        "analytics engineer",
+        "разработчик BI"
+      ],
+      "subtypes": [
+        "витрины данных",
+        "управленческие отчёты",
+        "семантические слои"
+      ],
+      "skills": [
+        {
+          "id": "sql",
+          "label": "SQL"
+        },
+        {
+          "id": "dbt",
+          "label": "dbt"
+        },
+        {
+          "id": "data-modeling",
+          "label": "моделирование данных"
+        },
+        {
+          "id": "bi-dashboards",
+          "label": "BI-дашборды"
+        },
+        {
+          "id": "semantic-layer",
+          "label": "семантический слой"
+        },
+        {
+          "id": "data-tests",
+          "label": "тесты данных"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "data_engineering",
+      "name_ru": "Data engineering",
+      "name_en": "Data engineering",
+      "parent_area": "Данные и аналитика",
+      "aliases": [
+        "data engineer",
+        "ETL developer",
+        "инженер данных"
+      ],
+      "subtypes": [
+        "потоки данных",
+        "пакетные загрузки",
+        "озёра и хранилища"
+      ],
+      "skills": [
+        {
+          "id": "python",
+          "label": "Python"
+        },
+        {
+          "id": "sql",
+          "label": "SQL"
+        },
+        {
+          "id": "airflow",
+          "label": "Airflow"
+        },
+        {
+          "id": "kafka",
+          "label": "Kafka"
+        },
+        {
+          "id": "spark",
+          "label": "Spark"
+        },
+        {
+          "id": "data-pipelines",
+          "label": "конвейеры данных"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "data_science",
+      "name_ru": "Data science",
+      "name_en": "Data science",
+      "parent_area": "Данные и аналитика",
+      "aliases": [
+        "data scientist",
+        "applied statistician",
+        "специалист по данным"
+      ],
+      "subtypes": [
+        "прогнозирование",
+        "сегментация",
+        "оценка экспериментов"
+      ],
+      "skills": [
+        {
+          "id": "python",
+          "label": "Python"
+        },
+        {
+          "id": "statistics",
+          "label": "статистика"
+        },
+        {
+          "id": "scikit-learn",
+          "label": "scikit-learn"
+        },
+        {
+          "id": "feature-engineering",
+          "label": "признаки"
+        },
+        {
+          "id": "model-evaluation",
+          "label": "оценка моделей"
+        },
+        {
+          "id": "notebooks",
+          "label": "ноутбуки"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "ml_engineering",
+      "name_ru": "ML engineering",
+      "name_en": "Machine learning engineering",
+      "parent_area": "Данные и аналитика",
+      "aliases": [
+        "machine learning engineer",
+        "ML engineer",
+        "инженер машинного обучения"
+      ],
+      "subtypes": [
+        "инференс-сервисы",
+        "feature pipelines",
+        "обслуживание моделей"
+      ],
+      "skills": [
+        {
+          "id": "python",
+          "label": "Python"
+        },
+        {
+          "id": "pytorch",
+          "label": "PyTorch"
+        },
+        {
+          "id": "model-serving",
+          "label": "обслуживание моделей"
+        },
+        {
+          "id": "feature-store",
+          "label": "feature store"
+        },
+        {
+          "id": "ml-testing",
+          "label": "тестирование ML"
+        },
+        {
+          "id": "gpu-profiling",
+          "label": "профилирование GPU"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "applied_ai_nlp_llm",
+      "name_ru": "Прикладной AI, NLP и LLM",
+      "name_en": "Applied AI, NLP and LLM",
+      "parent_area": "Данные и аналитика",
+      "aliases": [
+        "NLP engineer",
+        "LLM engineer",
+        "applied AI developer"
+      ],
+      "subtypes": [
+        "поиск по знаниям",
+        "классификация обращений",
+        "ассистенты с источниками"
+      ],
+      "skills": [
+        {
+          "id": "python",
+          "label": "Python"
+        },
+        {
+          "id": "nlp",
+          "label": "NLP"
+        },
+        {
+          "id": "retrieval",
+          "label": "поиск и retrieval"
+        },
+        {
+          "id": "llm-evaluation",
+          "label": "оценка LLM"
+        },
+        {
+          "id": "prompt-security",
+          "label": "безопасность prompt"
+        },
+        {
+          "id": "structured-output",
+          "label": "структурированный вывод"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "computer_vision",
+      "name_ru": "Computer vision",
+      "name_en": "Computer vision",
+      "parent_area": "Данные и аналитика",
+      "aliases": [
+        "computer vision engineer",
+        "CV engineer",
+        "инженер компьютерного зрения"
+      ],
+      "subtypes": [
+        "контроль качества изображений",
+        "поиск объектов",
+        "визуальный осмотр"
+      ],
+      "skills": [
+        {
+          "id": "python",
+          "label": "Python"
+        },
+        {
+          "id": "opencv",
+          "label": "OpenCV"
+        },
+        {
+          "id": "pytorch",
+          "label": "PyTorch"
+        },
+        {
+          "id": "image-labeling",
+          "label": "разметка изображений"
+        },
+        {
+          "id": "vision-evaluation",
+          "label": "оценка vision"
+        },
+        {
+          "id": "edge-inference",
+          "label": "edge inference"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "mlops",
+      "name_ru": "MLOps",
+      "name_en": "MLOps",
+      "parent_area": "Платформы и инфраструктура",
+      "aliases": [
+        "MLOps engineer",
+        "ML platform engineer",
+        "инженер ML-платформы"
+      ],
+      "subtypes": [
+        "реестр моделей",
+        "пайплайны обучения",
+        "контроль моделей"
+      ],
+      "skills": [
+        {
+          "id": "mlflow",
+          "label": "MLflow"
+        },
+        {
+          "id": "airflow",
+          "label": "Airflow"
+        },
+        {
+          "id": "kubernetes",
+          "label": "Kubernetes"
+        },
+        {
+          "id": "model-registry",
+          "label": "реестр моделей"
+        },
+        {
+          "id": "pipeline-observability",
+          "label": "наблюдаемость pipeline"
+        },
+        {
+          "id": "artifact-lineage",
+          "label": "происхождение артефактов"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "qa",
+      "name_ru": "QA",
+      "name_en": "Quality assurance",
+      "parent_area": "Качество и безопасность",
+      "aliases": [
+        "QA engineer",
+        "test automation",
+        "инженер по тестированию"
+      ],
+      "subtypes": [
+        "ручное тестирование",
+        "автоматизация",
+        "производительность"
+      ],
+      "skills": [
+        {
+          "id": "test-design",
+          "label": "дизайн тестов"
+        },
+        {
+          "id": "api-testing",
+          "label": "тестирование API"
+        },
+        {
+          "id": "playwright",
+          "label": "Playwright"
+        },
+        {
+          "id": "pytest",
+          "label": "pytest"
+        },
+        {
+          "id": "performance-testing",
+          "label": "нагрузочное тестирование"
+        },
+        {
+          "id": "quality-risk",
+          "label": "оценка риска качества"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "devops",
+      "name_ru": "DevOps",
+      "name_en": "DevOps",
+      "parent_area": "Платформы и инфраструктура",
+      "aliases": [
+        "DevOps engineer",
+        "CI/CD engineer",
+        "инженер DevOps"
+      ],
+      "subtypes": [
+        "поставка приложений",
+        "окружения",
+        "инфраструктурные шаблоны"
+      ],
+      "skills": [
+        {
+          "id": "linux",
+          "label": "Linux"
+        },
+        {
+          "id": "docker",
+          "label": "Docker"
+        },
+        {
+          "id": "kubernetes",
+          "label": "Kubernetes"
+        },
+        {
+          "id": "terraform",
+          "label": "Terraform"
+        },
+        {
+          "id": "ci-cd",
+          "label": "CI/CD"
+        },
+        {
+          "id": "secrets-management",
+          "label": "управление секретами"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "sre",
+      "name_ru": "SRE",
+      "name_en": "Site reliability engineering",
+      "parent_area": "Платформы и инфраструктура",
+      "aliases": [
+        "SRE",
+        "reliability engineer",
+        "инженер надёжности"
+      ],
+      "subtypes": [
+        "доступность сервисов",
+        "дежурство",
+        "производительность"
+      ],
+      "skills": [
+        {
+          "id": "slo",
+          "label": "SLO/SLI"
+        },
+        {
+          "id": "incident-management",
+          "label": "управление инцидентами"
+        },
+        {
+          "id": "prometheus",
+          "label": "Prometheus"
+        },
+        {
+          "id": "distributed-tracing",
+          "label": "трассировка"
+        },
+        {
+          "id": "capacity-planning",
+          "label": "планирование ёмкости"
+        },
+        {
+          "id": "error-budgets",
+          "label": "бюджет ошибок"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "platform_engineering",
+      "name_ru": "Platform engineering",
+      "name_en": "Platform engineering",
+      "parent_area": "Платформы и инфраструктура",
+      "aliases": [
+        "platform engineer",
+        "internal developer platform",
+        "инженер платформы"
+      ],
+      "subtypes": [
+        "внутренняя платформа",
+        "каталог сервисов",
+        "самообслуживание команд"
+      ],
+      "skills": [
+        {
+          "id": "kubernetes",
+          "label": "Kubernetes"
+        },
+        {
+          "id": "developer-experience",
+          "label": "опыт разработчика"
+        },
+        {
+          "id": "platform-api",
+          "label": "platform API"
+        },
+        {
+          "id": "golden-paths",
+          "label": "golden paths"
+        },
+        {
+          "id": "terraform",
+          "label": "Terraform"
+        },
+        {
+          "id": "observability",
+          "label": "наблюдаемость"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "cloud_infrastructure",
+      "name_ru": "Cloud infrastructure",
+      "name_en": "Cloud infrastructure",
+      "parent_area": "Платформы и инфраструктура",
+      "aliases": [
+        "cloud engineer",
+        "cloud administrator",
+        "инженер облачной инфраструктуры"
+      ],
+      "subtypes": [
+        "облачные окружения",
+        "сетевые контуры",
+        "резервирование"
+      ],
+      "skills": [
+        {
+          "id": "cloud-networking",
+          "label": "облачные сети"
+        },
+        {
+          "id": "terraform",
+          "label": "Terraform"
+        },
+        {
+          "id": "iam",
+          "label": "IAM"
+        },
+        {
+          "id": "cost-observability",
+          "label": "наблюдаемость затрат"
+        },
+        {
+          "id": "backup-recovery",
+          "label": "резервирование и восстановление"
+        },
+        {
+          "id": "kubernetes",
+          "label": "Kubernetes"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "sysadmin",
+      "name_ru": "Системное администрирование",
+      "name_en": "Systems administration",
+      "parent_area": "Платформы и инфраструктура",
+      "aliases": [
+        "system administrator",
+        "Linux administrator",
+        "системный администратор"
+      ],
+      "subtypes": [
+        "Linux-серверы",
+        "рабочие места",
+        "учётные записи и службы"
+      ],
+      "skills": [
+        {
+          "id": "linux",
+          "label": "Linux"
+        },
+        {
+          "id": "windows-server",
+          "label": "Windows Server"
+        },
+        {
+          "id": "identity-management",
+          "label": "управление учётными записями"
+        },
+        {
+          "id": "patch-management",
+          "label": "обновления"
+        },
+        {
+          "id": "backup-restore",
+          "label": "резервное копирование"
+        },
+        {
+          "id": "shell-scripting",
+          "label": "shell scripting"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "network_engineering",
+      "name_ru": "Сетевое инженерное дело",
+      "name_en": "Network engineering",
+      "parent_area": "Платформы и инфраструктура",
+      "aliases": [
+        "network engineer",
+        "сетевой инженер",
+        "инженер сетей"
+      ],
+      "subtypes": [
+        "корпоративные сети",
+        "сегментация",
+        "сетевой мониторинг"
+      ],
+      "skills": [
+        {
+          "id": "routing",
+          "label": "маршрутизация"
+        },
+        {
+          "id": "switching",
+          "label": "коммутация"
+        },
+        {
+          "id": "firewalls",
+          "label": "межсетевые экраны"
+        },
+        {
+          "id": "network-monitoring",
+          "label": "сетевой мониторинг"
+        },
+        {
+          "id": "dns",
+          "label": "DNS"
+        },
+        {
+          "id": "network-automation",
+          "label": "автоматизация сети"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "dba",
+      "name_ru": "Администрирование баз данных",
+      "name_en": "Database administration",
+      "parent_area": "Платформы и инфраструктура",
+      "aliases": [
+        "DBA",
+        "database administrator",
+        "администратор баз данных"
+      ],
+      "subtypes": [
+        "эксплуатация PostgreSQL",
+        "резервирование",
+        "производительность запросов"
+      ],
+      "skills": [
+        {
+          "id": "postgresql",
+          "label": "PostgreSQL"
+        },
+        {
+          "id": "query-plans",
+          "label": "планы запросов"
+        },
+        {
+          "id": "backup-recovery",
+          "label": "резервирование и восстановление"
+        },
+        {
+          "id": "replication",
+          "label": "репликация"
+        },
+        {
+          "id": "database-security",
+          "label": "безопасность БД"
+        },
+        {
+          "id": "capacity-planning",
+          "label": "ёмкость БД"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "cybersecurity",
+      "name_ru": "Информационная безопасность",
+      "name_en": "Cybersecurity",
+      "parent_area": "Качество и безопасность",
+      "aliases": [
+        "AppSec",
+        "SOC analyst",
+        "security engineer",
+        "специалист ИБ"
+      ],
+      "subtypes": [
+        "защита приложений",
+        "анализ событий",
+        "управление уязвимостями"
+      ],
+      "skills": [
+        {
+          "id": "threat-modeling",
+          "label": "моделирование угроз"
+        },
+        {
+          "id": "secure-code-review",
+          "label": "безопасный code review"
+        },
+        {
+          "id": "siem",
+          "label": "SIEM"
+        },
+        {
+          "id": "incident-triage",
+          "label": "разбор событий"
+        },
+        {
+          "id": "iam",
+          "label": "IAM"
+        },
+        {
+          "id": "vulnerability-management",
+          "label": "уязвимости"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "product_management",
+      "name_ru": "Управление продуктом",
+      "name_en": "Product management",
+      "parent_area": "Продукт и дизайн",
+      "aliases": [
+        "product manager",
+        "product owner",
+        "менеджер продукта"
+      ],
+      "subtypes": [
+        "развитие продукта",
+        "приоритизация",
+        "пользовательские сценарии"
+      ],
+      "skills": [
+        {
+          "id": "product-discovery",
+          "label": "product discovery"
+        },
+        {
+          "id": "metric-design",
+          "label": "дизайн метрик"
+        },
+        {
+          "id": "roadmapping",
+          "label": "дорожная карта"
+        },
+        {
+          "id": "user-research",
+          "label": "исследования пользователей"
+        },
+        {
+          "id": "experimentation",
+          "label": "эксперименты"
+        },
+        {
+          "id": "stakeholder-alignment",
+          "label": "согласование ожиданий"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "project_delivery",
+      "name_ru": "Управление проектами и delivery",
+      "name_en": "Project and delivery management",
+      "parent_area": "Продукт и дизайн",
+      "aliases": [
+        "project manager",
+        "delivery manager",
+        "Scrum master"
+      ],
+      "subtypes": [
+        "межкомандные релизы",
+        "управление зависимостями",
+        "планирование delivery"
+      ],
+      "skills": [
+        {
+          "id": "delivery-planning",
+          "label": "планирование delivery"
+        },
+        {
+          "id": "risk-management",
+          "label": "управление рисками"
+        },
+        {
+          "id": "dependency-mapping",
+          "label": "карта зависимостей"
+        },
+        {
+          "id": "agile-facilitation",
+          "label": "фасилитация"
+        },
+        {
+          "id": "release-management",
+          "label": "управление релизом"
+        },
+        {
+          "id": "decision-log",
+          "label": "журнал решений"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "business_system_analysis",
+      "name_ru": "Бизнес- и системный анализ",
+      "name_en": "Business and systems analysis",
+      "parent_area": "Продукт и дизайн",
+      "aliases": [
+        "business analyst",
+        "system analyst",
+        "системный аналитик"
+      ],
+      "subtypes": [
+        "описание процессов",
+        "интеграционные контракты",
+        "требования к системам"
+      ],
+      "skills": [
+        {
+          "id": "requirements-engineering",
+          "label": "работа с требованиями"
+        },
+        {
+          "id": "process-modeling",
+          "label": "моделирование процессов"
+        },
+        {
+          "id": "api-specification",
+          "label": "спецификация API"
+        },
+        {
+          "id": "data-mapping",
+          "label": "сопоставление данных"
+        },
+        {
+          "id": "acceptance-criteria",
+          "label": "критерии приёмки"
+        },
+        {
+          "id": "domain-analysis",
+          "label": "анализ предметной области"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "ux_ui_design",
+      "name_ru": "UX/UI-дизайн",
+      "name_en": "UX/UI design",
+      "parent_area": "Продукт и дизайн",
+      "aliases": [
+        "UX designer",
+        "UI designer",
+        "product designer"
+      ],
+      "subtypes": [
+        "исследование сценариев",
+        "интерфейсы данных",
+        "дизайн-системы"
+      ],
+      "skills": [
+        {
+          "id": "user-research",
+          "label": "исследования пользователей"
+        },
+        {
+          "id": "interaction-design",
+          "label": "дизайн взаимодействий"
+        },
+        {
+          "id": "accessibility",
+          "label": "доступность"
+        },
+        {
+          "id": "design-systems",
+          "label": "дизайн-системы"
+        },
+        {
+          "id": "prototyping",
+          "label": "прототипирование"
+        },
+        {
+          "id": "usability-testing",
+          "label": "проверка удобства"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "technical_writing",
+      "name_ru": "Техническое письмо",
+      "name_en": "Technical writing",
+      "parent_area": "Продукт и дизайн",
+      "aliases": [
+        "technical writer",
+        "documentation engineer",
+        "технический писатель"
+      ],
+      "subtypes": [
+        "документация API",
+        "инструкции операторов",
+        "внутренние runbooks"
+      ],
+      "skills": [
+        {
+          "id": "docs-as-code",
+          "label": "Docs-as-code"
+        },
+        {
+          "id": "api-documentation",
+          "label": "документация API"
+        },
+        {
+          "id": "information-architecture",
+          "label": "информационная архитектура"
+        },
+        {
+          "id": "technical-editing",
+          "label": "техническая редактура"
+        },
+        {
+          "id": "docs-testing",
+          "label": "проверка документации"
+        },
+        {
+          "id": "release-notes",
+          "label": "release notes"
+        }
+      ],
+      "data_mode": "synthetic"
+    },
+    {
+      "id": "integrations_solutions",
+      "name_ru": "Интеграции, технические решения и внедрение",
+      "name_en": "Integrations, solutions and implementation",
+      "parent_area": "Клиентские технологии",
+      "aliases": [
+        "integration engineer",
+        "solutions engineer",
+        "implementation engineer",
+        "technical support"
+      ],
+      "subtypes": [
+        "внедрение систем",
+        "интеграции партнёров",
+        "технические решения"
+      ],
+      "skills": [
+        {
+          "id": "api-integration",
+          "label": "интеграция API"
+        },
+        {
+          "id": "webhooks",
+          "label": "webhooks"
+        },
+        {
+          "id": "data-mapping",
+          "label": "сопоставление данных"
+        },
+        {
+          "id": "solution-design",
+          "label": "проектирование решения"
+        },
+        {
+          "id": "implementation-planning",
+          "label": "план внедрения"
+        },
+        {
+          "id": "technical-troubleshooting",
+          "label": "техническая диагностика"
+        }
+      ],
+      "data_mode": "synthetic"
+    }
+  ]
+}
