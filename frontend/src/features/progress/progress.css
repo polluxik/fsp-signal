@@ -1,0 +1,11 @@
+.candidate-journey { margin-bottom: 24px; }
+.journey-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 0; list-style: none; }
+.journey-steps button { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; width: 100%; height: 100%; text-align: left; padding: 14px; border: 1px solid #d9ded8; border-radius: 10px; background: #f8faf7; color: #26372f; }
+.journey-steps small { grid-column: 2; color: #52645a; }
+.assessment-report { margin: 20px 0; }
+.assessment-plan { margin: 16px 0; padding: 16px; border: 1px solid #d9ded8; border-radius: 10px; }
+.competency-results { display: grid; gap: 16px; margin: 20px 0; }
+.competency-result > div { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.competency-result progress { width: 100%; height: 12px; accent-color: #285a47; }
+.practice-plan li, .assessment-gates li { margin: 10px 0; line-height: 1.6; }
+@media (max-width: 760px) { .journey-steps { grid-template-columns: 1fr; } }

@@ -2284,6 +2284,94 @@
         ]
       }
     },
+    "/api/v1/candidate/journey": {
+      "get": {
+        "tags": [
+          "Candidate progress"
+        ],
+        "summary": "Candidate Journey",
+        "operationId": "candidate_journey_api_v1_candidate_journey_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JourneyOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
+      }
+    },
+    "/api/v1/candidate/assessment-attempts/{attempt_id}/report": {
+      "get": {
+        "tags": [
+          "Candidate progress"
+        ],
+        "summary": "Assessment Report",
+        "operationId": "assessment_report_api_v1_candidate_assessment_attempts__attempt_id__report_get",
+        "parameters": [
+          {
+            "name": "attempt_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Attempt Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssessmentReportOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          }
+        },
+        "security": [
+          {
+            "CookieSession": []
+          }
+        ]
+      }
+    },
     "/api/v1/taxonomy/categories": {
       "get": {
         "summary": "Get Taxonomy Categories",
@@ -4428,6 +4516,25 @@
         ],
         "title": "AchievementStoryIn"
       },
+      "ActiveAttempt": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "expires_at"
+        ],
+        "title": "ActiveAttempt"
+      },
       "AnswersIn": {
         "properties": {
           "answers": {
@@ -4463,6 +4570,89 @@
           "answers"
         ],
         "title": "AnswersIn"
+      },
+      "AssessmentReportOut": {
+        "properties": {
+          "attempt_id": {
+            "type": "string",
+            "title": "Attempt Id"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "blueprint_version": {
+            "type": "string",
+            "title": "Blueprint Version"
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "passed",
+              "failed"
+            ],
+            "title": "Outcome"
+          },
+          "score": {
+            "type": "integer",
+            "title": "Score"
+          },
+          "score_gate": {
+            "type": "boolean",
+            "title": "Score Gate"
+          },
+          "competency_gate": {
+            "type": "boolean",
+            "title": "Competency Gate"
+          },
+          "changed_condition_gate": {
+            "type": "boolean",
+            "title": "Changed Condition Gate"
+          },
+          "competencies": {
+            "items": {
+              "$ref": "#/components/schemas/CompetencyResult"
+            },
+            "type": "array",
+            "title": "Competencies"
+          },
+          "next_action": {
+            "type": "string",
+            "title": "Next Action"
+          },
+          "limitations": {
+            "type": "string",
+            "title": "Limitations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "attempt_id",
+          "category",
+          "blueprint_version",
+          "submitted_at",
+          "outcome",
+          "score",
+          "score_gate",
+          "competency_gate",
+          "changed_condition_gate",
+          "competencies",
+          "next_action",
+          "limitations"
+        ],
+        "title": "AssessmentReportOut"
       },
       "AssistantDraftIn": {
         "properties": {
@@ -5413,6 +5603,56 @@
         ],
         "title": "CompatibilitySoftSignal"
       },
+      "CompetencyResult": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "points": {
+            "type": "integer",
+            "title": "Points"
+          },
+          "max_points": {
+            "type": "integer",
+            "title": "Max Points"
+          },
+          "percent": {
+            "type": "integer",
+            "title": "Percent"
+          },
+          "meets_minimum": {
+            "type": "boolean",
+            "title": "Meets Minimum"
+          },
+          "practice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Practice"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "points",
+          "max_points",
+          "percent",
+          "meets_minimum",
+          "practice"
+        ],
+        "title": "CompetencyResult"
+      },
       "ConsentIn": {
         "properties": {
           "expected_version": {
@@ -6265,6 +6505,95 @@
           "employer_contact"
         ],
         "title": "InvitationV2In"
+      },
+      "JourneyOut": {
+        "properties": {
+          "visible_to_employers": {
+            "type": "boolean",
+            "title": "Visible To Employers"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/JourneyStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "blockers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Blockers"
+          },
+          "next_step": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JourneyStep"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "active_attempt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActiveAttempt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fsp_status": {
+            "type": "string",
+            "title": "Fsp Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "visible_to_employers",
+          "steps",
+          "blockers",
+          "next_step",
+          "active_attempt",
+          "fsp_status"
+        ],
+        "title": "JourneyOut"
+      },
+      "JourneyStep": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "done": {
+            "type": "boolean",
+            "title": "Done"
+          },
+          "tab": {
+            "type": "string",
+            "enum": [
+              "profile",
+              "test",
+              "preferences"
+            ],
+            "title": "Tab"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "done",
+          "tab"
+        ],
+        "title": "JourneyStep"
       },
       "LoginIn": {
         "properties": {

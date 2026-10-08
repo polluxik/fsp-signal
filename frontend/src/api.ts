@@ -37,6 +37,7 @@ const messages: Record<string, string> = {
   CONSENT_REQUIRED: 'Нужно согласие на обработку данных',
   ASSESSMENT_ATTEMPT_LIMIT: 'Лимит: три попытки за семь дней',
   ASSESSMENT_RETRY_COOLDOWN: 'Повтор этого теста доступен через 72 часа',
+  ASSESSMENT_REPORT_NOT_READY: 'Разбор появится после завершения и проверки теста.',
   GRADE_CHANGE_COOLDOWN: 'Смена грейда доступна через 30 дней после предыдущей',
   ANSWERS_INCOMPLETE: 'Ответьте на все вопросы',
   SALARY_RANGE_INVALID: 'Проверьте зарплатный диапазон и ожидания кандидата',

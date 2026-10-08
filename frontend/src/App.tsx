@@ -14,6 +14,10 @@ import CalendarPanel from './features/calendar/CalendarPanel'
 import MeetingList from './features/calendar/MeetingList'
 import PublicCalendar from './features/calendar/PublicCalendar'
 import BookingLink from './features/calendar/BookingLink'
+import CandidateJourney from './features/progress/CandidateJourney'
+import AssessmentReport from './features/progress/AssessmentReport'
+import AssessmentPlan from './features/progress/AssessmentPlan'
+import './features/progress/progress.css'
 import './features/calendar/calendar.css'
 
 const skillNames: Record<string, string> = {
@@ -135,6 +139,7 @@ function CandidateApp({ me }: { me: User }) {
   const [history, setHistory] = useState<{ id: string; category: string; state: string; score: number | null; outcome: string | null; started_at: string }[]>([])
   const [grants, setGrants] = useState<{ id: string; employer_id: string; revoked_at: string | null }[]>([])
   const [attempt, setAttempt] = useState<Attempt | null>(null)
+  const [reportId, setReportId] = useState<string | null>(null)
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({})
   const [spec, setSpec] = useState('backend')
   const [grade, setGrade] = useState('junior')
@@ -228,12 +233,12 @@ function CandidateApp({ me }: { me: User }) {
   async function startTest() {
     setError(''); setFeedback('')
     try { const result = await api<Attempt>('/candidate/assessment-attempts', 'POST', { industry:'it', specialization: spec, grade });
-      setAttempt(result); setAnswers({}); setTab('test') } catch (err) { setError((err as Error).message) }
+      setAttempt(result); setReportId(null); setAnswers({}); setTab('test') } catch (err) { setError((err as Error).message) }
   }
   async function resumeTest(id: string) {
     setError('')
     try { const result = await api<Attempt>(`/candidate/assessment-attempts/${id}`)
-      setAttempt(result); setAnswers(result.answers || {}) }
+      setAttempt(result); setReportId(result.state === 'scored' ? result.id : null); setAnswers(result.answers || {}); setTab('test') }
     catch (err) { setError((err as Error).message) }
   }
   async function progressTest() {
@@ -253,7 +258,7 @@ function CandidateApp({ me }: { me: User }) {
       await api(`/candidate/assessment-attempts/${attempt.id}/answers`, 'PUT', { answers: currentAnswers })
       const updated = await api<Attempt>(`/candidate/assessment-attempts/${attempt.id}/${attempt.phase === 1 ? 'advance' : 'submit'}`, 'POST')
       setAttempt(updated)
-      if (updated.state === 'scored') { await load(); setFeedback(updated.outcome === 'passed' ? 'Категория подтверждена' : 'Тест не пройден. Ваш прежний подтверждённый грейд сохранён.') }
+      if (updated.state === 'scored') { setReportId(updated.id); await load(); setFeedback(updated.outcome === 'passed' ? 'Категория подтверждена' : 'Тест не пройден. Ваш прежний подтверждённый грейд сохранён.') }
     } catch (err) { setError((err as Error).message) }
   }
   return <div className="workspace">
@@ -264,7 +269,7 @@ function CandidateApp({ me }: { me: User }) {
       <div className="sidebar-bottom"><CategoryBadge spec={profile.verified_specialization} grade={profile.verified_grade}/><p className="small muted">Контакты открываются только по вашему решению.</p></div>
     </aside><main className="content">
       {error && <Notice tone="bad">{error}</Notice>}{feedback && <Notice tone="good">{feedback}</Notice>}
-      {tab === 'roles' && <RoleFeed onNavigate={setTab}/>}
+      {tab === 'roles' && <><CandidateJourney onNavigate={setTab} onResume={id => { void resumeTest(id) }}/><RoleFeed onNavigate={setTab}/></>}
       {tab === 'meetings' && <><div className="page-heading"><p className="eyebrow">СЛЕДУЮЩИЙ ШАГ</p><h1>Встречи и договорённости</h1><p>Выберите время разговора и сохраните материалы вместе с работодателем.</p></div><MeetingList viewer="candidate"/></>}
       {tab === 'preferences' && <><div className="page-heading"><p className="eyebrow">ВАШИ ПРАВИЛА</p><h1>Подборка под ваши условия</h1><p>Сохранённые ограничения фильтруют выдачу. Их значения остаются закрытыми от компаний.</p></div><PreferencesPanel onSaved={preferences => setProfile(current => ({
         ...current,
@@ -308,9 +313,11 @@ function CandidateApp({ me }: { me: User }) {
           </form>
         </section></>}
       {tab === 'test' && <><div className="page-heading"><p className="eyebrow">ПРОВЕРКА НАВЫКОВ</p><h1>Категория, которую можно проверить</h1><p>Три группы практических вопросов, 20 минут. После первого этапа одно условие изменится. Ответы первого этапа будут зафиксированы.</p></div>
+        {reportId && <AssessmentReport attemptId={reportId}/>}
         {!attempt || attempt.state === 'scored' ? <section className="card"><h2>{attempt?.state === 'scored' ? `Результат: ${attempt.score} / 100` : 'Выберите направление'}</h2>{attempt?.state === 'scored' && <Notice tone={attempt.outcome === 'passed' ? 'good' : 'info'}>{attempt.outcome === 'passed' ? 'Категория подтверждена.' : 'Пока не подтверждено. Вы можете выбрать другой уровень по правилам попыток.'}</Notice>}
           <div className="form-grid"><label>Отрасль<select value="it" disabled><option value="it">Информационные технологии</option></select></label><label>Специализация<select value={spec} onChange={e => setSpec(e.target.value)}><option value="backend">Backend</option><option value="frontend">Frontend</option><option value="qa">QA</option><option value="data_analyst">Аналитика данных</option></select></label><label>Предполагаемый грейд<select value={grade} onChange={e => setGrade(e.target.value)}><option value="junior">Junior</option><option value="middle">Middle</option></select></label></div>
-          <button className="primary" onClick={startTest}>Начать тест</button><p className="small muted">Порог: 70/100, половина баллов в каждой группе и верный ответ после изменения условия. Провал не понижает подтверждённый грейд.</p>{history.length > 0 && <div className="history"><h3>История тестов</h3>{history.map(item => <div className="grant" key={item.id}><span>{item.category} · {fmtDate(item.started_at)} · {item.state === 'scored' ? `${item.score}/100, ${item.outcome === 'passed' ? 'пройден' : 'не пройден'}` : 'в процессе'}</span>{item.state === 'in_progress' && <button className="button subtle" onClick={() => resumeTest(item.id)}>Продолжить</button>}</div>)}</div>}</section>
+          <AssessmentPlan specialization={spec} grade={grade}/>
+          <button className="primary" onClick={startTest}>Начать тест</button><p className="small muted">Порог: 70/100, половина баллов в каждой группе и верный ответ после изменения условия. Провал не понижает подтверждённый грейд.</p>{history.length > 0 && <div className="history"><h3>История тестов</h3>{history.map(item => <div className="grant" key={item.id}><span>{item.category} · {fmtDate(item.started_at)} · {item.state === 'scored' ? `${item.score}/100, ${item.outcome === 'passed' ? 'пройден' : 'не пройден'}` : 'в процессе'}</span>{item.state === 'in_progress' && <button className="button subtle" onClick={() => resumeTest(item.id)}>Продолжить</button>}{item.state === 'scored' && <button className="button subtle" onClick={() => setReportId(item.id)}>Разбор попытки от {fmtDate(item.started_at)}</button>}</div>)}</div>}</section>
           : <section className="card"><div className="section-title"><div><h2>Этап {attempt.phase} из 2</h2><p className="muted">{attempt.phase === 1 ? 'Решите основные задания' : 'Изменилось одно условие. Старые ответы зафиксированы.'}</p></div><span className="badge">20 минут от начала попытки</span></div>
             {attempt.questions.filter(q => q.phase === attempt.phase).map((q, index) => <div className="question" key={q.id}><div className="question-top"><span>{index+1}. {skillNames[q.competency] ?? q.competency}</span><span>{q.points} баллов</span></div><p>{q.prompt}</p>{q.type === 'structured' ? <div className="form-grid">{q.fields?.map(field => { const current = answers[q.id]; const value = typeof current === 'object' && current !== null ? current[field.id] ?? '' : ''; return <label key={field.id}>{field.label}<select value={value} onChange={e => setAnswers({...answers,[q.id]:{...(typeof current === 'object' && current !== null ? current : {}),[field.id]:e.target.value}})}><option value="">Выберите вариант</option>{field.options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label> })}</div> : q.type === 'choice' ? <div className="options">{q.options?.map(o => <label key={o.value}><input type="radio" name={q.id} checked={answers[q.id] === o.value} onChange={() => setAnswers({...answers,[q.id]:o.value})}/>{o.label}</label>)}</div> : <input className="answer-input" type="number" aria-label={`Ответ на вопрос ${index+1}`} value={scalarAnswer(answers[q.id])} onChange={e => setAnswers({...answers,[q.id]:e.target.value})}/>}</div>)}
             <button className="primary" onClick={progressTest}>{attempt.phase === 1 ? 'Зафиксировать ответы и продолжить' : 'Отправить на проверку'}</button></section>}
