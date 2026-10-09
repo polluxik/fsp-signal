@@ -275,7 +275,14 @@ function CandidateApp({ me }: { me: User }) {
       <div className="sidebar-bottom"><CategoryBadge spec={profile.verified_specialization} grade={profile.verified_grade}/><p className="small muted">Контакты открываются только по вашему решению.</p></div>
     </aside><main className="content">
       {error && <Notice tone="bad">{error}</Notice>}{feedback && <Notice tone="good">{feedback}</Notice>}
-      {tab === 'roles' && <><CandidateJourney onNavigate={setTab} onResume={id => { void resumeTest(id) }}/><RoleFeed onNavigate={setTab}/></>}
+      {tab === 'roles' && <><CandidateJourney onNavigate={setTab} onResume={id => { void resumeTest(id) }}/><RoleFeed onNavigate={setTab} onPreferencesSaved={preferences => setProfile(current => ({
+        ...current,
+        preferences_version: preferences.version,
+        min_salary_rub: preferences.salary_min_rub ?? 0,
+        work_format: preferences.allowed_work_formats.length === 1 ? preferences.allowed_work_formats[0] : 'any',
+        available: preferences.available,
+        adult_hiring_confirmed: preferences.adult_hiring_confirmed,
+      }))}/></>}
       {tab === 'market' && me.demo_market_enabled && <DemoMarket viewer="candidate"/>}
       {tab === 'meetings' && <><div className="page-heading"><p className="eyebrow">СЛЕДУЮЩИЙ ШАГ</p><h1>Встречи и договорённости</h1><p>Выберите время разговора и сохраните материалы вместе с работодателем.</p></div><MeetingList viewer="candidate"/></>}
       {tab === 'preferences' && <><div className="page-heading"><p className="eyebrow">ВАШИ ПРАВИЛА</p><h1>Подборка под ваши условия</h1><p>Сохранённые ограничения фильтруют выдачу. Их значения остаются закрытыми от компаний.</p></div><PreferencesPanel onSaved={preferences => setProfile(current => ({

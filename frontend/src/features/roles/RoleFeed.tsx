@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, ApiError } from '../../api'
 import { displayText } from '../../presentation'
-import type { CandidateRoleDecision, CandidateRoleFeed, CandidateRoleFeedItem } from '../../types'
+import type { CandidatePreferences, CandidateRoleDecision, CandidateRoleFeed, CandidateRoleFeedItem } from '../../types'
 import RoleCard from './RoleCard'
 import MatchDetails from './MatchDetails'
 import TwinDeck from './TwinDeck'
+import PreferencesPanel from '../preferences/PreferencesPanel'
 
-type Props = { onNavigate: (tab: string) => void }
+type Props = { onNavigate: (tab: string) => void; onPreferencesSaved?: (value: CandidatePreferences) => void }
 type Filters = { specialization: string; grade: string; workFormat: string; savedOnly: boolean }
 
 const emptyFeedMessage: Record<NonNullable<CandidateRoleFeed['empty_state']>, string> = {
@@ -85,8 +86,9 @@ function RoleGroup({ title, items, busyId, onDecision, sponsored = false }: {
   </section>
 }
 
-export default function RoleFeed({ onNavigate }: Props) {
+export default function RoleFeed({ onNavigate, onPreferencesSaved }: Props) {
   const [view, setView] = useState<'list' | 'cards'>('list')
+  const [assistantOpen, setAssistantOpen] = useState(false)
   const [recommendationConsent, setRecommendationConsent] = useState(false)
   useEffect(() => { api<{ consent: boolean }>('/candidate/recommendations/consent').then(result => setRecommendationConsent(result.consent)).catch(() => {}) }, [])
   const [filters, setFilters] = useState<Filters>({ specialization: '', grade: '', workFormat: '', savedOnly: false })
@@ -253,6 +255,15 @@ export default function RoleFeed({ onNavigate }: Props) {
     <div className="page-heading"><p className="eyebrow">АКТУАЛЬНЫЕ РОЛИ</p><h1>Роли с понятными условиями</h1>
       <p>Ваши закрытые ограничения фильтруют выдачу и не видны работодателям. Продвигаемые роли проходят те же обязательные условия, вынесены отдельно и не дублируются в общей ленте.</p>
     </div>
+    <section className="card feed-assistant-toggle"><div><h2>Найдём работу под ваш запрос</h2><p className="small muted">Опишите зарплату, формат и интересные задачи. ИИ подготовит черновик условий, который вы сможете изменить.</p></div>
+      <button className="button outline" aria-expanded={assistantOpen} aria-controls="feed-ai-preferences" onClick={() => setAssistantOpen(value => !value)}>{assistantOpen ? 'Закрыть помощника' : 'ИИ-помощник подбора'}</button>
+    </section>
+    {assistantOpen && <div id="feed-ai-preferences" data-testid="feed-ai-preferences"><PreferencesPanel onSaved={value => {
+      onPreferencesSaved?.(value)
+      setUndoTarget(null)
+      setRefreshKey(current => current + 1)
+      setFeedback('Условия сохранены. Подборка обновлена по вашему запросу.')
+    }}/></div>}
     <section className="card discovery-filters" aria-label="Фильтры вакансий">
       <label>Направление<select value={filters.specialization} onChange={event => { setRefreshNotice(''); setFilters(current => ({ ...current, specialization: event.target.value })) }}>
         <option value="">Любое</option><option value="backend">Backend</option><option value="frontend">Frontend</option><option value="qa">QA</option><option value="data_analyst">Аналитика данных</option>
