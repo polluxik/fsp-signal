@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="420" viewBox="0 0 1440 420" role="img" aria-labelledby="title description">
+  <title id="title">ФСП Сигнал — обратный найм в IT</title>
+  <desc id="description">Работодатель видит навыки. Кандидат выбирает условия. Профиль, предложение и первый разговор в одном сценарии.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#22172f" />
+      <stop offset="1" stop-color="#402359" />
+    </linearGradient>
+  </defs>
+  <rect width="1440" height="420" rx="24" fill="url(#background)" />
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="64" y="67" fill="#c9bdd6" font-size="17" font-weight="700" letter-spacing="3">ОБРАТНЫЙ НАЙМ В IT</text>
+    <text x="58" y="164" fill="#ffffff" font-size="88" font-weight="800" letter-spacing="-3">СИГНАЛ</text>
+    <text x="64" y="235" fill="#ffffff" font-size="35" font-weight="700">Работодатель видит навыки.</text>
+    <text x="64" y="283" fill="#ffffff" font-size="35" font-weight="700">Кандидат выбирает условия.</text>
+    <text x="64" y="360" fill="#c9bdd6" font-size="19">ФСП</text>
+    <text x="129" y="360" fill="#c9bdd6" font-size="19">ЛЦТ 2026</text>
+    <text x="272" y="360" fill="#c9bdd6" font-size="19">Рабочий MVP</text>
+    <path d="M110 343v22M252 343v22" stroke="#725c88" stroke-width="1" />
+    <path d="M884 49v323" stroke="#6b547f" stroke-width="1" />
+    <path d="M976 116v196" stroke="#90799f" stroke-width="2" />
+    <g>
+      <rect x="930" y="50" width="441" height="87" rx="18" fill="#ffffff" fill-opacity="0.06" stroke="#735888" />
+      <circle cx="976" cy="94" r="18" fill="#795796" />
+      <text x="976" y="100" text-anchor="middle" fill="#ffffff" font-size="18" font-weight="700">1</text>
+      <text x="1012" y="85" fill="#ffffff" font-size="22" font-weight="700">Навыки и личный вклад</text>
+      <text x="1012" y="114" fill="#c9bdd6" font-size="17">Понятное основание выбора</text>
+    </g>
+    <g>
+      <rect x="930" y="166" width="441" height="87" rx="18" fill="#ffffff" fill-opacity="0.06" stroke="#735888" />
+      <circle cx="976" cy="210" r="18" fill="#795796" />
+      <text x="976" y="216" text-anchor="middle" fill="#ffffff" font-size="18" font-weight="700">2</text>
+      <text x="1012" y="201" fill="#ffffff" font-size="22" font-weight="700">Конкретное предложение</text>
+      <text x="1012" y="230" fill="#c9bdd6" font-size="17">Условия до передачи контактов</text>
+    </g>
+    <g>
+      <rect x="930" y="282" width="441" height="87" rx="18" fill="#d9eddf" />
+      <circle cx="976" cy="326" r="18" fill="#426b50" />
+      <text x="976" y="332" text-anchor="middle" fill="#ffffff" font-size="18" font-weight="700">3</text>
+      <text x="1012" y="317" fill="#24362a" font-size="22" font-weight="700">Первый разговор</text>
+      <text x="1012" y="346" fill="#426b50" font-size="17">Согласие и общий слот в календаре</text>
+    </g>
+  </g>
+</svg>
